@@ -1,0 +1,66 @@
+{
+    "Autumn": {
+        "CSIT321": {
+            "Assignments": [
+                {
+                    "Subject Assessment": "Project Requirements and Interface Presentation",
+                    "Unweighted Mark": 1.0,
+                    "Weighted Mark": 10.0,
+                    "Mark Weight": 10.0
+                },
+                {
+                    "Subject Assessment": "Prototype Presentation",
+                    "Unweighted Mark": 0.6666666666666666,
+                    "Weighted Mark": 10.0,
+                    "Mark Weight": 15.0
+                }
+            ]
+        },
+        "CSCI316": {
+            "Assignments": [
+                {
+                    "Subject Assessment": "Quiz",
+                    "Unweighted Mark": 1.0,
+                    "Weighted Mark": 15.0,
+                    "Mark Weight": 15.0
+                }
+            ]
+        }
+    },
+    "Spring": {
+        "CSIT321": {
+            "Assignments": [
+                {
+                    "Subject Assessment": "Project Requirements and Interface Presentation",
+                    "Unweighted Mark": 1.0,
+                    "Weighted Mark": 10.0,
+                    "Mark Weight": 10.0
+                },
+                {
+                    "Subject Assessment": "Prototype Presentation",
+                    "Unweighted Mark": 0.6666666666666666,
+                    "Weighted Mark": 10.0,
+                    "Mark Weight": 15.0
+                }
+            ]
+        }
+    },
+    "Annual": {
+        "CSIT321": {
+            "Assignments": [
+                {
+                    "Subject Assessment": "Project Requirements and Interface Presentation",
+                    "Unweighted Mark": 1.0,
+                    "Weighted Mark": 10.0,
+                    "Mark Weight": 10.0
+                },
+                {
+                    "Subject Assessment": "Prototype Presentation",
+                    "Unweighted Mark": 0.6666666666666666,
+                    "Weighted Mark": 10.0,
+                    "Mark Weight": 15.0
+                }
+            ]
+        }
+    }
+}
