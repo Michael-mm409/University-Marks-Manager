@@ -35,6 +35,7 @@ class DataPersistence:
         """Sync data between the Autumn, Spring, and Annual semesters."""
         # Only sync subjects that exist in the "Annual" semester
         if "Annual" in self.data:
+            print("Annual exists in json data!")
             annual_data = self.data["Annual"]
 
             # Sync data from "Annual" to "Autumn"

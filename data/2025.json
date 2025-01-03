@@ -39,69 +39,11 @@
                     "Mark Weight": 15.0
                 }
             ],
-            "Total Mark": 0
-        },
-        "CSCI316": {
-            "Assignments": [
-                {
-                    "Subject Assessment": "W4 Assessed Lab",
-                    "Unweighted Mark": 1.0,
-                    "Weighted Mark": 5.0,
-                    "Mark Weight": 5.0
-                },
-                {
-                    "Subject Assessment": "W10 Assessed Lab",
-                    "Unweighted Mark": 1.0,
-                    "Weighted Mark": 5.0,
-                    "Mark Weight": 5.0
-                },
-                {
-                    "Subject Assessment": "Assignment 1",
-                    "Unweighted Mark": 1.0,
-                    "Weighted Mark": 10.0,
-                    "Mark Weight": 10.0
-                },
-                {
-                    "Subject Assessment": "Assignment 2",
-                    "Unweighted Mark": 1.0,
-                    "Weighted Mark": 10.0,
-                    "Mark Weight": 10.0
-                },
-                {
-                    "Subject Assessment": "Group Project",
-                    "Unweighted Mark": 1.0,
-                    "Weighted Mark": 25.0,
-                    "Mark Weight": 25.0
-                }
-            ],
-            "Examination": {
+            "Total Mark": 0,
+            "Examinations": {
                 "Exam Mark": 0,
-                "Exam Weight": 45.0
-            },
-            "Total Mark": 0
-        },
-        "CSIT375": {
-            "Assignments": [
-                {
-                    "Subject Assessment": "Assessed Lab",
-                    "Unweighted Mark": 0.0,
-                    "Weighted Mark": 0.0,
-                    "Mark Weight": 5.0
-                },
-                {
-                    "Subject Assessment": "Assignment 1",
-                    "Unweighted Mark": 0.0,
-                    "Weighted Mark": 0.0,
-                    "Mark Weight": 22.5
-                },
-                {
-                    "Subject Assessment": "Assignment 2",
-                    "Unweighted Mark": 0.0,
-                    "Weighted Mark": 0.0,
-                    "Mark Weight": 22.5
-                }
-            ],
-            "Total Mark": 0
+                "Exam Weight": -30.0
+            }
         },
         "CSCI323": {
             "Assignments": [
@@ -124,7 +66,65 @@
                     "Mark Weight": 20.0
                 }
             ],
-            "Total Mark": 0
+            "Total Mark": 0,
+            "Examinations": {
+                "Exam Mark": 0,
+                "Exam Weight": 50.0
+            }
+        },
+        "CSCI316": {
+            "Assignments": [
+                {
+                    "Subject Assessment": "Lab Test",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 15.0
+                },
+                {
+                    "Subject Assessment": "Assignment",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 15.0
+                },
+                {
+                    "Subject Assessment": "Group Project",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 25.0
+                }
+            ],
+            "Total Mark": 0,
+            "Examinations": {
+                "Exam Mark": 0,
+                "Exam Weight": 45.0
+            }
+        },
+        "CSIT375": {
+            "Assignments": [
+                {
+                    "Subject Assessment": "Lab Test",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 15.0
+                },
+                {
+                    "Subject Assessment": "Assignment 1",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 17.5
+                },
+                {
+                    "Subject Assessment": "Assignment 2",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 17.5
+                }
+            ],
+            "Total Mark": 0,
+            "Examinations": {
+                "Exam Mark": 0,
+                "Exam Weight": 50.0
+            }
         }
     },
     "Spring": {
@@ -167,7 +167,65 @@
                     "Mark Weight": 15.0
                 }
             ],
-            "Total Mark": 0
+            "Total Mark": 0,
+            "Examinations": {
+                "Exam Mark": 0,
+                "Exam Weight": -30.0
+            }
+        },
+        "CSCI369": {
+            "Assignments": [
+                {
+                    "Subject Assessment": "Lab Assessment 1",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 15.0
+                },
+                {
+                    "Subject Assessment": "Lab Assessment 2",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 15.0
+                },
+                {
+                    "Subject Assessment": "Assignment",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 20.0
+                }
+            ],
+            "Total Mark": 0,
+            "Examinations": {
+                "Exam Mark": 0,
+                "Exam Weight": 20.0
+            }
+        },
+        "ISIT312": {
+            "Assignments": [
+                {
+                    "Subject Assessment": "Assignment 1",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 10.0
+                },
+                {
+                    "Subject Assessment": "Assignment 2",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 20.0
+                },
+                {
+                    "Subject Assessment": "Assignment 3",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 20.0
+                }
+            ],
+            "Total Mark": 0,
+            "Examinations": {
+                "Exam Mark": 0,
+                "Exam Weight": 50.0
+            }
         }
     },
     "Annual": {
@@ -210,7 +268,11 @@
                     "Mark Weight": 15.0
                 }
             ],
-            "Total Mark": 0
+            "Total Mark": 0,
+            "Examinations": {
+                "Exam Mark": 0,
+                "Exam Weight": -30.0
+            }
         }
     }
 }

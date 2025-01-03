@@ -36,23 +36,52 @@ class Semester:
         else:
             self.data_persistence.data[semester][subject_code]["Total Mark"] = 0
 
-        # Validate and parse `weighted_mark` and `mark_weight`
         try:
+            # Validate and parse `weighted_mark` and `mark_weight`
             weighted_mark = float(weighted_mark) if weighted_mark else 0.0
             mark_weight = float(mark_weight) if mark_weight else 0.0
-        except ValueError:
-            messagebox.showerror("Error", "Weighted Mark and Mark Weight must be valid numbers.")
+
+            # Ensure weights are within valid range
+            if mark_weight < 0 or mark_weight > 100:
+                messagebox.showerror("Error", "Mark Weight must be between 0 and 100!")
+                return
+
+            # Check if 'Examinations' key exists before accessing it
+            if "Examinations" not in self.data_persistence.data[semester][subject_code]:
+                self.data_persistence.data[semester][subject_code]["Examinations"] = {"Exam Mark": 0, "Exam Weight": 100}
+
+            # Parse 'Examinations'
+            current_exam_weight = self.data_persistence.data[semester][subject_code]["Examinations"]["Exam Weight"]
+            exam_weight = float(current_exam_weight - mark_weight)
+
+            # Print statements for debugging
+            # print(f"Calculated Exam Weight for {subject_code}: {exam_weight}")
+
+            # Ensure the data structure for 'Examinations' exists before adding to it
+            print(self.data_persistence.data[semester][subject_code])
+
+            if "Examinations" not in self.data_persistence.data[semester][subject_code]:
+                self.data_persistence.data[semester][subject_code]["Examinations"]["Exam Weight"] = exam_weight
+                self.data_persistence.save_data_to_json()
+            print(self.data_persistence.data[semester][subject_code])
+
+            current_exam_weight = self.data_persistence.data[semester][subject_code]["Examinations"]["Exam Weight"]
+            exam_weight = current_exam_weight - mark_weight
+
+            # Update teh "Examinations" entry with the new exam weight
+            self.data_persistence.data[semester][subject_code]["Examinations"]["Exam Weight"] = exam_weight
+
+            # Save the data to JSON after the update
+            self.data_persistence.save_data_to_json()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to add entry: {str(e)}")
             return
 
-        # Ensure weights are within valid range
-        if mark_weight < 0 or mark_weight > 100:
-            messagebox.showerror("Error", "Mark Weight must be between 0 and 100!")
-            return
-
+        # Calculate unweighted mark if needed
         unweighted_mark = 0
         if mark_weight != 0:
             unweighted_mark = round(weighted_mark / mark_weight, 4)
-        print(unweighted_mark)
+
 
         # Add or update the assignment data
         assessments = self.data_persistence.data[semester][subject_code]["Assignments"]
@@ -85,7 +114,6 @@ class Semester:
         self.data_persistence.save_data_to_json()
 
     def view_data(self) -> List[List[str]]:
-        """Return the data for viewing in the TreeView, including summary lines."""
         data_list: List[List[str]] = []
         if self.name in self.data_persistence.data:
             for subject_code, subject_data in self.data_persistence.data[self.name].items():
@@ -120,9 +148,13 @@ class Semester:
                 # Format Total Mark
                 total_mark = f"{float(total_mark):.0f}" if isinstance(total_mark, (int, float)) else "N/A"
 
+                # Print statements for debugging
+                print(f"Subject Code: {subject_code}")
+                print(f"Examinations Data: {subject_data.get('Examinations', {})}")
+
                 # Add summary row after the assessments
-                exam_mark = round(subject_data.get("Examination", {}).get("Exam Mark", 0), 4)
-                exam_weight = subject_data.get("Examination", {}).get("Exam Weight", "N/A")
+                exam_mark = round(subject_data.get("Examinations", {}).get("Exam Mark", 0), 4)  # Updated key
+                exam_weight = subject_data.get("Examinations", {}).get("Exam Weight", 0)  # Updated key
 
                 # Format exam weight
                 exam_weight = f"{exam_weight:.0f}%" if isinstance(exam_weight, (int, float)) else "N/A"
@@ -141,6 +173,7 @@ class Semester:
 
         return data_list
 
+
     def calculate_exam_mark(self, subject_code: str) -> float:
         """Calculate the exam mark for a given subject based on the current semester's data."""
         for subject_code_key, subject_data in self.data_persistence.data[self.name].items():
@@ -157,7 +190,8 @@ class Semester:
                 # Exam weight is the remaining weight
                 exam_weight = max(0, 100 - assessments_weights)
 
-                subject_data["Examination"] = {"Exam Mark": exam_mark, "Exam Weight": exam_weight}
+                subject_data[("Examinations"
+                              "")] = {"Exam Mark": exam_mark, "Exam Weight": exam_weight}
                 self.data_persistence.save_data_to_json()
                 return exam_mark
 
