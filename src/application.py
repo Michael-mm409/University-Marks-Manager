@@ -1,18 +1,52 @@
-import datetime
+from datetime import datetime
 from tkinter import messagebox, ttk
 import tkinter as tk
-
 from data_persistence import DataPersistence
 from semester import Semester
 
 
+class ToolTip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tip_window = None
+
+    def show_tip(self, event):
+        if self.tip_window or not self.text:
+            return
+        x = event.x_root + 10
+        y = event.y_root + 10
+        self.tip_window = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(1)
+        tw.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(tw, text=self.text, background="yellow", relief=tk.SOLID, borderwidth=1)
+        label.pack(ipadx=1)
+
+    def hide_tip(self, event):
+        if self.tip_window:
+            self.tip_window.destroy()
+            self.tip_window = None
+
+
 class Application:
     def __init__(self, root: tk.Tk, data_persistence: DataPersistence):
+        self.subject_code_entry = None
+        self.subject_assessment_entry = None
+        self.weighted_mark_entry = None
+        self.mark_weight_entry = None
+        self.total_mark_entry = None
+        self.subject_assessment_label = None
+        self.current_tooltip = None
         self.root = root
 
-        # Treeview for viewing data in a table-like format
-        self.treeview = ttk.Treeview(self.root, columns=("Subject Code", "Subject Assessment", "Unweighted Mark",
-                                                         "Weighted Mark", "Mark Weight", "Exam Mark", "Exam Weight"),
+        main_frame = tk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        grid_frame = tk.Frame(main_frame)
+        grid_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        self.treeview = ttk.Treeview(grid_frame, columns=("Subject Code", "Subject Assessment", "Unweighted Mark",
+                                                          "Weighted Mark", "Mark Weight", "Exam Mark", "Exam Weight"),
                                      show="headings")
         self.data_persistence = data_persistence
         self.semesters = {
@@ -20,42 +54,33 @@ class Application:
             for sem in ["Autumn", "Spring", "Annual"]
         }
 
-        # Get the current year
         current_year = datetime.datetime.now().year
+        self.year_list = [str(year) for year in range(current_year - 2, current_year + 2, 1)]
 
-        # Create the list of years for the dropdown (current year and next two years)
-        self.year_list = [str(year) for year in range(current_year-2,current_year + 2, 1)]
-
-        # Set the default year to the current year
         self.year_var = tk.StringVar()
-        self.year_var.set(str(current_year))  # Default value to the current year
+        self.year_var.set(str(current_year))
 
         self.sheet_var = tk.StringVar()
-        self.sheet_var.set("Autumn")  # Default semester to Autumn
+        self.sheet_var.set("Autumn")
 
-        self.setup_gui()
+        self.setup_gui(grid_frame)
 
-        # Bind the resizing event to adjust column widths
         self.root.bind("<Configure>", self.on_window_resize)
 
-    def setup_gui(self):
-        """Setup the main GUI elements."""
-        # Sheet selection (e.g., Autumn, Spring, Annual)
-        sheet_label = tk.Label(self.root, text="Select Sheet:")
+    def setup_gui(self, parent):
+        sheet_label = tk.Label(parent, text="Select Sheet:")
         sheet_label.grid(row=0, column=0, padx=10, pady=10)
 
-        sheet_menu = tk.OptionMenu(self.root, self.sheet_var, "Autumn", "Spring", "Annual",
+        sheet_menu = tk.OptionMenu(parent, self.sheet_var, "Autumn", "Spring", "Annual",
                                    command=self.update_semester)
         sheet_menu.grid(row=0, column=1, padx=10, pady=10)
 
-        # Year selection (e.g., 2024, 2025, etc.)
-        year_label = tk.Label(self.root, text="Select Year:")
+        year_label = tk.Label(parent, text="Select Year:")
         year_label.grid(row=1, column=0, padx=10, pady=10)
 
-        year_menu = tk.OptionMenu(self.root, self.year_var, *self.year_list, command=self.update_year)
+        year_menu = tk.OptionMenu(parent, self.year_var, *self.year_list, command=self.update_year)
         year_menu.grid(row=1, column=1, padx=10, pady=10)
 
-        # Define the columns for the treeview with descriptive headings
         headings = {
             "Subject Code": "Subject Code",
             "Subject Assessment": "Subject Assessment",
@@ -79,97 +104,111 @@ class Application:
         ]
 
         for field, row, attr in fields:
-            tk.Label(self.root, text=f"{field}:").grid(row=row, column=0, padx=10, pady=10)
-            setattr(self, attr, tk.Entry(self.root))
+            label = tk.Label(parent, text=f"{field}:")
+            label.grid(row=row, column=0, padx=10, pady=10)
+            setattr(self, attr, tk.Entry(parent))
             getattr(self, attr).grid(row=row, column=1, padx=10, pady=10)
 
-        # Button to add entry
-        tk.Button(self.root, text="Add Entry", command=self.add_entry).grid(row=6, column=0, columnspan=2, pady=10)
-        # Button to calculate final mark
-        calculate_button = tk.Button(self.root, text="Calculate Exam Mark", command=self.calculate_exam_mark)
-        calculate_button.grid(row=7, column=0, columnspan=2, pady=10)
+        tk.Button(parent, text="Add Entry", command=self.add_entry).grid(row=6, column=0, columnspan=2, pady=10)
+        tk.Button(parent, text="Delete Entry", command=self.delete_entry).grid(row=7, column=0, columnspan=2, pady=10)
+        tk.Button(parent, text="Calculate Exam Mark", command=self.calculate_exam_mark).grid(row=8, column=0, columnspan=2, pady=10)
 
-        # Button to sync semesters
-        sync_button = tk.Button(self.root, text="Sync All Semesters", command=self.sync_all_semesters)
-        sync_button.grid(row=8, column=0, columnspan=2, pady=10)
+        tk.Button(parent, text="Sync All Semesters", command=self.sync_all_semesters).grid(row=9, column=0, columnspan=2, pady=10)
 
-        # Configure the TreeView
-        self.treeview.grid(row=9, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+        self.treeview.grid(row=10, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
 
-        # Add a scrollbar for the Treeview
-        v_scrollbar = ttk.Scrollbar(self.root, orient="vertical", command=self.treeview.yview)
+        v_scrollbar = ttk.Scrollbar(parent, orient="vertical", command=self.treeview.yview)
         self.treeview.configure(yscrollcommand=v_scrollbar.set)
-        v_scrollbar.grid(row=9, column=2, sticky="ns", padx=(0, 10), pady=10)
+        v_scrollbar.grid(row=10, column=2, sticky="ns", padx=(0, 10), pady=10)
 
-        # Configure grid weights to make the TreeView resizable
-        self.root.grid_rowconfigure(9, weight=1)
-        self.root.grid_rowconfigure(10, weight=0)
-        self.root.grid_columnconfigure(0, weight=1)
-        self.root.grid_columnconfigure(1, weight=1)
+        parent.grid_rowconfigure(10, weight=1)
+        parent.grid_rowconfigure(11, weight=0)
+        parent.grid_columnconfigure(0, weight=1)
+        parent.grid_columnconfigure(1, weight=1)
 
-        # Update the semester
+        self.treeview.bind("<Motion>", self.on_treeview_motion)
+        self.treeview.bind("<<TreeviewSelect>>", self.on_treeview_select)
+
         self.update_semester()
 
+    def on_treeview_select(self, event):
+        selected_item = self.treeview.selection()
+        if selected_item:
+            selected_item_id = selected_item[0]
+            values = self.treeview.item(selected_item_id, "values")
+
+            entries = [
+                (self.subject_code_entry, values[0]),
+                (self.subject_assessment_entry, values[1]),
+                (self.weighted_mark_entry, values[3]),
+                (self.mark_weight_entry, values[4].replace("%", ""))
+            ]
+
+            for entry, value in entries:
+                entry.delete(0, tk.END)
+                entry.insert(0, value)
+
+    def on_treeview_motion(self, event):
+        region = self.treeview.identify("region", event.x, event.y)
+        if region == "cell":
+            column = self.treeview.identify_column(event.x)
+            row_id = self.treeview.identify_row(event.y)
+
+            if column == "#2":  # Assuming column index 2 is Subject Assessment
+                values = self.treeview.item(row_id, "values")
+                if len(values) > 1:
+                    text = values[1]
+                    if self.current_tooltip:
+                        self.current_tooltip.hide_tip(event)
+                    self.current_tooltip = ToolTip(self.treeview, text)
+                    self.current_tooltip.show_tip(event)
+            else:
+                if self.current_tooltip:
+                    self.current_tooltip.hide_tip(event)
+                    self.current_tooltip = None
+        else:
+            if self.current_tooltip:
+                self.current_tooltip.hide_tip(event)
+                self.current_tooltip = None
+
     def on_window_resize(self, event=None):
-        """Automatically adjust column widths on window resize."""
         total_width = self.root.winfo_width()
         column_count = len(self.treeview["columns"])
-
-        # Set the width of each column to be proportional to the total window width
         column_width = total_width // column_count
         for col in self.treeview["columns"]:
             self.treeview.column(col, width=column_width)
 
     def update_year(self, event=None):
-        """Update the year based on the selection from the dropdown."""
         selected_year = self.year_var.get()
-
-        # Reinitialize DataPersistence with the selected year
         self.data_persistence = DataPersistence(selected_year)
-
         self.semesters = {sem: Semester(sem, self.data_persistence.year, self.data_persistence) for sem in
                           self.semesters.keys()}
-
         self.update_semester()
         self.update_treeview()
 
     def update_semester(self, event=None):
-        """Update the semester data based on the selected sheet and year."""
         selected_sheet = self.sheet_var.get()
         selected_year = self.year_var.get()
-
-        # Ensure the semester is properly initialized
         if self.semesters[selected_sheet] is None:
             self.semesters[selected_sheet] = Semester(selected_sheet, selected_year, self.data_persistence)
-
         self.update_treeview()
 
     def update_treeview(self):
-        """Update the TreeView widget with data from the selected semester."""
-        semester_name = self.sheet_var.get()  # Get the current semester
-        semester = self.semesters[semester_name]  # Retrieve the Semester
-        treeview_data = semester.view_data()  # Get the data for TreeView
-
-        # Clear the TreeView
+        semester_name = self.sheet_var.get()
+        semester = self.semesters[semester_name]
+        treeview_data = semester.view_data()
         for row in self.treeview.get_children():
             self.treeview.delete(row)
-
-        # Insert data into the TreeView
         for row in treeview_data:
             self.treeview.insert("", "end", values=row)
 
-
     def add_entry(self):
-        """Method to add an entry in the selected semester."""
         subject_code = self.subject_code_entry.get()
         subject_assessment = self.subject_assessment_entry.get()
         weighted_mark = self.weighted_mark_entry.get()
         mark_weight = self.mark_weight_entry.get()
         total_mark = self.total_mark_entry.get()
-
         semester_name = self.sheet_var.get()
-
-        # Add entry using the Semester
         try:
             self.semesters[semester_name].add_entry(
                 semester=semester_name,
@@ -181,25 +220,60 @@ class Application:
             )
         except Exception as error:
             messagebox.showerror("Error", f"Failed to add entry: {error}")
-
         self.update_treeview()
 
+    def delete_entry(self):
+        selected_items = self.treeview.selection()
+        if not selected_items:
+            messagebox.showerror("Error", "Please select an item to delete.")
+            return -1
+
+        semester_name = self.sheet_var.get()
+        semester = self.semesters[semester_name]
+        for selected_item in selected_items:
+            values = self.treeview.item(selected_item, "values")
+            if len(values) < 2:
+                continue # Skip if values are not sufficient
+
+            subject_code = values[0]
+            subject_assessment = values[1]
+
+            # Remove the entry from the data structure
+            if subject_code in semester.data_persistence.data[semester_name]:
+                assessments = semester.data_persistence.data[semester_name][subject_code]["Assignments"]
+                updated_assessments = [assessment for assessment in assessments if assessment["Subject Assessment"] != subject_assessment]
+                semester.data_persistence.data[semester_name][subject_code]["Assignments"] = updated_assessments
+
+                # Remove the entry from the tree view
+                self.treeview.delete(selected_item)
+
+
+            # Save teh updated data structure
+            semester.data_persistence.save_data_to_json()
+
+            messagebox.showinfo("Success", "Selected entry has been deleted.")
+
     def calculate_exam_mark(self):
-        """Calculate the exam mark for the selected semester's subject."""
         semester_name = self.sheet_var.get()
         subject_code = self.subject_code_entry.get()
         if not subject_code:
             messagebox.showerror("Error", "Please enter a Subject Code.")
             return
-
         exam_mark = self.semesters[semester_name].calculate_exam_mark(subject_code)
+
+        self.update_treeview()
         if exam_mark is not None:
             messagebox.showinfo("Success", f"Exam Mark for {subject_code}: {exam_mark}")
         else:
             messagebox.showerror("Error", f"Subject {subject_code} not found.")
-        self.update_treeview()
-
+            self.update_treeview()
     def sync_all_semesters(self):
-        """Sync data for all semesters"""
         self.data_persistence.sync_semesters()
         self.update_treeview()
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.geometry("800x600")
+    data_persistence = DataPersistence(str(datetime.now().year))
+    app = Application(root, data_persistence)
+    root.mainloop()

@@ -3,64 +3,214 @@
         "CSIT321": {
             "Assignments": [
                 {
+                    "Subject Assessment": "Initial Project Description",
+                    "Unweighted Mark": 0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 0.0
+                },
+                {
                     "Subject Assessment": "Project Requirements and Interface Presentation",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 10.0
+                },
+                {
+                    "Subject Assessment": "Prototype Presentation",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 15.0
+                },
+                {
+                    "Subject Assessment": "Design Progress",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 15.0
+                },
+                {
+                    "Subject Assessment": "Final Product & Documentation",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 45.0
+                },
+                {
+                    "Subject Assessment": "Marketing & Technical Presentation",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 15.0
+                }
+            ],
+            "Total Mark": 0
+        },
+        "CSCI316": {
+            "Assignments": [
+                {
+                    "Subject Assessment": "W4 Assessed Lab",
+                    "Unweighted Mark": 1.0,
+                    "Weighted Mark": 5.0,
+                    "Mark Weight": 5.0
+                },
+                {
+                    "Subject Assessment": "W10 Assessed Lab",
+                    "Unweighted Mark": 1.0,
+                    "Weighted Mark": 5.0,
+                    "Mark Weight": 5.0
+                },
+                {
+                    "Subject Assessment": "Assignment 1",
                     "Unweighted Mark": 1.0,
                     "Weighted Mark": 10.0,
                     "Mark Weight": 10.0
                 },
                 {
-                    "Subject Assessment": "Prototype Presentation",
-                    "Unweighted Mark": 0.6666666666666666,
+                    "Subject Assessment": "Assignment 2",
+                    "Unweighted Mark": 1.0,
                     "Weighted Mark": 10.0,
-                    "Mark Weight": 15.0
+                    "Mark Weight": 10.0
+                },
+                {
+                    "Subject Assessment": "Group Project",
+                    "Unweighted Mark": 1.0,
+                    "Weighted Mark": 25.0,
+                    "Mark Weight": 25.0
                 }
-            ]
+            ],
+            "Examination": {
+                "Exam Mark": 0,
+                "Exam Weight": 45.0
+            },
+            "Total Mark": 0
         },
-        "CSCI316": {
+        "CSIT375": {
             "Assignments": [
                 {
-                    "Subject Assessment": "Quiz",
-                    "Unweighted Mark": 1.0,
-                    "Weighted Mark": 15.0,
-                    "Mark Weight": 15.0
+                    "Subject Assessment": "Assessed Lab",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 5.0
+                },
+                {
+                    "Subject Assessment": "Assignment 1",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 22.5
+                },
+                {
+                    "Subject Assessment": "Assignment 2",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 22.5
                 }
-            ]
+            ],
+            "Total Mark": 0
+        },
+        "CSCI323": {
+            "Assignments": [
+                {
+                    "Subject Assessment": "Assignment",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 10.0
+                },
+                {
+                    "Subject Assessment": "Lab Assignment",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 20.0
+                },
+                {
+                    "Subject Assessment": "Group Project",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 20.0
+                }
+            ],
+            "Total Mark": 0
         }
     },
     "Spring": {
         "CSIT321": {
             "Assignments": [
                 {
+                    "Subject Assessment": "Initial Project Description",
+                    "Unweighted Mark": 0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 0.0
+                },
+                {
                     "Subject Assessment": "Project Requirements and Interface Presentation",
-                    "Unweighted Mark": 1.0,
-                    "Weighted Mark": 10.0,
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
                     "Mark Weight": 10.0
                 },
                 {
                     "Subject Assessment": "Prototype Presentation",
-                    "Unweighted Mark": 0.6666666666666666,
-                    "Weighted Mark": 10.0,
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 15.0
+                },
+                {
+                    "Subject Assessment": "Design Progress",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 15.0
+                },
+                {
+                    "Subject Assessment": "Final Product & Documentation",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 45.0
+                },
+                {
+                    "Subject Assessment": "Marketing & Technical Presentation",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
                     "Mark Weight": 15.0
                 }
-            ]
+            ],
+            "Total Mark": 0
         }
     },
     "Annual": {
         "CSIT321": {
             "Assignments": [
                 {
+                    "Subject Assessment": "Initial Project Description",
+                    "Unweighted Mark": 0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 0.0
+                },
+                {
                     "Subject Assessment": "Project Requirements and Interface Presentation",
-                    "Unweighted Mark": 1.0,
-                    "Weighted Mark": 10.0,
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
                     "Mark Weight": 10.0
                 },
                 {
                     "Subject Assessment": "Prototype Presentation",
-                    "Unweighted Mark": 0.6666666666666666,
-                    "Weighted Mark": 10.0,
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 15.0
+                },
+                {
+                    "Subject Assessment": "Design Progress",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 15.0
+                },
+                {
+                    "Subject Assessment": "Final Product & Documentation",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
+                    "Mark Weight": 45.0
+                },
+                {
+                    "Subject Assessment": "Marketing & Technical Presentation",
+                    "Unweighted Mark": 0.0,
+                    "Weighted Mark": 0.0,
                     "Mark Weight": 15.0
                 }
-            ]
+            ],
+            "Total Mark": 0
         }
     }
 }

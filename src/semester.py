@@ -26,13 +26,15 @@ class Semester:
             self.data_persistence.data[semester][subject_code] = {"Assignments": []}
 
         # Validate and parse `total_mark`
-        if total_mark:
+        if total_mark and subject_code:
             try:
                 total_mark = float(total_mark)
                 self.data_persistence.data[semester][subject_code]["Total Mark"] = total_mark
             except ValueError:
                 messagebox.showerror("Error", "Total Mark must be a valid number.")
                 return
+        else:
+            self.data_persistence.data[semester][subject_code]["Total Mark"] = 0
 
         # Validate and parse `weighted_mark` and `mark_weight`
         try:
@@ -47,6 +49,11 @@ class Semester:
             messagebox.showerror("Error", "Mark Weight must be between 0 and 100!")
             return
 
+        unweighted_mark = 0
+        if mark_weight != 0:
+            unweighted_mark = round(weighted_mark / mark_weight, 4)
+        print(unweighted_mark)
+
         # Add or update the assignment data
         assessments = self.data_persistence.data[semester][subject_code]["Assignments"]
         for entry in assessments:
@@ -54,7 +61,7 @@ class Semester:
                 # If the assessment already exists, overwrite it
                 entry.update({
                     "Subject Assessment": subject_assessment,
-                    "Unweighted Mark": weighted_mark / mark_weight,
+                    "Unweighted Mark": unweighted_mark,
                     "Weighted Mark": weighted_mark,
                     "Mark Weight": mark_weight,
                 })
@@ -62,13 +69,17 @@ class Semester:
                 self.data_persistence.save_data_to_json()
                 return
 
-        # Add a new assignment entry
-        assessments.append({
-            "Subject Assessment": subject_assessment,
-            "Weighted Mark": weighted_mark,
-            "Mark Weight": mark_weight,
-        })
-        messagebox.showinfo("Success", "Assignment added successfully!")
+        # Check if Total Mark already exists, if so update it,
+        if total_mark and "Total Mark" in self.data_persistence.data[semester][subject_code]:
+            self.data_persistence.data[semester][subject_code]["Total Mark"] = total_mark
+        else:
+            assessments.append({
+                "Subject Assessment": subject_assessment,
+                "Unweighted Mark": unweighted_mark,
+                "Weighted Mark": weighted_mark,
+                "Mark Weight": mark_weight,
+            })
+            messagebox.showinfo("Success", "Assignment added successfully!")
 
         # Save the data to JSON
         self.data_persistence.save_data_to_json()
@@ -95,8 +106,8 @@ class Semester:
                     data_list.append([
                         subject_code,
                         subject_assessment,
-                        unweighted_mark,
-                        weighted_mark,
+                        f"{unweighted_mark:.2f}",
+                        f"{weighted_mark:.2f}",
                         f"{mark_weight:.2f}%"
                     ])
 
@@ -104,10 +115,13 @@ class Semester:
                     total_weight += mark_weight
 
                 # Retrieve Total Mark
-                total_mark = subject_data.get("Total Mark", "N/A")
+                total_mark = subject_data.get("Total Mark", 0)
+
+                # Format Total Mark
+                total_mark = f"{float(total_mark):.0f}" if isinstance(total_mark, (int, float)) else "N/A"
 
                 # Add summary row after the assessments
-                exam_mark = subject_data.get("Examination", {}).get("Exam Mark", "N/A")
+                exam_mark = round(subject_data.get("Examination", {}).get("Exam Mark", 0), 4)
                 exam_weight = subject_data.get("Examination", {}).get("Exam Weight", "N/A")
 
                 # Format exam weight
@@ -118,12 +132,12 @@ class Semester:
                     f"Number of Assessments: {len(assessments)}",
                     f"Total Weighted Mark: {total_weighted_mark:.2f}",
                     f"Total Mark Weight: {total_weight:.0f}%",
-                    f"Total Mark: {total_mark:.0f}",
-                    f"Exam Mark: {exam_mark}",
+                    f"Total Mark: {total_mark}",
+                    f"Exam Mark: {exam_mark:.2f}",
                     f"Exam Weight: {exam_weight}"
                 ])
 
-                data_list.append(["=" * 10] * 7)
+                data_list.append(["=" * 20] * 7)
 
         return data_list
 
@@ -137,8 +151,8 @@ class Semester:
                 assessments_weights = sum(float(assessment.get("Mark Weight", 0)) for assessment in assessments)
 
                 # Ensure exam mark is non-negative
-                exam_mark = total_mark - assessments_sum
-                exam_mark = max(0, int(exam_mark))
+                exam_mark: float = round((total_mark - assessments_sum),2) if (total_mark - assessments_sum) > 0 else 0
+
 
                 # Exam weight is the remaining weight
                 exam_weight = max(0, 100 - assessments_weights)
