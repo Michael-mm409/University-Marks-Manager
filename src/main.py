@@ -10,7 +10,7 @@ if __name__ == "__main__":
     root.resizable(width=True, height=True)
 
     root.title("University Marks Manager")
-    data_persistence = DataPersistence(str(datetime.now().year))  # Year is set as 2024 for demonstration
+    data_persistence = DataPersistence(str(datetime.now().year), use_tinydb=True)  # Year is set as 2024 for demonstration
     app = Application(root, data_persistence)
 
     try:

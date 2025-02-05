@@ -119,7 +119,7 @@ class Application:
 
         v_scrollbar = ttk.Scrollbar(parent, orient="vertical", command=self.treeview.yview)
         self.treeview.configure(yscrollcommand=v_scrollbar.set)
-        v_scrollbar.grid(row=10, column=2, sticky="ns", padx=(0, 10), pady=10)
+        v_scrollbar.grid(row=11, column=2, sticky="ns", padx=(0, 10), pady=10)
 
         parent.grid_rowconfigure(10, weight=1)
         parent.grid_rowconfigure(11, weight=0)
@@ -250,7 +250,7 @@ class Application:
                 self.treeview.delete(selected_item)
 
             # Save the updated data structure
-            semester.data_persistence.save_data_to_json()
+            semester.data_persistence.save_data()
 
             # Parse 'Examinations'
             try:
@@ -281,9 +281,32 @@ class Application:
             messagebox.showinfo("Success", "Selected entry has been deleted.")
 
             # Save the updated data structure again
-            semester.data_persistence.save_data_to_json()
+            semester.data_persistence.save_data()
 
         self.update_treeview()
+
+    def sort_subjects(self, sort_by="Subject Code"):
+        semester_name = self.sheet_var.get()
+        semester = self.semesters[semester_name]
+        semester.sort_subjects(sort_by)
+        # Get the data to be sorted
+        treeview_data = semester.view_data()
+
+        # Sort by the chosen field (Subject Code, Subject Assessment, Weighted Mark, Mark Weight)
+        if sort_by == "Subject Code":
+            treeview_data.sort(key=lambda row: row[0])  # Sort by Subject Code
+        elif sort_by == "Subject Assessment":
+            treeview_data.sort(key=lambda row: row[1])  # Sort by Subject Assessment
+        elif sort_by == "Weighted Mark":
+            treeview_data.sort(key=lambda row: float(row[3]) if row[3] else 0)  # Sort by Weighted Mark
+        elif sort_by == "Mark Weight":
+            treeview_data.sort(key=lambda row: float(row[4].replace("%", "")) if row[4] else 0)  # Sort by Mark Weight
+
+    
+
+        # Optionally, display a success message
+        messagebox.showinfo("Sorted", f"Subjects sorted by {sort_by}.")
+
 
     def calculate_exam_mark(self):
         semester_name = self.sheet_var.get()
