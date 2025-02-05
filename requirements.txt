@@ -1,1 +1,2 @@
 tk    # Built-in Python library for GUI
+tinydb    # Database for storing data
