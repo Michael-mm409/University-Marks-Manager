@@ -72,7 +72,7 @@ class Application:
         sheet_label.grid(row=0, column=0, padx=10, pady=10)
 
         sheet_menu = tk.OptionMenu(parent, self.sheet_var, "Autumn", "Spring", "Annual",
-                                   command=self.update_semester)
+                                command=self.update_semester)
         sheet_menu.grid(row=0, column=1, padx=10, pady=10)
 
         year_label = tk.Label(parent, text="Select Year:")
@@ -106,7 +106,7 @@ class Application:
         for field, row, attr in fields:
             label = tk.Label(parent, text=f"{field}:")
             label.grid(row=row, column=0, padx=10, pady=10)
-            setattr(self, attr, tk.Entry(parent))
+            setattr(self, attr, tk.Entry(parent, width=50))
             getattr(self, attr).grid(row=row, column=1, padx=10, pady=10)
 
         tk.Button(parent, text="Add Entry", command=self.add_entry).grid(row=6, column=0, columnspan=2, pady=10)
@@ -119,10 +119,9 @@ class Application:
 
         v_scrollbar = ttk.Scrollbar(parent, orient="vertical", command=self.treeview.yview)
         self.treeview.configure(yscrollcommand=v_scrollbar.set)
-        v_scrollbar.grid(row=11, column=2, sticky="ns", padx=(0, 10), pady=10)
+        v_scrollbar.grid(row=10, column=2, sticky="ns", padx=(0, 10), pady=10)
 
         parent.grid_rowconfigure(10, weight=1)
-        parent.grid_rowconfigure(11, weight=0)
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_columnconfigure(1, weight=1)
 
@@ -322,8 +321,22 @@ class Application:
         else:
             messagebox.showerror("Error", f"Subject {subject_code} not found.")
             self.update_treeview()
+
     def sync_all_semesters(self):
-        self.data_persistence.sync_semesters()
+        combined_data = {
+            "Autumn": self.data_persistence.data.get("Autumn", {}).copy(),
+            "Spring": self.data_persistence.data.get("Spring", {}).copy(),
+            "Annual": self.data_persistence.data.get("Annual", {}).copy()
+        }
+
+        # Add Annual data to Autumn and Spring for display purposes
+        for subject, details in combined_data["Annual"].items():
+            if subject not in combined_data["Autumn"]:
+                combined_data["Autumn"][subject] = details
+            if subject not in combined_data["Spring"]:
+                combined_data["Spring"][subject] = details
+        
+        self.data_persistence.data = combined_data
         self.update_treeview()
 
 if __name__ == "__main__":
