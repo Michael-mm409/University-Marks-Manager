@@ -1,2 +1,4 @@
 /MarksManager.exe
 /data/*
+/.idea/*
+*.pyc
