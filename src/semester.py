@@ -4,7 +4,7 @@ in the University Marks Manager application.
 
 The Semester class is responsible for handling assignments and examinations for a given semester.
 """
-from tkinter import messagebox
+from PyQt6.QtWidgets import QMessageBox
 from typing import List, Dict, Any
 
 from data_persistence import DataPersistence
@@ -30,6 +30,7 @@ class Semester:
         self.name = name
         self.year = year
         self.data_persistence = data_persistence
+        self.data = self.data_persistence.data.get(self.name, {})
 
     def __get_subject_data(self, semester: str, subject_code: str) -> Dict[str, Any]:
         """Retrieve the subject data for a given semester and subject code."""
@@ -42,14 +43,14 @@ class Semester:
                 "Examinations": {"Exam Mark": 0, "Exam Weight": 100}}
         return self.data_persistence.data[semester][subject_code]
 
-    def __validate_float(self, value: Any, errorr_message: str) -> float:
+    def __validate_float(self, value: Any, error_message: str) -> float:
         """Validate the input value and return it as a float."""
         if value is None or value == "":
             return 0
         try:
             return float(value)
         except ValueError:
-            messagebox.showerror("Error", errorr_message)
+            QMessageBox.critical(None, "Error", error_message)
             return -1
 
     def add_entry(self, semester, subject_code, subject_assessment,
@@ -57,7 +58,7 @@ class Semester:
         """Add a new entry to the selected semester with assignment details."""
         # Check if subject_code is filled out
         if not subject_code:
-            messagebox.showerror("Error", "Subject Code is required!")
+            QMessageBox.critical(None, "Error", "Subject Code is required!")
             return
 
         subject_data = self.__get_subject_data(semester, subject_code)
@@ -72,7 +73,7 @@ class Semester:
                                               "Weighted Mark must be a valid number.")
         mark_weight = self.__validate_float(mark_weight, "Mark Weight must be a valid number.")
         if mark_weight < 0 or mark_weight > 100:
-            messagebox.showerror("Error", "Mark Weight must be between 0 and 100.")
+            QMessageBox(None, "Error", "Mark Weight must be between 0 and 100.")
             return
 
         unweighted_mark = round(weighted_mark / mark_weight, 4) if mark_weight > 0 else 0
@@ -85,7 +86,7 @@ class Semester:
                     {"Unweighted Mark": unweighted_mark,
                       "Weighted Mark": weighted_mark, 
                       "Mark Weight": mark_weight})
-                messagebox.showinfo("Success", "Assessment updated successfully!")
+                QMessageBox.information(None, "Success", "Assessment updated successfully!")
                 self.data_persistence.save_data()
                 return
 
@@ -100,11 +101,27 @@ class Semester:
             new_assessment["Mark Weight"] = mark_weight
 
         assessments.append(new_assessment)
-        messagebox.showinfo("Success", "Assessment added successfully!")
+        QMessageBox.information(None, "Success", "Assessment added successfully!")
 
         # Adjust exam weight if mark weight was provided
         if mark_weight != -1:
             subject_data["Examinations"]["Exam Weight"] -= mark_weight
+        self.data_persistence.save_data()
+
+    def delete_entry(self, subject_code: str, subject_assessment: str):
+        if subject_code in self.data:
+            assignments = self.data[subject_code]["Assignments"]
+            for assignment in assignments:
+                if assignment["Subject Assessment"] == subject_assessment:
+                    assignments.remove(assignment)
+                    break
+            else:
+                raise ValueError(f"Assessment '{subject_assessment}' not found for subject '{subject_code}'")
+        else:
+            raise ValueError(f"Subject '{subject_code}' not found in semester '{self.name}'")
+
+        # Update the data in the persistence layer
+        self.data_persistence.data[self.name] = self.data
         self.data_persistence.save_data()
 
     def sort_subjects(self, sort_by: str = "subject_code") -> List[List[str]]:
@@ -150,7 +167,7 @@ class Semester:
             for entry in subject_data.get("Assignments"):
                 sorted_data_list.append([
                     subject_code,
-                    entry.get("Subject Assessment", "N/A"),
+                    entry.get("Subject Assessment", "N/A").strip("\n"),
                     f"{entry.get('Unweighted Mark', 0):.2f}",
                     f"{entry.get('Weighted Mark', 0):.2f}",
                     f"{entry.get('Mark Weight', 0):.2f}%"
@@ -195,4 +212,5 @@ class Semester:
         subject_data["Examinations"]["Exam Weight"] = exam_weight
 
         self.data_persistence.save_data()
+        QMessageBox.information(None, "Success", f"Exam mark calculated: {exam_mark}")
         return exam_mark

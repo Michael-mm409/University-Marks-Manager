@@ -32,7 +32,9 @@ class DataPersistence:
 
     def save_data(self):
         """Save data to TinyDB or JSON file with pretty-printing."""
-
-        with open(self.file_path, 'w', encoding='utf-8') as json_file:
-            json.dump(self.data, json_file, indent=4)
-        messagebox.showinfo("Success", f"Data saved successfully to {self.file_path}!")
+        try:
+            with open(self.file_path, 'w', encoding='utf-8') as json_file:
+                json.dump(self.data, json_file, indent=4)
+            messagebox.showinfo("Success", f"Data saved successfully to {self.file_path}!")
+        except (IOError, json.JSONDecodeError) as e:
+            messagebox.showerror("Error", f"Failed to save data: {e}")

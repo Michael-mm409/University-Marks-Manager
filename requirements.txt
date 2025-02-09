@@ -1,2 +1,2 @@
-tk    # Built-in Python library for GUI
-tinydb    # Database for storing data
+pyqt6~=6.8.1
+pyqt6-sip~=13.10.0

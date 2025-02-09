@@ -5,7 +5,7 @@ It sets up the main application window, initializes data persistence, and
 runs the Tkinter event loop.
 
 Modules:
-    tkinter (tk): Provides GUI components.
+    PyQt5.QtWidgets (QApplication, QMainWindow): Provides GUI Components.
     datetime (datetime): Handles date-related operations.
     application (Application): Main application logic.
     data_persistence (DataPersistence): Handles data storage and retrieval.
@@ -14,23 +14,23 @@ Usage:
     Run this script to launch the University Marks Manager.
 """
 
-import tkinter as tk
+import sys
 from datetime import datetime
+from PyQt6.QtWidgets import QApplication
 from application import Application
 from data_persistence import DataPersistence
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    app = QApplication(sys.argv)
 
-    # Enable window resizing (set both width and height to True)
-    root.resizable(width=True, height=True)
+   # Initialise data persistence with the current year
+    data_persistence = DataPersistence(str(datetime.now().year))
 
-    root.title("University Marks Manager")
-    data_persistence = DataPersistence(
-        str(datetime.now().year))  # Year is set as 2024 for demonstration
-    app = Application(root, data_persistence)
+    # Create and show the main window
+    window = Application(data_persistence) # Ensure Application inherits from QMainWindow or QWidget
+    window.show()
 
     try:
-        root.mainloop()
+        sys.exit(app.exec())
     except KeyboardInterrupt:
-        root.destroy()
+        print("Application closed.")

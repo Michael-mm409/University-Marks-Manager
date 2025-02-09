@@ -4,447 +4,271 @@ user interface of the University Marks Manager application. It also includes the
 ToolTip class for displaying tooltips when hovering over a Treeview cell.
 """
 from datetime import datetime
-from tkinter import messagebox, ttk
-import tkinter as tk
+from PyQt6.QtGui import QIcon, QFont
+from PyQt6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QFormLayout, QHBoxLayout, QLabel,
+    QPushButton, QTableWidget, QTableWidgetItem, QComboBox, QLineEdit, QMessageBox, QSizePolicy, QAbstractItemView
+)
+
 from data_persistence import DataPersistence
 from semester import Semester
 
+class Application(QMainWindow):
+    def __init__(self, storage_handler: DataPersistence):
+        super().__init__()
 
-class ToolTip:
-    """
-    A class to represent a tooltip for displaying 
-    additional information when hovering over a widget.
-    
-    Args:
-        widget (tk.Widget): The widget to which the tooltip is attached.
-        text (str): The text to be displayed in the tooltip.
-        tip_window (tk.Toplevel): The tooltip window to display the text.
-    """
-    def __init__(self, widget: tk.Widget, text: str):
-        """
-        Constructs all the necessary attributes for the tooltip window.
-        
-        Args:
-            widget (tk.Widget): The widget to which the tooltip is attached.
-            text (str): The text to be displayed in the tooltip.
-        """
-        self.widget = widget
-        self.text = text
-        self.tip_window = None
-
-    def show_tip(self, event: tk.Event):
-        """
-        Displays the tooltip window with the specified text.
-
-        Args:
-            event (tk.Event): The event that triggered the tooltip display.
-        """
-        if self.tip_window or not self.text:
-            return
-        x = event.x_root + 10
-        y = event.y_root + 10
-        self.tip_window = tw = tk.Toplevel(self.widget)
-        tw.wm_overrideredirect(1)
-        tw.wm_geometry(f"+{x}+{y}")
-        label = tk.Label(tw, text=self.text, background="yellow", relief=tk.SOLID, borderwidth=1)
-        label.pack(ipadx=1)
-
-    def hide_tip(self, _event):
-        """
-        Hides the tooltip window when the mouse leaves the widget.
-        
-        Args:
-            _event (tk.Event): The event that triggered the tooltip hide action."""
-        if self.tip_window:
-            self.tip_window.destroy()
-            self.tip_window = None
-
-
-class Application:
-    """
-    A class to represent the main application window for the University Marks Manager.
-    This class is responsible for managing the user interface of the application,
-    including adding, deleting, and calculating marks for subjects.
-    
-    Args:
-        application_root (tk.Tk): The main application window.
-        storage_handler (DataPersistence): An instance of the DataPersistence class.
-    """
-    def __init__(self, application_root: tk.Tk, storage_handler: DataPersistence):
-        self.subject_code_entry = None
-        self.subject_assessment_entry = None
-        self.weighted_mark_entry = None
-        self.mark_weight_entry = None
-        self.total_mark_entry = None
-        self.subject_assessment_label = None
-        self.current_tooltip = None
-        self.root = application_root
-
-        main_frame = tk.Frame(self.root)
-        main_frame.pack(fill=tk.BOTH, expand=True)
-
-        grid_frame = tk.Frame(main_frame)
-        grid_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-        self.treeview = ttk.Treeview(grid_frame, columns=("Subject Code", "Subject Assessment", "Unweighted Mark",
-                                                          "Weighted Mark", "Mark Weight", "Exam Mark", "Exam Weight"),
-                                     show="headings")
-        self.data_persistence = storage_handler
+        self.setWindowIcon(QIcon('assets/app_icon.png'))
+        self.storage_handler = storage_handler
         self.semesters = {
             sem: Semester(sem, storage_handler.year, storage_handler)
             for sem in ["Autumn", "Spring", "Annual"]
         }
 
+        # Main Widget
+        self.central_widget = QWidget()
+
+        # Dropdowns
+        self.year_combo = QComboBox()
+        self.semester_combo = QComboBox()
+
+        # Table (equivalent to Treeview)
+        self.table = QTableWidget()
+
+        # Entry Fields
+        self.subject_code_entry = QLineEdit()
+        self.assessment_entry = QLineEdit()
+        self.weighted_mark_entry = QLineEdit()
+        self.mark_weight_entry = QLineEdit()
+        self.total_mark_entry = QLineEdit()
+
+        # Buttons
+        self.add_button = QPushButton("Add Entry", self)
+        self.delete_button = QPushButton("Delete Entry", self)
+        self.calc_button = QPushButton("Calculate Exam Mark", self)
+
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("University Marks Manager")
+        self.setGeometry(100, 100, 800, 600)
+
+        # Main Widget
+        self.setCentralWidget(self.central_widget)
+
+        # Layouts
+        main_layout = QVBoxLayout()
+        form_layout = QHBoxLayout()
+        entry_layout = QFormLayout()  # New layout for labels + inputs
+        button_layout = QHBoxLayout()  # New layout for buttons
+
+        # Dropdowns
         current_year = datetime.now().year
-        self.year_list = [str(year) for year in range(current_year - 2, current_year + 2, 1)]
+        self.year_combo.addItems([str(year) for year in range(current_year - 2, current_year + 2)])
+        self.year_combo.setCurrentText(str(current_year))
+        self.year_combo.currentTextChanged.connect(self.update_year)
 
-        self.year_var = tk.StringVar()
-        self.year_var.set(str(current_year))
+        self.semester_combo.addItems(["Autumn", "Spring", "Annual"])
+        self.semester_combo.currentTextChanged.connect(self.update_semester)
 
-        self.sheet_var = tk.StringVar()
-        self.sheet_var.set("Autumn")
+        # Labels
+        year_label = QLabel("Select Year:")
+        semester_label = QLabel("Select Semester:")
 
-        self.setup_gui(grid_frame)
+        # Table
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(
+            ["Subject Code", "Assessment", "Unweighted Mark", "Weighted Mark", "Mark Weight"])
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)  # Ensure row selection
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)  # Allow single row selection
 
-        self.root.bind("<Configure>", self.on_window_resize)
+        # Entry Field Labels
+        subject_code_label = QLabel("Select Subject Code:")
+        assessment_label = QLabel("Select Assessment:")
+        weighted_mark_label = QLabel("Select Weighted Mark:")
+        mark_weight_label = QLabel("Select Mark Weight:")
+        total_mark_label = QLabel("Select Total Mark:")
 
-    def setup_gui(self, parent: tk.Frame):
-        """
-        Sets up the GUI components for the main application window.
-        
-        Args:
-            parent (tk.Frame): The parent frame to which the GUI components are added.
-        """
-        sheet_label = tk.Label(parent, text="Select Sheet:")
-        sheet_label.grid(row=0, column=0, padx=10, pady=10)
+        # Add Labels and Fields to entry Layout
+        entry_layout.addRow(subject_code_label, self.subject_code_entry)
+        entry_layout.addRow(assessment_label, self.assessment_entry)
+        entry_layout.addRow(weighted_mark_label, self.weighted_mark_entry)
+        entry_layout.addRow(mark_weight_label, self.mark_weight_entry)
+        entry_layout.addRow(total_mark_label, self.total_mark_entry)
 
-        sheet_menu = tk.OptionMenu(parent, self.sheet_var, "Autumn", "Spring", "Annual",
-                                command=self.update_semester)
-        sheet_menu.grid(row=0, column=1, padx=10, pady=10)
+        # Buttons
+        self.add_button.clicked.connect(self.add_entry)
+        self.delete_button.clicked.connect(self.delete_entry)
+        self.calc_button.clicked.connect(self.calculate_exam_mark)
 
-        year_label = tk.Label(parent, text="Select Year:")
-        year_label.grid(row=1, column=0, padx=10, pady=10)
+        # Add buttons to button layout
+        button_layout.addWidget(self.add_button)
+        button_layout.addWidget(self.delete_button)
+        button_layout.addWidget(self.calc_button)
 
-        year_menu = tk.OptionMenu(parent, self.year_var, *self.year_list, command=self.update_year)
-        year_menu.grid(row=1, column=1, padx=10, pady=10)
+        # Wrap the entry layout in a QWidget
+        entry_widget = QWidget()
+        entry_widget.setLayout(entry_layout)
 
-        headings = {
-            "Subject Code": "Subject Code",
-            "Subject Assessment": "Subject Assessment",
-            "Unweighted Mark": "Mark (Out of Full Score)",
-            "Weighted Mark": "Weighted Contribution (%)",
-            "Mark Weight": "Assessment Weight (e.g., 30%)",
-            "Exam Mark": "Exam Mark (Calculated)",
-            "Exam Weight": "Exam Weight (%)",
+        # Wrap the button layout in a QWidget
+        button_widget = QWidget()
+        button_widget.setLayout(button_layout)
+
+        # Layout Arrangements
+        form_layout.addWidget(year_label)
+        form_layout.addWidget(self.year_combo)
+        form_layout.addWidget(semester_label)
+        form_layout.addWidget(self.semester_combo)
+
+        # Add layouts to the main layout
+        main_layout.addLayout(form_layout)
+        main_layout.addWidget(self.table, stretch=1)  # Add the table without explicit stretch
+        main_layout.addWidget(entry_widget)  # Add the labels + input fields layout
+        main_layout.addWidget(button_widget)  # Add the buttons
+
+        self.central_widget.setLayout(main_layout)
+        self.update_semester()
+
+        # Resize columns to fit content after updating the table
+        self.table.resizeColumnsToContents()
+
+        self.table.itemSelectionChanged.connect(self.populate_entries_from_selection)
+
+    def populate_entries_from_selection(self):
+        selected_items = self.table.selectedItems()
+        if selected_items:
+            row = selected_items[0].row()
+            self.subject_code_entry.setText(self.table.item(row, 0).text())
+            self.assessment_entry.setText(self.table.item(row, 1).text())
+            self.weighted_mark_entry.setText(self.table.item(row, 3).text())
+            self.mark_weight_entry.setText(self.table.item(row, 4).text().strip("%"))
+
+    def update_year(self):
+        selected_year = self.year_combo.currentText()
+        self.storage_handler = DataPersistence(selected_year)
+        self.semesters = {
+            sem: Semester(sem, self.storage_handler.year, self.storage_handler)
+            for sem in self.semesters.keys()
         }
-
-        for col, description in headings.items():
-            self.treeview.heading(col, text=description)
-            self.treeview.column(col, anchor=tk.CENTER)
-
-        fields = [
-            ("Subject Code", 2, "subject_code_entry"),
-            ("Subject Assessment", 3, "subject_assessment_entry"),
-            ("Weighted Mark", 4, "weighted_mark_entry"),
-            ("Mark Weight", 5, "mark_weight_entry"),
-            ("Total Mark", 6, "total_mark_entry"),
-        ]
-
-        for field, row, attr in fields:
-            label = tk.Label(parent, text=f"{field}:")
-            label.grid(row=row, column=0, padx=10, pady=10)
-            setattr(self, attr, tk.Entry(parent, width=50))
-            getattr(self, attr).grid(row=row, column=1, padx=10, pady=10)
-
-        add_btn = tk.Button(parent, text="Add Entry", command=self.add_entry)
-        add_btn.grid(row=6, column=0, columnspan=2, pady=10)
-        del_btn = tk.Button(parent, text="Delete Entry", command=self.delete_entry)
-        del_btn.grid(row=7, column=0, columnspan=2, pady=10)
-        calc_btn = tk.Button(parent, text="Calculate Exam Mark", command=self.calculate_exam_mark)
-        calc_btn.grid(row=8, column=0, columnspan=2, pady=10)
-
-        sync_btn = tk.Button(parent, text="Sync All Semesters", command=self.sync_all_semesters)
-        sync_btn.grid(row=9, column=0, columnspan=2, pady=10)
-
-        self.treeview.grid(row=10, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
-
-        v_scrollbar = ttk.Scrollbar(parent, orient="vertical", command=self.treeview.yview)
-        self.treeview.configure(yscrollcommand=v_scrollbar.set)
-        v_scrollbar.grid(row=10, column=2, sticky="ns", padx=(0, 10), pady=10)
-
-        parent.grid_rowconfigure(10, weight=1)
-        parent.grid_columnconfigure(0, weight=1)
-        parent.grid_columnconfigure(1, weight=1)
-
-        self.treeview.bind("<Motion>", self.on_treeview_motion)
-        self.treeview.bind("<<TreeviewSelect>>", self.on_treeview_select)
-
         self.update_semester()
 
-    def on_treeview_select(self, _event=None):
-        """
-        Handles the selection event on the Treeview widget.
-        
-        Args:
-            _event (tk.Event): The event that triggered the selection.
-        """
-        selected_item = self.treeview.selection()
-        if selected_item:
-            selected_item_id = selected_item[0]
-            values = self.treeview.item(selected_item_id, "values")
-            
-            entries = [
-                (self.subject_code_entry, values[0]),
-                (self.subject_assessment_entry, values[1]),
-                (self.weighted_mark_entry, values[3]),
-                (self.mark_weight_entry, values[4].replace("%", ""))
-            ]
+    def update_semester(self):
+        semester_name = self.semester_combo.currentText()
+        semester = self.semesters.get(semester_name, "Unknown")
+        self.update_table(semester)
 
-            for entry, value in entries:
-                entry.delete(0, tk.END)
-                entry.insert(0, value)
 
-    def on_treeview_motion(self, event):
-        """
-        Handles the mouse motion event on the Treeview widget.
-        
-        Args:
-            event (tk.Event): The event that triggered the mouse motion.
-        """
-        region = self.treeview.identify("region", event.x, event.y)
-        if region == "cell":
-            column = self.treeview.identify_column(event.x)
-            row_id = self.treeview.identify_row(event.y)
+    def update_table(self, semester: Semester | str):
+        """ Update the table with new data and adjust row heights. """
+        self.table.setRowCount(0)  # Clear existing rows
 
-            if column == "#2":  # Assuming column index 2 is Subject Assessment
-                values = self.treeview.item(row_id, "values")
+        # Insert new rows with data
+        for row_data in semester.view_data():
+            row_index = self.table.rowCount()  # Get the current row index
+            self.table.insertRow(row_index)
 
-                if any("=" in value or "Assessments:" in value for value in values):
-                    return
-                if len(values) > 1:
-                    text = values[1]
-                    if self.current_tooltip:
-                        self.current_tooltip.hide_tip(event)
-                    self.current_tooltip = ToolTip(self.treeview, text)
-                    self.current_tooltip.show_tip(event)
-            else:
-                if self.current_tooltip:
-                    self.current_tooltip.hide_tip(event)
-                    self.current_tooltip = None
+            # Fill the row with data
+            for col, item in enumerate(row_data):
+                item_widget = QTableWidgetItem(str(item))
+                self.table.setItem(row_index, col, item_widget)
+
+        # Call to update row heights based on available space
+        self.update_row_heights()
+
+    def update_row_heights(self):
+        """ Adjust row heights based on available space. """
+        available_height = self.height() - self.table.horizontalHeader().height()
+        num_rows = self.table.rowCount()
+
+        if num_rows > 0:
+            row_height = available_height // num_rows
+            for row in range(num_rows):
+                self.table.setRowHeight(row, row_height)
         else:
-            if self.current_tooltip:
-                self.current_tooltip.hide_tip(event)
-                self.current_tooltip = None
+            for row in range(num_rows):
+                self.table.setRowHeight(row, 20)  # Default height if no rows exist
 
-    def on_window_resize(self, _event=None):
-        """
-        Handles the window resize event and adjusts the column width of the Treeview widget.
-        
-        Args:
-            event (tk.Event): The event that triggered the window resize.
-        """
-        total_width = self.root.winfo_width()
-        column_count = len(self.treeview["columns"])
-        column_width = total_width // column_count
-        for col in self.treeview["columns"]:
-            self.treeview.column(col, width=column_width)
+        # Resize rows to fit content after adjusting heights
+        self.table.resizeRowsToContents()
 
-    def update_year(self, _event=None):
-        """
-        Updates the year in the application.
-
-        Args:
-            event (tk.Event): The event that triggered the year update.
-        """
-        selected_year = self.year_var.get()
-        self.data_persistence = DataPersistence(selected_year)
-        self.semesters = {sem: Semester(sem, self.data_persistence.year, self.data_persistence)
-                          for sem in self.semesters.keys()}
-        self.update_semester()
-        self.update_treeview()
-
-    def update_semester(self, _event=None):
-        """
-        Updates the semester in the application.
-        
-        Args:
-            event (tk.Event): The event that triggered the semester update.
-        """
-        selected_sheet = self.sheet_var.get()
-        selected_year = self.year_var.get()
-        if self.semesters[selected_sheet] is None:
-            self.semesters[selected_sheet] = Semester(selected_sheet, 
-                                                      selected_year, self.data_persistence)
-        self.update_treeview()
-
-    def update_treeview(self):
-        """Updates the Treeview widget with the data from the selected semester."""
-        semester_name = self.sheet_var.get()
-        semester = self.semesters[semester_name]
-        treeview_data = semester.view_data()
-        for row in self.treeview.get_children():
-            self.treeview.delete(row)
-        for row in treeview_data:
-            self.treeview.insert("", "end", values=row)
+    def resizeEvent(self, event):
+        """ Handle window resizing and adjust row heights accordingly. """
+        super().resizeEvent(event)
+        # Update row heights and font size when resizing the window
+        self.update_row_heights()
+        # self.adjust_table_font_size()
 
     def add_entry(self):
-        """Adds a new entry to the selected semester with assignment details."""
-        subject_code = self.subject_code_entry.get()
-        subject_assessment = self.subject_assessment_entry.get()
-        weighted_mark = self.weighted_mark_entry.get()
-        mark_weight = self.mark_weight_entry.get()
-        total_mark = self.total_mark_entry.get()
-        semester_name = self.sheet_var.get()
+        semester_name = self.semester_combo.currentText()
+        semester = self.semesters.get(semester_name, "Unknown")
+
+        subject_code = self.subject_code_entry.text()
+        assessment = self.assessment_entry.text()
+        weighted_mark = self.weighted_mark_entry.text()
+        mark_weight = self.mark_weight_entry.text()
+        total_mark = self.total_mark_entry.text()
+
+        if total_mark == "":
+            total_mark = 0
+
         try:
-            self.semesters[semester_name].add_entry(
+            semester.add_entry(
                 semester=semester_name,
                 subject_code=subject_code,
-                subject_assessment=subject_assessment,
-                weighted_mark=weighted_mark,
-                mark_weight=mark_weight,
-                total_mark=total_mark
+                subject_assessment=assessment,
+                weighted_mark=float(weighted_mark),
+                mark_weight=float(mark_weight),
+                total_mark=float(total_mark)
             )
+            self.storage_handler.save_data()  # Ensure data is saved after adding entry
+            self.update_table(semester)
         except ValueError as error:
-            messagebox.showerror("Error", f"Failed to add entry: {error}")
-        self.update_treeview()
+            QMessageBox.critical(self, "Error", f"Failed to add entry: {error}")
 
     def delete_entry(self):
-        """
-        Deletes the selected entry from the Treeview widget and the data structure.
-        
-        Returns:
-            int: -1 if no item is selected, 0 if the item is deleted successfully.
-        """
-        selected_items = self.treeview.selection()
-        if not selected_items:
-            messagebox.showerror("Error", "Please select an item to delete.")
+        semester_name = self.semester_combo.currentText()
+        semester = self.semesters.get(semester_name, "Unknown")
+
+        selected_rows = self.table.selectionModel().selectedRows()
+        if not selected_rows:
+            QMessageBox.warning(self, "Error", "Please select an entry to delete.")
             return
 
-        semester_name = self.sheet_var.get()
-        semester = self.semesters[semester_name]
-        for selected_item in selected_items:
-            values = self.treeview.item(selected_item, "values")
-            if len(values) < 2:
-                continue  # Skip if values are not sufficient
+        print(f"Selected rows: {selected_rows}")  # Debugging information
 
-            subject_code = values[0]
-            subject_assessment = values[1]
+        for index in sorted(selected_rows, reverse=True):
+            row = index.row()
+            subject_code_item = self.table.item(row, 0)
+            assessment_item = self.table.item(row, 1)
 
-            # Remove the entry from the data structure
-            if subject_code in semester.data_persistence.data[semester_name]:
-                assessments = semester.data_persistence.data[semester_name][subject_code]["Assignments"]
-                updated_assessments = [assessment for assessment in assessments if
-                                       assessment["Subject Assessment"] != subject_assessment]
+            if subject_code_item and assessment_item:
+                subject_code = subject_code_item.text()
+                assessment = assessment_item.text()
+                print(f"Deleting entry: {subject_code}, {assessment}, row: {row}")  # Debugging information
+                try:
+                    semester.delete_entry(subject_code, assessment)
+                    self.table.removeRow(row)
+                except ValueError as error:
+                    QMessageBox.critical(self, "Error", f"Failed to delete entry: {error}")
+            else:
+                QMessageBox.warning(self, "Error", "Failed to retrieve subject code or assessment.")
 
-                semester.data_persistence.data[semester_name][subject_code]["Assignments"] = updated_assessments
-
-                # Remove the entry from the tree view
-                self.treeview.delete(selected_item)
-
-            # Save the updated data structure
-            semester.data_persistence.save_data()
-
-            # Parse 'Examinations'
-            try:
-                mark_weight = float(self.mark_weight_entry.get())
-            except ValueError:
-                messagebox.showerror("Error", "Mark Weight must be a valid number.")
-                return
-
-            # Fetch the current exam weight
-            current_exam_weight = float(
-                semester.data_persistence.data[semester_name][subject_code]["Examinations"].get("Exam Weight", 0))
-
-            # Add the mark weight to the current exam weight
-            exam_weight = current_exam_weight + mark_weight
-
-            # Print statements for debugging
-            print(f"Current Exam Weight for {subject_code}: {current_exam_weight}")
-            print(f"Added Mark Weight: {mark_weight}")
-            print(f"New Calculated Exam Weight for {subject_code}: {exam_weight}")
-
-            # Ensure the data structure for 'Examinations' exists before adding to it
-            if "Examinations" not in semester.data_persistence.data[semester_name][subject_code]:
-                semester.data_persistence.data[semester_name][subject_code]["Examinations"] = {}
-
-            # Update only the "Exam Weight" field for the specific subject
-            semester.data_persistence.data[semester_name][subject_code]["Examinations"]["Exam Weight"] = exam_weight
-
-            messagebox.showinfo("Success", "Selected entry has been deleted.")
-
-            # Save the updated data structure again
-            semester.data_persistence.save_data()
-
-        self.update_treeview()
-
-    def sort_subjects(self, sort_by="Subject Code"):
-        """
-        Sorts the subjects in the Treeview widget based on the selected field.
-        
-        Args:
-            sort_by (str, optional):
-                The field by which the subjects are sorted. Defaults to "Subject Code".
-        """
-        semester_name = self.sheet_var.get()
-        semester = self.semesters[semester_name]
-        semester.sort_subjects(sort_by)
-        # Get the data to be sorted
-        treeview_data = semester.view_data()
-
-        # Sort by the chosen field (Subject Code, Subject Assessment, Weighted Mark, Mark Weight)
-        if sort_by == "Subject Code":
-            treeview_data.sort(key=lambda row: row[0])  # Sort by Subject Code
-        elif sort_by == "Subject Assessment":
-            treeview_data.sort(key=lambda row: row[1])  # Sort by Subject Assessment
-        elif sort_by == "Weighted Mark":
-            treeview_data.sort(key=lambda row:
-                               float(row[3]) if row[3] else 0)  # Sort by Weighted Mark
-        elif sort_by == "Mark Weight":
-            treeview_data.sort(key=lambda row:
-                               float(row[4].replace("%", ""))
-                               if row[4] else 0)  # Sort by Mark Weight
-
-        # Optionally, display a success message
-        messagebox.showinfo("Sorted", f"Subjects sorted by {sort_by}.")
-
+        self.storage_handler.save_data()  # Ensure data is saved after deleting entry
+        QMessageBox.information(self, "Success", "Selected entry has been deleted")
+        self.update_table(semester)
 
     def calculate_exam_mark(self):
-        """Synchronises all semesters' data into a single data structure."""
-        semester_name = self.sheet_var.get()
-        subject_code = self.subject_code_entry.get()
+        semester_name = self.semester_combo.currentText()
+        subject_code = self.subject_code_entry.text()
+
         if not subject_code:
-            messagebox.showerror("Error", "Please enter a Subject Code.")
+            QMessageBox.critical(self, "Error", "Please enter a Subject Code.")
             return
+
         exam_mark = self.semesters[semester_name].calculate_exam_mark(subject_code)
+        self.update_table(self.semesters[semester_name])
 
-        self.update_treeview()
         if exam_mark is not None:
-            messagebox.showinfo("Success", f"Exam Mark for {subject_code}: {exam_mark}")
+            QMessageBox.information(self, "Success", f"Exam Mark for {subject_code}: {exam_mark}")
         else:
-            messagebox.showerror("Error", f"Subject {subject_code} not found.")
-            self.update_treeview()
+            QMessageBox.critical(self, "Error", f"Subject {subject_code} not found.")
 
-    def sync_all_semesters(self):
-        """Synchronises all semesters' data into a single data structure."""
-        combined_data = {
-            "Autumn": self.data_persistence.data.get("Autumn", {}).copy(),
-            "Spring": self.data_persistence.data.get("Spring", {}).copy(),
-            "Annual": self.data_persistence.data.get("Annual", {}).copy()
-        }
-
-        # Add Annual data to Autumn and Spring for display purposes
-        for subject, details in combined_data["Annual"].items():
-            if subject not in combined_data["Autumn"]:
-                combined_data["Autumn"][subject] = details
-            if subject not in combined_data["Spring"]:
-                combined_data["Spring"][subject] = details
-
-        self.data_persistence.data = combined_data
-        self.update_treeview()
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    root.geometry("800x600")
-    data_persistence = DataPersistence(str(datetime.now().year))
-    app = Application(root, data_persistence)
-    root.mainloop()
