@@ -7,7 +7,7 @@ from datetime import datetime
 from PyQt6.QtGui import QIcon, QFont
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QFormLayout, QHBoxLayout, QLabel,
-    QPushButton, QTableWidget, QTableWidgetItem, QComboBox, QLineEdit, QMessageBox, QSizePolicy, QAbstractItemView
+    QPushButton, QTableWidget, QTableWidgetItem, QComboBox, QLineEdit, QMessageBox, QAbstractItemView
 )
 
 from data_persistence import DataPersistence
@@ -137,7 +137,16 @@ class Application(QMainWindow):
         selected_items = self.table.selectedItems()
         if selected_items:
             row = selected_items[0].row()
-            self.subject_code_entry.setText(self.table.item(row, 0).text())
+
+            subject_code = self.table.item(row, 0).text()
+            if "=" in subject_code or "Summary" in subject_code:
+                # Deselect the row if it contains the unwanted strings
+                self.table.clearSelection()
+
+                # Show a message box to inform the user
+                # QMessageBox.warning(self, "Selection Restricted", "This row cannot be selected because it contains summary information.")
+                return
+            self.subject_code_entry.setText(subject_code)
             self.assessment_entry.setText(self.table.item(row, 1).text())
             self.weighted_mark_entry.setText(self.table.item(row, 3).text())
             self.mark_weight_entry.setText(self.table.item(row, 4).text().strip("%"))
