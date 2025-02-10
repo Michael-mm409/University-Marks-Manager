@@ -43,7 +43,8 @@ class Semester:
                 "Examinations": {"Exam Mark": 0, "Exam Weight": 100}}
         return self.data_persistence.data[semester][subject_code]
 
-    def __validate_float(self, value: Any, error_message: str) -> float:
+    @staticmethod
+    def __validate_float(value: Any, error_message: str) -> float:
         """Validate the input value and return it as a float."""
         if value is None or value == "":
             return 0
@@ -53,8 +54,8 @@ class Semester:
             QMessageBox.critical(None, "Error", error_message)
             return -1
 
-    def add_entry(self, semester, subject_code, subject_assessment,
-                  weighted_mark, mark_weight, total_mark) -> None:
+    def add_entry(self, semester: str, subject_code: str, subject_assessment: str,
+                  weighted_mark: float | int, mark_weight: float, total_mark: float) -> None:
         """Add a new entry to the selected semester with assignment details."""
         # Check if subject_code is filled out
         if not subject_code:
