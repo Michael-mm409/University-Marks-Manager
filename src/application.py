@@ -31,6 +31,10 @@ class Application(QMainWindow):
         self.year_combo = QComboBox()
         self.semester_combo = QComboBox()
 
+        # Labels
+        self.year_label = None
+        self.semester_label = None
+
         # Table (equivalent to Treeview)
         self.table = QTableWidget()
 
@@ -49,6 +53,12 @@ class Application(QMainWindow):
         self.init_ui()
 
     def init_ui(self):
+        """
+        Initialize the user interface for the University Marks Manager application.
+        
+        This method sets up the main window, layouts, widgets, connects signals to their respective slots.
+        It configures the dropdowns, table, entry fields, buttons and arranges them in the main layout.
+        """
         self.setWindowTitle("University Marks Manager")
         self.setGeometry(100, 100, 800, 600)
 
@@ -62,48 +72,11 @@ class Application(QMainWindow):
         button_layout = QHBoxLayout()  # New layout for buttons
 
         # Dropdowns
-        current_year = datetime.now().year
-        self.year_combo.addItems([str(year) for year in range(current_year - 2, current_year + 2)])
-        self.year_combo.setCurrentText(str(current_year))
-        self.year_combo.currentTextChanged.connect(self.update_year)
-
-        self.semester_combo.addItems(["Autumn", "Spring", "Annual"])
-        self.semester_combo.currentTextChanged.connect(self.update_semester)
-
-        # Labels
-        year_label = QLabel("Select Year:")
-        semester_label = QLabel("Select Semester:")
-
-        # Table
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(
-            ["Subject Code", "Assessment", "Unweighted Mark", "Weighted Mark", "Mark Weight"])
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)  # Ensure row selection
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)  # Allow single row selection
-
-        # Entry Field Labels
-        subject_code_label = QLabel("Select Subject Code:")
-        assessment_label = QLabel("Select Assessment:")
-        weighted_mark_label = QLabel("Select Weighted Mark:")
-        mark_weight_label = QLabel("Select Mark Weight:")
-        total_mark_label = QLabel("Select Total Mark:")
-
-        # Add Labels and Fields to entry Layout
-        entry_layout.addRow(subject_code_label, self.subject_code_entry)
-        entry_layout.addRow(assessment_label, self.assessment_entry)
-        entry_layout.addRow(weighted_mark_label, self.weighted_mark_entry)
-        entry_layout.addRow(mark_weight_label, self.mark_weight_entry)
-        entry_layout.addRow(total_mark_label, self.total_mark_entry)
-
-        # Buttons
-        self.add_button.clicked.connect(self.add_entry)
-        self.delete_button.clicked.connect(self.delete_entry)
-        self.calc_button.clicked.connect(self.calculate_exam_mark)
-
-        # Add buttons to button layout
-        button_layout.addWidget(self.add_button)
-        button_layout.addWidget(self.delete_button)
-        button_layout.addWidget(self.calc_button)
+        self.setup_dropdowns()
+        self.setup_labels()
+        self.setup_tables()
+        self.setup_entry_fields(entry_layout)
+        self.setup_buttons(button_layout)
 
         # Wrap the entry layout in a QWidget
         entry_widget = QWidget()
@@ -114,9 +87,9 @@ class Application(QMainWindow):
         button_widget.setLayout(button_layout)
 
         # Layout Arrangements
-        form_layout.addWidget(year_label)
+        form_layout.addWidget(self.year_label)
         form_layout.addWidget(self.year_combo)
-        form_layout.addWidget(semester_label)
+        form_layout.addWidget(self.semester_label)
         form_layout.addWidget(self.semester_combo)
 
         # Add layouts to the main layout
@@ -133,6 +106,48 @@ class Application(QMainWindow):
 
         self.table.itemSelectionChanged.connect(self.populate_entries_from_selection)
 
+    def setup_dropdowns(self):
+        current_year = datetime.now().year
+        self.year_combo.addItems([str(year) for year in range(current_year - 5, current_year + 1)])
+        self.year_combo.setCurrentText(str(current_year))
+        self.year_combo.currentIndexChanged.connect(self.update_year)
+
+        self.semester_combo.addItems(["Autumn", "Spring", "Annual"])
+        self.semester_combo.currentIndexChanged.connect(self.update_semester)
+    
+    def setup_labels(self):
+        self.year_label = QLabel("Select Year:")
+        self.semester_label = QLabel("Select Semester:")
+    
+    def setup_tables(self):
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(
+            ["Subject Code", "Assessment", "Unweighted Mark", "Weighted Mark", "Mark Weight"])
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)  # Ensure row selection
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)  # Allow single row selection
+
+    def setup_entry_fields(self, entry_layout: QFormLayout):
+        subject_code_label = QLabel("Select Subject Code:")
+        assessment_label = QLabel("Select Assessment:")
+        weighted_mark_label = QLabel("Select Weighted Mark:")
+        mark_weight_label = QLabel("Select Mark Weight:")
+        total_mark_label = QLabel("Select Total Mark:")
+
+        entry_layout.addRow(subject_code_label, self.subject_code_entry)
+        entry_layout.addRow(assessment_label, self.assessment_entry)
+        entry_layout.addRow(weighted_mark_label, self.weighted_mark_entry)
+        entry_layout.addRow(mark_weight_label, self.mark_weight_entry)
+        entry_layout.addRow(total_mark_label, self.total_mark_entry)
+
+    def setup_buttons(self, button_layout: QHBoxLayout):
+        self.add_button.clicked.connect(self.add_entry)
+        self.delete_button.clicked.connect(self.delete_entry)
+        self.calc_button.clicked.connect(self.calculate_exam_mark)
+
+        button_layout.addWidget(self.add_button)
+        button_layout.addWidget(self.delete_button)
+        button_layout.addWidget(self.calc_button)
+
     def populate_entries_from_selection(self):
         selected_items = self.table.selectedItems()
         if selected_items:
@@ -142,10 +157,8 @@ class Application(QMainWindow):
             if "=" in subject_code or "Summary" in subject_code:
                 # Deselect the row if it contains the unwanted strings
                 self.table.clearSelection()
-
-                # Show a message box to inform the user
-                # QMessageBox.warning(self, "Selection Restricted", "This row cannot be selected because it contains summary information.")
                 return
+            
             self.subject_code_entry.setText(subject_code)
             self.assessment_entry.setText(self.table.item(row, 1).text())
             self.weighted_mark_entry.setText(self.table.item(row, 3).text())
