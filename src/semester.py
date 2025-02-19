@@ -6,6 +6,7 @@ The Semester class is responsible for handling assignments and examinations for 
 """
 from PyQt6.QtWidgets import QMessageBox
 from typing import List, Dict, Any
+from collections import OrderedDict
 
 from data_persistence import DataPersistence
 
@@ -32,15 +33,30 @@ class Semester:
         self.data_persistence = data_persistence
         self.data = self.data_persistence.data.get(self.name, {})
 
-    def __get_subject_data(self, semester: str, subject_code: str) -> Dict[str, Any]:
+    def __get_subject_data(self, semester: str, subject_code: str, subject_name: str = None) -> Dict[str, Any]:
         """Retrieve the subject data for a given semester and subject code."""
         if semester not in self.data_persistence.data:
             self.data_persistence.data[semester] = {}
 
         if subject_code not in self.data_persistence.data[semester]:
-            self.data_persistence.data[semester][subject_code] = {
-                "Assignments": [], "Total Mark": 0,
-                "Examinations": {"Exam Mark": 0, "Exam Weight": 100}}
+            self.data_persistence.data[semester][subject_code] = OrderedDict([
+                ("Subject Name", subject_name if subject_name else "N/A"),
+                ("Assignments", []),
+                ("Total Mark", 0),
+                ("Examinations", {"Exam Mark": 0, "Exam Weight": 100})
+            ])
+        else:
+            # Update the subject name if it is provided and different from the existing one
+            if subject_name and self.data_persistence.data[semester][subject_code].get("Subject Name") != subject_name:
+                self.data_persistence.data[semester][subject_code]["Subject Name"] = subject_name
+                # Reorder the dictionary to ensure "Subject Name" is the first key
+                self.data_persistence.data[semester][subject_code] = OrderedDict([
+                    ("Subject Name", self.data_persistence.data[semester][subject_code]["Subject Name"]),
+                    ("Assignments", self.data_persistence.data[semester][subject_code]["Assignments"]),
+                    ("Total Mark", self.data_persistence.data[semester][subject_code]["Total Mark"]),
+                    ("Examinations", self.data_persistence.data[semester][subject_code]["Examinations"])
+                ])
+
         return self.data_persistence.data[semester][subject_code]
 
     @staticmethod
@@ -54,7 +70,7 @@ class Semester:
             QMessageBox.critical(None, "Error", error_message)
             return -1
 
-    def add_entry(self, semester: str, subject_code: str, subject_assessment: str,
+    def add_entry(self, semester: str, subject_code: str, subject_name: str, subject_assessment: str,
                   weighted_mark: float | int, mark_weight: float, total_mark: float) -> None:
         """Add a new entry to the selected semester with assignment details."""
         # Check if subject_code is filled out
@@ -62,7 +78,7 @@ class Semester:
             QMessageBox.critical(None, "Error", "Subject Code is required!")
             return
 
-        subject_data = self.__get_subject_data(semester, subject_code)
+        subject_data = self.__get_subject_data(semester, subject_code, subject_name)
 
         # Validate and convert input values to float
         total_mark = self.__validate_float(total_mark, "Total Mark must be a valid number.")
@@ -70,8 +86,7 @@ class Semester:
         if total_mark != -1:
             subject_data["Total Mark"] = total_mark
 
-        weighted_mark = self.__validate_float(weighted_mark,
-                                              "Weighted Mark must be a valid number.")
+        weighted_mark = self.__validate_float(weighted_mark, "Weighted Mark must be a valid number.")
         mark_weight = self.__validate_float(mark_weight, "Mark Weight must be a valid number.")
         if mark_weight < 0 or mark_weight > 100:
             QMessageBox(None, "Error", "Mark Weight must be between 0 and 100.")
@@ -85,8 +100,8 @@ class Semester:
             if entry.get("Subject Assessment") == subject_assessment:
                 entry.update(
                     {"Unweighted Mark": unweighted_mark,
-                      "Weighted Mark": weighted_mark, 
-                      "Mark Weight": mark_weight})
+                     "Weighted Mark": weighted_mark, 
+                     "Mark Weight": mark_weight})
                 QMessageBox.information(None, "Success", "Assessment updated successfully!")
                 self.data_persistence.save_data()
                 return
@@ -144,7 +159,7 @@ class Semester:
         all_subjects = {**annual_subjects, **semester_data}
 
         # Sort the subjects based on the chosen criteria
-        if sort_by == "subject_code":
+        if (sort_by == "subject_code"):
             sorted_subjects = sorted(all_subjects.items(),
                                     key=lambda x: x[0])  # Sort by subject_code
         else:
@@ -153,9 +168,10 @@ class Semester:
         # Format the sorted data for display
         sorted_data_list = []
         for subject_code, subject_data in sorted_subjects:
+            subject_name = subject_data.get("Subject Name", "N/A")
             totals = {
                 "total_weighted_mark": sum(entry.get("Weighted Mark", 0) 
-                                           for entry in subject_data.get("Assignments", [])),
+                                        for entry in subject_data.get("Assignments", [])),
                 "total_weight": sum(entry.get("Mark Weight", 0) 
                                     for entry in subject_data.get("Assignments", [])),
                 "total_mark": subject_data.get("Total Mark", 0),
@@ -164,14 +180,19 @@ class Semester:
             totals["exam_mark"] = totals["exam_data"].get("Exam Mark", 0)
             totals["exam_weight"] = totals["exam_data"].get("Exam Weight", 0)
 
+            # Add subject name as a separate row
+            # sorted_data_list.append([subject_code, subject_name, "", "", "", "", ""])
+
             # Add assignments to the list
             for entry in subject_data.get("Assignments"):
                 sorted_data_list.append([
                     subject_code,
+                    subject_name,  # Include subject name
                     entry.get("Subject Assessment", "N/A").strip("\n"),
                     f"{entry.get('Unweighted Mark', 0):.2f}",
                     f"{entry.get('Weighted Mark', 0):.2f}",
-                    f"{entry.get('Mark Weight', 0):.2f}%"
+                    f"{entry.get('Mark Weight', 0):.2f}%",
+                    f"{totals['total_mark']:.2f}"  # Include total mark
                 ])
 
             sorted_data_list.append([
@@ -188,12 +209,46 @@ class Semester:
 
         return sorted_data_list
 
-
     def view_data(self) -> List[List[str]]:
         """Retrieve and format semester data for display."""
         # Call the sort_subjects method to get sorted data
         sorted_data = self.sort_subjects()
         return sorted_data
+    # def view_data(self) -> List[List[str]]:
+    #     """
+    #     Retrieve the data for the semester in a format suitable for display in the table.
+        
+    #     Returns:
+    #         List[List[str]]: The data for the semester.
+    #     """
+    #     data = []
+    #     for subject_code, subject_data in self.data.items():
+    #         subject_name = subject_data.get("Subject Name", "N/A")
+    #         total_mark = subject_data.get("Total Mark", 0)
+    #         # Add subject name as a separate row
+    #         for assignment in subject_data["Assignments"]:
+    #             data.append([
+    #                 subject_code,
+    #                 subject_name,  # Include subject name
+    #                 assignment["Subject Assessment"],
+    #                 f"{assignment['Unweighted Mark']:.2f}",
+    #                 f"{assignment['Weighted Mark']:.2f}",
+    #                 f"{assignment['Mark Weight']:.2f}%",
+    #                 f"{total_mark:.2f}"  # Include total mark
+    #             ])
+    #         # Add summary line for each subject
+    #         exam_mark = subject_data["Examinations"]["Exam Mark"]
+    #         exam_weight = subject_data["Examinations"]["Exam Weight"]
+    #         data.append([
+    #             f"Summary for {subject_code}",
+    #             f"Assessments: {len(subject_data['Assignments'])}",
+    #             f"Total Weighted: {sum(a['Weighted Mark'] for a in subject_data['Assignments']):.2f}",
+    #             f"Total Weight: {sum(a['Mark Weight'] for a in subject_data['Assignments'])::.2f}%",
+    #             f"Exam Mark: {exam_mark:.2f}",
+    #             f"Exam Weight: {exam_weight:.2f}%",
+    #             f"Total Mark: {total_mark:.2f}"
+    #         ])
+    #     return data
 
 
     def calculate_exam_mark(self, subject_code: str) -> float:

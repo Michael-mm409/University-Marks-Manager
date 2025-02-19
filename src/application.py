@@ -4,6 +4,7 @@ user interface of the University Marks Manager application. It also includes the
 ToolTip class for displaying tooltips when hovering over a Treeview cell.
 """
 from datetime import datetime
+from typing import Any
 from PyQt6.QtGui import QIcon, QFont
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QFormLayout, QHBoxLayout, QLabel,
@@ -40,6 +41,7 @@ class Application(QMainWindow):
 
         # Entry Fields
         self.subject_code_entry = QLineEdit()
+        self.subject_name_entry = QLineEdit()
         self.assessment_entry = QLineEdit()
         self.weighted_mark_entry = QLineEdit()
         self.mark_weight_entry = QLineEdit()
@@ -60,7 +62,7 @@ class Application(QMainWindow):
         It configures the dropdowns, table, entry fields, buttons and arranges them in the main layout.
         """
         self.setWindowTitle("University Marks Manager")
-        self.setGeometry(100, 100, 800, 600)
+        self.setGeometry(100, 100, 1500, 900)
 
         # Main Widget
         self.setCentralWidget(self.central_widget)
@@ -108,7 +110,7 @@ class Application(QMainWindow):
 
     def setup_dropdowns(self):
         current_year = datetime.now().year
-        self.year_combo.addItems([str(year) for year in range(current_year - 5, current_year + 1)])
+        self.year_combo.addItems([str(year) for year in range(current_year - 3, current_year + 2)])
         self.year_combo.setCurrentText(str(current_year))
         self.year_combo.currentIndexChanged.connect(self.update_year)
 
@@ -120,20 +122,31 @@ class Application(QMainWindow):
         self.semester_label = QLabel("Select Semester:")
     
     def setup_tables(self):
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(
-            ["Subject Code", "Assessment", "Unweighted Mark", "Weighted Mark", "Mark Weight"])
+        columns =  ["Subject Code", "Subject Name", "Assessment", "Unweighted Mark", "Weighted Mark", "Mark Weight", "Total Mark"]
+        self.table.setColumnCount(len(columns))
+        self.table.setHorizontalHeaderLabels(columns)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)  # Ensure row selection
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)  # Allow single row selection
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)  # Disable editing cells
 
     def setup_entry_fields(self, entry_layout: QFormLayout):
-        subject_code_label = QLabel("Select Subject Code:")
-        assessment_label = QLabel("Select Assessment:")
-        weighted_mark_label = QLabel("Select Weighted Mark:")
-        mark_weight_label = QLabel("Select Mark Weight:")
-        total_mark_label = QLabel("Select Total Mark:")
+        subject_code_label = QLabel("Enter Subject Code:")
+        subject_name_label = QLabel("Enter Subject Name:")
+        assessment_label = QLabel("Enter Assessment:")
+        weighted_mark_label = QLabel("Enter Weighted Mark:")
+        mark_weight_label = QLabel("Enter Mark Weight:")
+        total_mark_label = QLabel("Enter Total Mark:")
+
+        # Set fixed width for labels to align them properly
+        self.subject_code_entry.setFixedWidth(350)
+        self.subject_name_entry.setFixedWidth(350)
+        self.assessment_entry.setFixedWidth(350)
+        self.weighted_mark_entry.setFixedWidth(350)
+        self.mark_weight_entry.setFixedWidth(350)
+        self.total_mark_entry.setFixedWidth(350)
 
         entry_layout.addRow(subject_code_label, self.subject_code_entry)
+        entry_layout.addRow(subject_name_label, self.subject_name_entry)  # Add the subject name field
         entry_layout.addRow(assessment_label, self.assessment_entry)
         entry_layout.addRow(weighted_mark_label, self.weighted_mark_entry)
         entry_layout.addRow(mark_weight_label, self.mark_weight_entry)
@@ -160,7 +173,8 @@ class Application(QMainWindow):
                 return
             
             self.subject_code_entry.setText(subject_code)
-            self.assessment_entry.setText(self.table.item(row, 1).text())
+            self.subject_name_entry.setText(self.table.item(row, 1).text())
+            self.assessment_entry.setText(self.table.item(row, 2).text())
             self.weighted_mark_entry.setText(self.table.item(row, 3).text())
             self.mark_weight_entry.setText(self.table.item(row, 4).text().strip("%"))
 
@@ -176,6 +190,17 @@ class Application(QMainWindow):
     def update_semester(self):
         semester_name = self.semester_combo.currentText()
         semester = self.semesters.get(semester_name, "Unknown")
+         
+         # Sync subjects/assessment data from "Annual" semester to other semesters
+        if semester_name in ["Autumn", "Spring"]:
+            annual_data =self.semesters.get("Annual", "Unknown").view_data()
+
+            for row_data in annual_data:
+                subject_code = row_data[0]
+
+                if "Summary" not in subject_code and "=" not in subject_code:
+                    if subject_code not in semester.data:
+                        semester.data[subject_code] = self.semesters["Annual"]._Semester__get_subject_data("Annual", subject_code)
         self.update_table(semester)
 
 
@@ -195,6 +220,8 @@ class Application(QMainWindow):
 
         # Call to update row heights based on available space
         self.update_row_heights()
+
+        self.table.resizeColumnsToContents()
 
     def update_row_heights(self):
         """ Adjust row heights based on available space. """
@@ -224,28 +251,45 @@ class Application(QMainWindow):
         semester = self.semesters.get(semester_name, "Unknown")
 
         subject_code = self.subject_code_entry.text()
+        subject_name = self.subject_name_entry.text()  # Get the subject name from the input field
         assessment = self.assessment_entry.text()
         weighted_mark = self.weighted_mark_entry.text()
         mark_weight = self.mark_weight_entry.text()
         total_mark = self.total_mark_entry.text()
 
-        if total_mark == "":
-            total_mark = 0
+        # Validate and convert input values to float
+        weighted_mark = self.__validate_float(weighted_mark, "Weighted Mark must be a valid number.")
+        mark_weight = self.__validate_float(mark_weight, "Mark Weight must be a valid number.")
+        total_mark = self.__validate_float(total_mark, "Total Mark must be a valid number.")
+
+        if weighted_mark == -1 or mark_weight == -1 or total_mark == -1:
+            return  # Exit if any of the values are invalid
 
         try:
             semester.add_entry(
                 semester=semester_name,
                 subject_code=subject_code,
+                subject_name=subject_name,
                 subject_assessment=assessment,
-                weighted_mark=float(weighted_mark),
-                mark_weight=float(mark_weight),
-                total_mark=float(total_mark)
+                weighted_mark=weighted_mark,
+                mark_weight=mark_weight,
+                total_mark=total_mark
             )
             self.storage_handler.save_data()  # Ensure data is saved after adding entry
             self.update_table(semester)
         except ValueError as error:
             QMessageBox.critical(self, "Error", f"Failed to add entry: {error}")
 
+    def __validate_float(self, value: Any, error_message: str) -> float:
+        """Validate the input value and return it as a float."""
+        if value is None or value == "":
+            return 0.0
+        try:
+            return float(value)
+        except ValueError:
+            QMessageBox.critical(None, "Error", error_message)
+            return -1
+        
     def delete_entry(self):
         semester_name = self.semester_combo.currentText()
         semester = self.semesters.get(semester_name, "Unknown")
@@ -260,7 +304,7 @@ class Application(QMainWindow):
         for index in sorted(selected_rows, reverse=True):
             row = index.row()
             subject_code_item = self.table.item(row, 0)
-            assessment_item = self.table.item(row, 1)
+            assessment_item = self.table.item(row, 2)
 
             if subject_code_item and assessment_item:
                 subject_code = subject_code_item.text()

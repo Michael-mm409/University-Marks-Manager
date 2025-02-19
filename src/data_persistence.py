@@ -20,15 +20,16 @@ class DataPersistence:
     def load_data(self) -> Dict[str, Dict[str, List[Dict[str, Union[str, float]]]]]:
         """Load data from TinyDB or from a JSON file."""
         if path.exists(self.file_path):
-            with open(self.file_path, 'r', encoding='utf-8') as json_file:
-                return json.load(json_file)
-        else:
-            # Initialize structure for all semesters (Autumn, Spring, Annual)
-            return {
-                "Autumn": {},
-                "Spring": {},
-                "Annual": {}
-            }
+            try:
+                with open(self.file_path, 'r', encoding='utf-8') as json_file:
+                    return json.load(json_file)
+            except json.JSONDecodeError:
+                # Initialize structure for all semesters (Autumn, Spring, Annual)
+                return {
+                    "Autumn": {},
+                    "Spring": {},
+                    "Annual": {}
+                }
 
     def save_data(self):
         """Save data to TinyDB or JSON file with pretty-printing."""
