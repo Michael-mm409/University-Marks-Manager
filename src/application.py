@@ -120,10 +120,11 @@ class Application:
         form_frame = ttk.Frame(main_frame)
         form_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
 
-        sheet_label = ttk.Label(form_frame, text="Select Sheet:")
+        sheet_label = ttk.Label(form_frame, text="Select Semester:")
         sheet_label.grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
 
-        sheet_menu = ttk.OptionMenu(form_frame, self.sheet_var, "Autumn", "Spring", "Annual", command=self.update_semester)
+        sheet_menu = ttk.OptionMenu(form_frame, self.sheet_var, list(self.semesters.keys())[0], *list(self.semesters.keys()), command=self.update_semester)
+        print(f"Semesters: {self.semesters.keys()}")
         sheet_menu.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
 
         year_label = ttk.Label(form_frame, text="Select Year:")
