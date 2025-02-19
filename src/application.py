@@ -71,24 +71,7 @@ class Application:
         storage_handler (DataPersistence): An instance of the DataPersistence class.
     """
     def __init__(self, application_root: tk.Tk, storage_handler: DataPersistence):
-        self.subject_code_entry = None
-        self.subject_assessment_entry = None
-        self.weighted_mark_entry = None
-        self.mark_weight_entry = None
-        self.total_mark_entry = None
-        self.subject_assessment_label = None
-        self.current_tooltip = None
         self.root = application_root
-
-        main_frame = tk.Frame(self.root)
-        main_frame.pack(fill=tk.BOTH, expand=True)
-
-        grid_frame = tk.Frame(main_frame)
-        grid_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-        self.treeview = ttk.Treeview(grid_frame, columns=("Subject Code", "Subject Assessment", "Unweighted Mark",
-                                                          "Weighted Mark", "Mark Weight", "Exam Mark", "Exam Weight"),
-                                     show="headings")
         self.data_persistence = storage_handler
         self.semesters = {
             sem: Semester(sem, storage_handler.year, storage_handler)
@@ -99,87 +82,123 @@ class Application:
         self.year_list = [str(year) for year in range(current_year - 2, current_year + 2, 1)]
 
         self.year_var = tk.StringVar()
-        self.year_var.set(str(current_year))
+        self.year_var.set(str(current_year))  # This sets the default year to current_year
+        print(f"Current year in init: {datetime.now().year}")
 
         self.sheet_var = tk.StringVar()
         self.sheet_var.set("Autumn")
 
-        self.setup_gui(grid_frame)
+        # Initialise current tooltip to None
+        self.current_tooltip = None
+        print(current_year)
+
+        self.setup_gui()
 
         self.root.bind("<Configure>", self.on_window_resize)
 
-    def setup_gui(self, parent: tk.Frame):
-        """
-        Sets up the GUI components for the main application window.
-        
-        Args:
-            parent (tk.Frame): The parent frame to which the GUI components are added.
-        """
-        sheet_label = tk.Label(parent, text="Select Sheet:")
-        sheet_label.grid(row=0, column=0, padx=10, pady=10)
+    def setup_gui(self):
+        self.root.title("University Marks Manager")
+        self.root.geometry("1500x900")
 
-        sheet_menu = tk.OptionMenu(parent, self.sheet_var, "Autumn", "Spring", "Annual",
-                                command=self.update_semester)
-        sheet_menu.grid(row=0, column=1, padx=10, pady=10)
+        style = ttk.Style(self.root)
+        style.theme_use("clam")  # Start with the 'clam' theme and customize it
 
-        year_label = tk.Label(parent, text="Select Year:")
-        year_label.grid(row=1, column=0, padx=10, pady=10)
+        # Customize the styles for dark mode
+        dark_bg = "#2e2e2e"
+        dark_fg = "#ffffff"
+        accent_color = "#0078D7"
 
-        year_menu = tk.OptionMenu(parent, self.year_var, *self.year_list, command=self.update_year)
-        year_menu.grid(row=1, column=1, padx=10, pady=10)
+        style.configure("TFrame", background=dark_bg)
+        style.configure("TLabel", background=dark_bg, foreground=dark_fg, font=("Helvetica", 12))
+        style.configure("TButton", background=accent_color, foreground=dark_fg, font=("Helvetica", 12))
+        style.configure("Treeview", background=dark_bg, foreground=dark_fg, fieldbackground=dark_bg)
+        style.configure("Treeview.Heading", background=accent_color, foreground=dark_fg)
+
+        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame.grid(row=0, column=0, sticky="nsew")
+
+        form_frame = ttk.Frame(main_frame)
+        form_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+
+        sheet_label = ttk.Label(form_frame, text="Select Sheet:")
+        sheet_label.grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
+
+        sheet_menu = ttk.OptionMenu(form_frame, self.sheet_var, "Autumn", "Spring", "Annual", command=self.update_semester)
+        sheet_menu.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
+
+        year_label = ttk.Label(form_frame, text="Select Year:")
+        year_label.grid(row=0, column=2, padx=5, pady=5, sticky=tk.W)
+
+        # Set the year_var to the current year
+        current_year = datetime.now().year
+        self.year_var.set(str(current_year))
+
+        year_menu = ttk.OptionMenu(form_frame, self.year_var, current_year, *self.year_list, command=self.update_year)
+        year_menu.grid(row=0, column=3, padx=5, pady=5, sticky=tk.W)
+
+        self.treeview = ttk.Treeview(main_frame, columns=("Subject Code", "Subject Name", "Subject Assessment", "Unweighted Mark",
+                                                          "Weighted Mark", "Mark Weight", "Total Mark"),
+                                     show="headings", height=15)
+        self.treeview.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
 
         headings = {
             "Subject Code": "Subject Code",
+            "Subject Name": "Subject Name",
             "Subject Assessment": "Subject Assessment",
             "Unweighted Mark": "Mark (Out of Full Score)",
             "Weighted Mark": "Weighted Contribution (%)",
             "Mark Weight": "Assessment Weight (e.g., 30%)",
-            "Exam Mark": "Exam Mark (Calculated)",
-            "Exam Weight": "Exam Weight (%)",
+            "Total Mark": "Total Mark"
         }
 
         for col, description in headings.items():
             self.treeview.heading(col, text=description)
             self.treeview.column(col, anchor=tk.CENTER)
 
+        entry_frame = ttk.Frame(main_frame)
+        entry_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
+
         fields = [
-            ("Subject Code", 2, "subject_code_entry"),
-            ("Subject Assessment", 3, "subject_assessment_entry"),
-            ("Weighted Mark", 4, "weighted_mark_entry"),
-            ("Mark Weight", 5, "mark_weight_entry"),
-            ("Total Mark", 6, "total_mark_entry"),
+            ("Subject Code", "subject_code_entry"),
+            ("Subject Name", "subject_name_entry"),
+            ("Subject Assessment", "subject_assessment_entry"),
+            ("Weighted Mark", "weighted_mark_entry"),
+            ("Mark Weight", "mark_weight_entry"),
+            ("Total Mark", "total_mark_entry"),
         ]
 
-        for field, row, attr in fields:
-            label = tk.Label(parent, text=f"{field}:")
-            label.grid(row=row, column=0, padx=10, pady=10)
-            setattr(self, attr, tk.Entry(parent, width=50))
-            getattr(self, attr).grid(row=row, column=1, padx=10, pady=10)
+        for i, (field, attr) in enumerate(fields):
+            label = ttk.Label(entry_frame, text=f"{field}:")
+            label.grid(row=i, column=0, padx=5, pady=5, sticky=tk.W)
+            entry = ttk.Entry(entry_frame, width=50)
+            entry.grid(row=i, column=1, padx=5, pady=5, sticky=tk.W)
+            setattr(self, attr, entry)
 
-        add_btn = tk.Button(parent, text="Add Entry", command=self.add_entry)
-        add_btn.grid(row=6, column=0, columnspan=2, pady=10)
-        del_btn = tk.Button(parent, text="Delete Entry", command=self.delete_entry)
-        del_btn.grid(row=7, column=0, columnspan=2, pady=10)
-        calc_btn = tk.Button(parent, text="Calculate Exam Mark", command=self.calculate_exam_mark)
-        calc_btn.grid(row=8, column=0, columnspan=2, pady=10)
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=10)
 
-        sync_btn = tk.Button(parent, text="Sync All Semesters", command=self.sync_all_semesters)
-        sync_btn.grid(row=9, column=0, columnspan=2, pady=10)
+        add_btn = ttk.Button(button_frame, text="Add Entry", compound=tk.LEFT, command=self.add_entry)
+        add_btn.grid(row=0, column=0, padx=5, pady=5)
 
-        self.treeview.grid(row=10, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+        del_btn = ttk.Button(button_frame, text="Delete Entry", compound=tk.LEFT, command=self.delete_entry)
+        del_btn.grid(row=0, column=1, padx=5, pady=5)
 
-        v_scrollbar = ttk.Scrollbar(parent, orient="vertical", command=self.treeview.yview)
-        self.treeview.configure(yscrollcommand=v_scrollbar.set)
-        v_scrollbar.grid(row=10, column=2, sticky="ns", padx=(0, 10), pady=10)
+        calc_btn = ttk.Button(button_frame, text="Calculate Exam Mark", compound=tk.LEFT, command=self.calculate_exam_mark)
+        calc_btn.grid(row=0, column=2, padx=5, pady=5)
 
-        parent.grid_rowconfigure(10, weight=1)
-        parent.grid_columnconfigure(0, weight=1)
-        parent.grid_columnconfigure(1, weight=1)
+        sync_btn = ttk.Button(button_frame, text="Sync All Semesters", compound=tk.LEFT, command=self.sync_all_semesters)
+        sync_btn.grid(row=0, column=3, padx=5, pady=5)
 
         self.treeview.bind("<Motion>", self.on_treeview_motion)
         self.treeview.bind("<<TreeviewSelect>>", self.on_treeview_select)
 
         self.update_semester()
+
+        # Make the main frame expandable
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+        main_frame.grid_rowconfigure(1, weight=1)
+        main_frame.grid_columnconfigure(0, weight=1)
 
     def on_treeview_select(self, _event=None):
         """
@@ -212,11 +231,11 @@ class Application:
             event (tk.Event): The event that triggered the mouse motion.
         """
         region = self.treeview.identify("region", event.x, event.y)
-        if region == "cell":
+        if (region == "cell"):
             column = self.treeview.identify_column(event.x)
             row_id = self.treeview.identify_row(event.y)
 
-            if column == "#2":  # Assuming column index 2 is Subject Assessment
+            if column in [f"#{i}" for i in range(1, 3)]:  # Check if the column is Subject Assessment
                 values = self.treeview.item(row_id, "values")
 
                 if any("=" in value or "Assessments:" in value for value in values):
@@ -262,6 +281,7 @@ class Application:
                           for sem in self.semesters.keys()}
         self.update_semester()
         self.update_treeview()
+        print(f"Year set in update_year: {selected_year}")
 
     def update_semester(self, _event=None):
         """
@@ -290,6 +310,7 @@ class Application:
     def add_entry(self):
         """Adds a new entry to the selected semester with assignment details."""
         subject_code = self.subject_code_entry.get()
+        subject_name = self.subject_name_entry.get()
         subject_assessment = self.subject_assessment_entry.get()
         weighted_mark = self.weighted_mark_entry.get()
         mark_weight = self.mark_weight_entry.get()
@@ -299,6 +320,7 @@ class Application:
             self.semesters[semester_name].add_entry(
                 semester=semester_name,
                 subject_code=subject_code,
+                subject_name=subject_name,
                 subject_assessment=subject_assessment,
                 weighted_mark=weighted_mark,
                 mark_weight=mark_weight,
@@ -441,10 +463,3 @@ class Application:
 
         self.data_persistence.data = combined_data
         self.update_treeview()
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    root.geometry("800x600")
-    data_persistence = DataPersistence(str(datetime.now().year))
-    app = Application(root, data_persistence)
-    root.mainloop()

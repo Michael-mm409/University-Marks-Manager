@@ -31,15 +31,21 @@ class Semester:
         self.year = year
         self.data_persistence = data_persistence
 
-    def __get_subject_data(self, semester: str, subject_code: str) -> Dict[str, Any]:
+    def __get_subject_data(self, semester: str, subject_code: str, subject_name: str = "") -> Dict[str, Any]:
         """Retrieve the subject data for a given semester and subject code."""
         if semester not in self.data_persistence.data:
             self.data_persistence.data[semester] = {}
 
         if subject_code not in self.data_persistence.data[semester]:
             self.data_persistence.data[semester][subject_code] = {
-                "Assignments": [], "Total Mark": 0,
-                "Examinations": {"Exam Mark": 0, "Exam Weight": 100}}
+                "Subject Name": subject_name,
+                "Assignments": [], 
+                "Total Mark": 0,
+                "Examinations": {
+                        "Exam Mark": 0,
+                        "Exam Weight": 100
+                    }
+                }
         return self.data_persistence.data[semester][subject_code]
 
     def __validate_float(self, value: Any, errorr_message: str) -> float:
@@ -52,7 +58,7 @@ class Semester:
             messagebox.showerror("Error", errorr_message)
             return -1
 
-    def add_entry(self, semester, subject_code, subject_assessment,
+    def add_entry(self, semester, subject_code, subject_name, subject_assessment,
                   weighted_mark, mark_weight, total_mark) -> None:
         """Add a new entry to the selected semester with assignment details."""
         # Check if subject_code is filled out
@@ -60,7 +66,7 @@ class Semester:
             messagebox.showerror("Error", "Subject Code is required!")
             return
 
-        subject_data = self.__get_subject_data(semester, subject_code)
+        subject_data = self.__get_subject_data(semester, subject_code, subject_name)
 
         # Validate and convert input values to float
         total_mark = self.__validate_float(total_mark, "Total Mark must be a valid number.")
@@ -150,10 +156,13 @@ class Semester:
             for entry in subject_data.get("Assignments"):
                 sorted_data_list.append([
                     subject_code,
+                    subject_data.get("Subject Name", "N/A"),
                     entry.get("Subject Assessment", "N/A"),
                     f"{entry.get('Unweighted Mark', 0):.2f}",
                     f"{entry.get('Weighted Mark', 0):.2f}",
-                    f"{entry.get('Mark Weight', 0):.2f}%"
+                    f"{entry.get('Mark Weight', 0):.2f}%",
+                    f"{subject_data.get('Total Mark', 0):.2f}"
+
                 ])
 
             sorted_data_list.append([
@@ -161,9 +170,9 @@ class Semester:
                 f"Assessments: {len(subject_data['Assignments'])}",
                 f"Total Weighted: {totals['total_weighted_mark']:.2f}",
                 f"Total Weight: {totals['total_weight']:.0f}%",
-                f"Total Mark: {totals['total_mark']:.0f}",
                 f"Exam Mark: {totals['exam_mark']:.2f}",
-                f"Exam Weight: {totals['exam_weight']:.0f}%"
+                f"Exam Weight: {totals['exam_weight']:.0f}%",
+                f"Total Mark: {subject_data.get('Total Mark', 0):.2f}",
             ])
 
             sorted_data_list.append(["=" * 20] * 7)
