@@ -102,7 +102,6 @@ class Semester:
                     {"Unweighted Mark": unweighted_mark,
                      "Weighted Mark": weighted_mark, 
                      "Mark Weight": mark_weight})
-                QMessageBox.information(None, "Success", "Assessment updated successfully!")
                 self.data_persistence.save_data()
                 return
 
@@ -117,7 +116,6 @@ class Semester:
             new_assessment["Mark Weight"] = mark_weight
 
         assessments.append(new_assessment)
-        QMessageBox.information(None, "Success", "Assessment added successfully!")
 
         # Adjust exam weight if mark weight was provided
         if mark_weight != -1:

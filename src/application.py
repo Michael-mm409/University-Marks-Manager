@@ -299,8 +299,6 @@ class Application(QMainWindow):
             QMessageBox.warning(self, "Error", "Please select an entry to delete.")
             return
 
-        print(f"Selected rows: {selected_rows}")  # Debugging information
-
         for index in sorted(selected_rows, reverse=True):
             row = index.row()
             subject_code_item = self.table.item(row, 0)
@@ -319,7 +317,7 @@ class Application(QMainWindow):
                 QMessageBox.warning(self, "Error", "Failed to retrieve subject code or assessment.")
 
         self.storage_handler.save_data()  # Ensure data is saved after deleting entry
-        QMessageBox.information(self, "Success", "Selected entry has been deleted")
+
         self.update_table(semester)
 
     def calculate_exam_mark(self):
@@ -333,8 +331,6 @@ class Application(QMainWindow):
         exam_mark = self.semesters[semester_name].calculate_exam_mark(subject_code)
         self.update_table(self.semesters[semester_name])
 
-        if exam_mark is not None:
-            QMessageBox.information(self, "Success", f"Exam Mark for {subject_code}: {exam_mark}")
-        else:
+        if exam_mark is None:
             QMessageBox.critical(self, "Error", f"Subject {subject_code} not found.")
 
