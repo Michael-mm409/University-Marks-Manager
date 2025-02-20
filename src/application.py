@@ -1,5 +1,5 @@
 """
-This module contains the Application class which is responsible for managing the 
+This module contains the Application class which is responsible for managing the
 user interface of the University Marks Manager application. It also includes the
 ToolTip class for displaying tooltips when hovering over a Treeview cell.
 """
@@ -8,12 +8,12 @@ import tkinter as tk
 from data_persistence import DataPersistence
 from semester import Semester
 from ui import (configure_styles, create_main_frame,
-                 create_form_frame, create_treeview,
+                create_form_frame, create_treeview,
                 create_entry_frame, create_button_frames)
 from application_logic import (
     update_year, update_semester, add_semester, remove_semester, update_semester_menu,
     add_subject, remove_subject, add_entry, delete_entry, calculate_exam_mark,
-    update_treeview, on_treeview_select, on_treeview_motion, on_window_resize, sort_subjects
+    update_treeview, on_treeview_select, on_treeview_motion, on_window_resize
 )
 
 
@@ -22,7 +22,7 @@ class Application:
     A class to represent the main application window for the University Marks Manager.
     This class is responsible for managing the user interface of the application,
     including adding, deleting, and calculating marks for subjects.
-    
+
     Args:
         application_root (tk.Tk): The main application window.
         storage_handler (DataPersistence): An instance of the DataPersistence class.
