@@ -2,3 +2,6 @@
 /data/*
 /.idea/*
 *.pyc
+/build/*
+/dist/*
+/.vs/*
