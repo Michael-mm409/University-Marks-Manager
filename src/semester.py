@@ -31,7 +31,7 @@ class Semester:
         self.year = year
         self.data_persistence = data_persistence
 
-    def __get_subject_data(self, semester: str, subject_code: str, subject_name: str = "") -> Dict[str, Any]:
+    def __get_subject_data(self, semester: str, subject_code: str, subject_name: str = "", sync_source: bool=False) -> Dict[str, Any]:
         """Retrieve the subject data for a given semester and subject code."""
         if semester not in self.data_persistence.data:
             self.data_persistence.data[semester] = {}
@@ -40,11 +40,12 @@ class Semester:
             self.data_persistence.data[semester][subject_code] = {
                 "Subject Name": subject_name,
                 "Assignments": [], 
-                "Total Mark": 0,
+                "Total Mark": self.data_persistence.data[semester].get("Total Mark", 0),
                 "Examinations": {
-                        "Exam Mark": 0,
-                        "Exam Weight": 100
-                    }
+                        "Exam Mark": self.data_persistence.data[semester][subject_code]["Examinations"].get("Exam Mark", 0),
+                        "Exam Weight": self.data_persistence.data[semester][subject_code]["Examinations"].get("Exam Weight", 0)
+                    },
+                "Sync Source": sync_source
                 }
         return self.data_persistence.data[semester][subject_code]
 
@@ -59,14 +60,14 @@ class Semester:
             return -1
 
     def add_entry(self, semester, subject_code, subject_name, subject_assessment,
-                  weighted_mark, mark_weight, total_mark) -> None:
+                  weighted_mark, mark_weight, total_mark, sync_source=False) -> None:
         """Add a new entry to the selected semester with assignment details."""
         # Check if subject_code is filled out
         if not subject_code:
             messagebox.showerror("Error", "Subject Code is required!")
             return
 
-        subject_data = self.__get_subject_data(semester, subject_code, subject_name)
+        subject_data = self.__get_subject_data(semester, subject_code, subject_name, sync_source)
 
         # Validate and convert input values to float
         total_mark = self.__validate_float(total_mark, "Total Mark must be a valid number.")
@@ -112,6 +113,26 @@ class Semester:
         if mark_weight != -1:
             subject_data["Examinations"]["Exam Weight"] -= mark_weight
         self.data_persistence.save_data()
+
+        # If sync_source is True, propagate this new entry to other semesters.
+        if sync_source:
+            for other_semester in self.data_persistence.data:
+                if other_semester != self.name:
+                    try:
+                        from semester import Semester  # ensure correct import
+                        other_sem = Semester(other_semester, self.year, self.data_persistence)
+                        other_sem.add_entry(
+                            semester=other_semester,
+                            subject_code=subject_code,
+                            subject_name=subject_name,
+                            subject_assessment=subject_assessment,
+                            weighted_mark=weighted_mark,
+                            mark_weight=mark_weight,
+                            total_mark=total_mark,
+                            sync_source=False  # prevent recursion of syncing
+                        )
+                    except Exception as e:
+                        print(f"Error syncing entry to semester {other_semester}: {e}")
 
     def sort_subjects(self, sort_by: str = "subject_code") -> List[List[str]]:
         """
