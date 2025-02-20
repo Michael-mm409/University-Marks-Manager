@@ -53,6 +53,26 @@ class Application:
         self.root.title("University Marks Manager")
         self.root.geometry("1500x1100")
 
+        self.configure_styles()
+        self.create_main_frame()
+        self.create_form_frame()
+        self.create_treeview()
+        self.create_entry_frame()
+        self.create_button_frames()
+
+        self.treeview.bind("<Motion>", self.on_treeview_motion)
+        self.treeview.bind("<<TreeviewSelect>>", self.on_treeview_select)
+
+        # Make the main frame expandable
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+        self.main_frame.grid_rowconfigure(1, weight=1)
+        self.main_frame.grid_columnconfigure(0, weight=1)
+
+        # Call update_semester at the end of setup_gui
+        self.update_semester()
+
+    def configure_styles(self):
         style = ttk.Style(self.root)
         style.theme_use("clam")  # Start with the 'clam' theme and customize it
 
@@ -90,33 +110,31 @@ class Application:
         style.configure("Treeview", background=dark_bg, foreground=dark_fg, fieldbackground=dark_bg)
         style.configure("Treeview.Heading", background=accent_color, foreground=dark_fg)
 
-        main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky="nsew")
+    def create_main_frame(self):
+        self.main_frame = ttk.Frame(self.root, padding="10")
+        self.main_frame.grid(row=0, column=0, sticky="nsew")
 
-        form_frame = ttk.Frame(main_frame)
-        form_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+    def create_form_frame(self):
+        form_frame = ttk.Frame(self.main_frame)
+        form_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)  # Reduced padding
 
         sheet_label = ttk.Label(form_frame, text="Select Semester:")
-        sheet_label.grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
+        sheet_label.grid(row=0, column=0, padx=2, pady=2, sticky=tk.W)  # Reduced padding
 
         self.semester_menu = ttk.OptionMenu(form_frame, self.sheet_var, list(self.semesters.keys())[0], *list(self.semesters.keys()), command=self.update_semester)
-        print(f"Semesters: {self.semesters.keys()}")
-        self.semester_menu.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
+        self.semester_menu.grid(row=0, column=1, padx=2, pady=2, sticky=tk.W)  # Reduced padding
 
         year_label = ttk.Label(form_frame, text="Select Year:")
-        year_label.grid(row=0, column=2, padx=5, pady=5, sticky=tk.W)
+        year_label.grid(row=0, column=2, padx=2, pady=2, sticky=tk.W)  # Reduced padding
 
-        # Set the year_var to the current year
-        current_year = datetime.now().year
-        self.year_var.set(str(current_year))
+        year_menu = ttk.OptionMenu(form_frame, self.year_var, self.year_var.get(), *self.year_list, command=self.update_year)
+        year_menu.grid(row=0, column=3, padx=2, pady=2, sticky=tk.W)  # Reduced padding
 
-        year_menu = ttk.OptionMenu(form_frame, self.year_var, current_year, *self.year_list, command=self.update_year)
-        year_menu.grid(row=0, column=3, padx=5, pady=5, sticky=tk.W)
-
-        self.treeview = ttk.Treeview(main_frame, columns=("Subject Code", "Subject Name", "Subject Assessment", "Unweighted Mark",
-                                                        "Weighted Mark", "Mark Weight", "Total Mark"),
+    def create_treeview(self):
+        self.treeview = ttk.Treeview(self.main_frame, columns=("Subject Code", "Subject Name", "Subject Assessment", "Unweighted Mark",
+                                                              "Weighted Mark", "Mark Weight", "Total Mark"),
                                     show="headings", height=15)
-        self.treeview.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        self.treeview.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)  # Reduced padding
 
         headings = {
             "Subject Code": "Subject Code",
@@ -132,8 +150,9 @@ class Application:
             self.treeview.heading(col, text=description)
             self.treeview.column(col, anchor=tk.CENTER)
 
-        entry_frame = ttk.Frame(main_frame)
-        entry_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=10)
+    def create_entry_frame(self):
+        entry_frame = ttk.Frame(self.main_frame)
+        entry_frame.grid(row=2, column=0, sticky="ew", padx=5, pady=5)  # Reduced padding
 
         fields = [
             ("Subject Code", "subject_code_entry"),
@@ -146,60 +165,53 @@ class Application:
 
         for i, (field, attr) in enumerate(fields):
             label = ttk.Label(entry_frame, text=f"{field}:")
-            label.grid(row=i, column=0, padx=5, pady=5, sticky=tk.W)
+            label.grid(row=i//2, column=(i%2)*2, padx=2, pady=2, sticky=tk.W)  # Reduced padding
             entry = ttk.Entry(entry_frame, width=50)
-            entry.grid(row=i, column=1, padx=5, pady=5, sticky=tk.W)
+            entry.grid(row=i//2, column=(i%2)*2 + 1, padx=2, pady=2, sticky=tk.W)  # Reduced padding
             setattr(self, attr, entry)
 
         # Add a checkbox for sync source with the new style
         self.sync_source_var = tk.BooleanVar()
         sync_source_checkbox = ttk.Checkbutton(entry_frame, text="Sync Subject Across All Semesters", variable=self.sync_source_var, style="TCheckbutton")
-        sync_source_checkbox.grid(row=len(fields), column=0, columnspan=2, padx=5, pady=5, sticky=tk.W)
+        sync_source_checkbox.grid(row=3, column=0, columnspan=2, padx=2, pady=2, sticky=tk.W)  # Reduced padding
 
-        # Frame for subject-related buttons
-        subject_button_frame = ttk.Frame(main_frame)
-        subject_button_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=10)
+    def create_button_frames(self):
+        # Frame for subject-related and semester-related buttons combined
+        subject_button_frame = ttk.Frame(self.main_frame)
+        subject_button_frame.grid(row=3, column=0, sticky="ew", padx=5, pady=5)  # Reduced padding
 
         add_subject_btn = ttk.Button(subject_button_frame, text="Add Subject", compound=tk.LEFT, command=self.add_subject)
-        add_subject_btn.grid(row=0, column=0, padx=5, pady=5)
+        add_subject_btn.grid(row=0, column=0, padx=2, pady=2)  # Reduced padding
 
         remove_subject_btn = ttk.Button(subject_button_frame, text="Remove Subject", compound=tk.LEFT, command=self.remove_subject)
-        remove_subject_btn.grid(row=0, column=1, padx=5, pady=5)
+        remove_subject_btn.grid(row=0, column=1, padx=2, pady=2)  # Reduced padding
 
-        # Frame for entry-related buttons
-        entry_button_frame = ttk.Frame(main_frame)
-        entry_button_frame.grid(row=4, column=0, sticky="ew", padx=10, pady=10)
+        # Add Semester button
+        add_semester_btn = ttk.Button(subject_button_frame, text="Add Semester", compound=tk.LEFT, command=self.add_semester)
+        add_semester_btn.grid(row=0, column=2, padx=2, pady=2)  # Reduced padding
 
-        add_btn = ttk.Button(entry_button_frame, text="Add Entry", compound=tk.LEFT, command=self.add_entry)
-        add_btn.grid(row=0, column=0, padx=5, pady=5)
+        # Remove Semester button
+        remove_semester_btn = ttk.Button(subject_button_frame, text="Remove Semester", compound=tk.LEFT, command=self.remove_semester)
+        remove_semester_btn.grid(row=0, column=3, padx=2, pady=2)  # Reduced padding
 
-        del_btn = ttk.Button(entry_button_frame, text="Delete Entry", compound=tk.LEFT, command=self.delete_entry)
-        del_btn.grid(row=0, column=1, padx=5, pady=5)
+        # Frame for entry-related and semester-related buttons combined
+        button_frame = ttk.Frame(self.main_frame)
+        button_frame.grid(row=4, column=0, sticky="ew", padx=5, pady=5)  # Reduced padding
 
-        calc_btn = ttk.Button(entry_button_frame, text="Calculate Exam Mark", compound=tk.LEFT, command=self.calculate_exam_mark)
-        calc_btn.grid(row=0, column=2, padx=5, pady=5)
+        # Add Entry button
+        add_entry_btn = ttk.Button(button_frame, text="Add Entry", compound=tk.LEFT, command=self.add_entry)
+        add_entry_btn.grid(row=0, column=0, padx=2, pady=2)  # Reduced padding
 
-        # Frame for semester-related buttons
-        semester_button_frame = ttk.Frame(main_frame)
-        semester_button_frame.grid(row=5, column=0, sticky="ew", padx=10, pady=10)
+        # Delete Entry button
+        del_btn = ttk.Button(button_frame, text="Delete Entry", compound=tk.LEFT, command=self.delete_entry)
+        del_btn.grid(row=0, column=1, padx=2, pady=2)  # Reduced padding
 
-        add_semester_btn = ttk.Button(semester_button_frame, text="Add Semester", compound=tk.LEFT, command=self.add_semester)
-        add_semester_btn.grid(row=0, column=0, padx=5, pady=5)
+        # Calculate Exam Mark button
+        calc_btn = ttk.Button(button_frame, text="Calculate Exam Mark", compound=tk.LEFT, command=self.calculate_exam_mark)
+        calc_btn.grid(row=0, column=2, padx=2, pady=2)  # Reduced padding
 
-        remove_semester_btn = ttk.Button(semester_button_frame, text="Remove Semester", compound=tk.LEFT, command=self.remove_semester)
-        remove_semester_btn.grid(row=0, column=1, padx=5, pady=5)
+        
 
-        self.treeview.bind("<Motion>", self.on_treeview_motion)
-        self.treeview.bind("<<TreeviewSelect>>", self.on_treeview_select)
-
-        # Make the main frame expandable
-        self.root.grid_rowconfigure(0, weight=1)
-        self.root.grid_columnconfigure(0, weight=1)
-        main_frame.grid_rowconfigure(1, weight=1)
-        main_frame.grid_columnconfigure(0, weight=1)
-
-        # Call update_semester at the end of setup_gui
-        self.update_semester()
 
     def on_treeview_select(self, _event=None):
         """
