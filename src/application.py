@@ -7,58 +7,10 @@ from datetime import datetime
 from tkinter import messagebox, simpledialog, ttk
 import tkinter as tk
 from data_persistence import DataPersistence
+import ui.tooltip as tooltip
 from semester import Semester
+from typing import List, Dict, Any
 
-
-class ToolTip:
-    """
-    A class to represent a tooltip for displaying 
-    additional information when hovering over a widget.
-    
-    Args:
-        widget (tk.Widget): The widget to which the tooltip is attached.
-        text (str): The text to be displayed in the tooltip.
-        tip_window (tk.Toplevel): The tooltip window to display the text.
-    """
-    def __init__(self, widget: tk.Widget, text: str):
-        """
-        Constructs all the necessary attributes for the tooltip window.
-        
-        Args:
-            widget (tk.Widget): The widget to which the tooltip is attached.
-            text (str): The text to be displayed in the tooltip.
-        """
-        self.widget = widget
-        self.text = text
-        self.tip_window = None
-
-    def show_tip(self, event: tk.Event):
-        """
-        Displays the tooltip window with the specified text.
-
-        Args:
-            event (tk.Event): The event that triggered the tooltip display.
-        """
-        if self.tip_window or not self.text:
-            return
-        x = event.x_root + 10
-        y = event.y_root + 10
-        self.tip_window = tw = tk.Toplevel(self.widget)
-        tw.wm_overrideredirect(1)
-        tw.wm_geometry(f"+{x}+{y}")
-        label = tk.Label(tw, text=self.text, background="yellow", relief=tk.SOLID, borderwidth=1)
-        label.pack(ipadx=1)
-
-    def hide_tip(self, _event):
-        """
-        Hides the tooltip window when the mouse leaves the widget.
-        
-        Args:
-            _event (tk.Event): The event that triggered the tooltip hide action.
-        """
-        if self.tip_window:
-            self.tip_window.destroy()
-            self.tip_window = None
 
 
 class Application:
@@ -76,7 +28,7 @@ class Application:
         self.data_persistence = storage_handler
         self.semesters = {
             sem: Semester(sem, storage_handler.year, storage_handler)
-            for sem in ["Autumn", "Spring", "Annual"]
+            for sem in self.data_persistence.data.keys()
         }
 
         current_year = datetime.now().year
@@ -99,7 +51,7 @@ class Application:
 
     def setup_gui(self):
         self.root.title("University Marks Manager")
-        self.root.geometry("1500x800")
+        self.root.geometry("1500x1100")
 
         style = ttk.Style(self.root)
         style.theme_use("clam")  # Start with the 'clam' theme and customize it
@@ -108,10 +60,33 @@ class Application:
         dark_bg = "#2e2e2e"
         dark_fg = "#ffffff"
         accent_color = "#0078D7"
+        hover_color = "#3399FF"  # Slightly brighter color for hover
 
         style.configure("TFrame", background=dark_bg)
         style.configure("TLabel", background=dark_bg, foreground=dark_fg, font=("Helvetica", 12))
-        style.configure("TButton", background=accent_color, foreground=dark_fg, font=("Helvetica", 12))
+        style.configure("TButton",
+                        background=accent_color, 
+                        foreground=dark_fg, 
+                        font=("Helvetica", 12), 
+                        relief="flat")  # Remove the border effect
+        style.map("TButton",
+                background=[("active", hover_color), ("focus", accent_color)],
+                foreground=[("active", dark_fg), ("focus", dark_fg)],
+                highlightbackground=[("active", hover_color), ("focus", accent_color)],
+                highlightcolor=[("active", hover_color), ("focus", accent_color)])
+
+        style.configure("TCheckbutton", 
+                        background=dark_bg, 
+                        foreground=dark_fg, 
+                        font=("Helvetica", 12), 
+                        selectcolor=dark_bg, 
+                        relief="flat")  # Remove the border effect
+        style.map("TCheckbutton",
+                background=[("active", dark_bg), ("focus", dark_bg)],
+                foreground=[("active", dark_fg), ("focus", dark_fg)],
+                highlightbackground=[("active", dark_bg), ("focus", dark_bg)],
+                highlightcolor=[("active", dark_bg), ("focus", dark_bg)])
+
         style.configure("Treeview", background=dark_bg, foreground=dark_fg, fieldbackground=dark_bg)
         style.configure("Treeview.Heading", background=accent_color, foreground=dark_fg)
 
@@ -139,8 +114,8 @@ class Application:
         year_menu.grid(row=0, column=3, padx=5, pady=5, sticky=tk.W)
 
         self.treeview = ttk.Treeview(main_frame, columns=("Subject Code", "Subject Name", "Subject Assessment", "Unweighted Mark",
-                                                          "Weighted Mark", "Mark Weight", "Total Mark"),
-                                     show="headings", height=15)
+                                                        "Weighted Mark", "Mark Weight", "Total Mark"),
+                                    show="headings", height=15)
         self.treeview.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
 
         headings = {
@@ -176,34 +151,55 @@ class Application:
             entry.grid(row=i, column=1, padx=5, pady=5, sticky=tk.W)
             setattr(self, attr, entry)
 
-        button_frame = ttk.Frame(main_frame)
-        button_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=10)
+        # Add a checkbox for sync source with the new style
+        self.sync_source_var = tk.BooleanVar()
+        sync_source_checkbox = ttk.Checkbutton(entry_frame, text="Sync Subject Across All Semesters", variable=self.sync_source_var, style="TCheckbutton")
+        sync_source_checkbox.grid(row=len(fields), column=0, columnspan=2, padx=5, pady=5, sticky=tk.W)
 
-        add_btn = ttk.Button(button_frame, text="Add Entry", compound=tk.LEFT, command=self.add_entry)
+        # Frame for subject-related buttons
+        subject_button_frame = ttk.Frame(main_frame)
+        subject_button_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=10)
+
+        add_subject_btn = ttk.Button(subject_button_frame, text="Add Subject", compound=tk.LEFT, command=self.add_subject)
+        add_subject_btn.grid(row=0, column=0, padx=5, pady=5)
+
+        remove_subject_btn = ttk.Button(subject_button_frame, text="Remove Subject", compound=tk.LEFT, command=self.remove_subject)
+        remove_subject_btn.grid(row=0, column=1, padx=5, pady=5)
+
+        # Frame for entry-related buttons
+        entry_button_frame = ttk.Frame(main_frame)
+        entry_button_frame.grid(row=4, column=0, sticky="ew", padx=10, pady=10)
+
+        add_btn = ttk.Button(entry_button_frame, text="Add Entry", compound=tk.LEFT, command=self.add_entry)
         add_btn.grid(row=0, column=0, padx=5, pady=5)
 
-        del_btn = ttk.Button(button_frame, text="Delete Entry", compound=tk.LEFT, command=self.delete_entry)
+        del_btn = ttk.Button(entry_button_frame, text="Delete Entry", compound=tk.LEFT, command=self.delete_entry)
         del_btn.grid(row=0, column=1, padx=5, pady=5)
 
-        calc_btn = ttk.Button(button_frame, text="Calculate Exam Mark", compound=tk.LEFT, command=self.calculate_exam_mark)
+        calc_btn = ttk.Button(entry_button_frame, text="Calculate Exam Mark", compound=tk.LEFT, command=self.calculate_exam_mark)
         calc_btn.grid(row=0, column=2, padx=5, pady=5)
 
-        add_semester_btn = ttk.Button(button_frame, text="Add Semester", compound=tk.LEFT, command=self.add_semester)
-        add_semester_btn.grid(row=0, column=3, padx=5, pady=5)
+        # Frame for semester-related buttons
+        semester_button_frame = ttk.Frame(main_frame)
+        semester_button_frame.grid(row=5, column=0, sticky="ew", padx=10, pady=10)
 
-        remove_semester_btn = ttk.Button(button_frame, text="Remove Semester", compound=tk.LEFT, command=self.remove_semester)
-        remove_semester_btn.grid(row=0, column=4, padx=5, pady=5)
+        add_semester_btn = ttk.Button(semester_button_frame, text="Add Semester", compound=tk.LEFT, command=self.add_semester)
+        add_semester_btn.grid(row=0, column=0, padx=5, pady=5)
+
+        remove_semester_btn = ttk.Button(semester_button_frame, text="Remove Semester", compound=tk.LEFT, command=self.remove_semester)
+        remove_semester_btn.grid(row=0, column=1, padx=5, pady=5)
 
         self.treeview.bind("<Motion>", self.on_treeview_motion)
         self.treeview.bind("<<TreeviewSelect>>", self.on_treeview_select)
-
-        self.update_semester()
 
         # Make the main frame expandable
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
         main_frame.grid_rowconfigure(1, weight=1)
         main_frame.grid_columnconfigure(0, weight=1)
+
+        # Call update_semester at the end of setup_gui
+        self.update_semester()
 
     def on_treeview_select(self, _event=None):
         """
@@ -240,7 +236,7 @@ class Application:
             event (tk.Event): The event that triggered the mouse motion.
         """
         region = self.treeview.identify("region", event.x, event.y)
-        if region == "cell":
+        if (region == "cell"):
             column = self.treeview.identify_column(event.x)
             row_id = self.treeview.identify_row(event.y)
 
@@ -253,7 +249,7 @@ class Application:
                     text = values[int(column[1]) - 1]  # Get the text for the specific column
                     if self.current_tooltip:
                         self.current_tooltip.hide_tip(event)
-                    self.current_tooltip = ToolTip(self.treeview, text)
+                    self.current_tooltip = tooltip.ToolTipManager(self.treeview, text)
                     self.current_tooltip.show_tip(event)
             else:
                 if self.current_tooltip:
@@ -292,7 +288,7 @@ class Application:
         self.update_treeview()
         print(f"Year set in update_year: {selected_year}")
 
-    def update_semester(self, _event=None):
+    def update_semester(self, _event=None, *args):
         """
         Updates the semester in the application.
         
@@ -301,16 +297,15 @@ class Application:
         """
         selected_sheet = self.sheet_var.get()
         selected_year = self.year_var.get()
-        if self.semesters[selected_sheet] is None:
-            self.semesters[selected_sheet] = Semester(selected_sheet, 
-                                                      selected_year, self.data_persistence)
+        if selected_sheet not in self.semesters:
+            self.semesters[selected_sheet] = Semester(selected_sheet, selected_year, self.data_persistence)
         self.update_treeview()
 
     def update_treeview(self):
         """Updates the Treeview widget with the data from the selected semester."""
         semester_name = self.sheet_var.get()
         semester = self.semesters[semester_name]
-        treeview_data = semester.view_data()
+        treeview_data = semester.sort_subjects()
         for row in self.treeview.get_children():
             self.treeview.delete(row)
         
@@ -328,6 +323,10 @@ class Application:
         mark_weight = self.mark_weight_entry.get()
         total_mark = self.total_mark_entry.get()
         semester_name = self.sheet_var.get()
+
+        # Get the value of the sync source checkbox
+        sync_source = self.sync_source_var.get()
+
         try:
             self.semesters[semester_name].add_entry(
                 semester=semester_name,
@@ -336,7 +335,8 @@ class Application:
                 subject_assessment=subject_assessment,
                 weighted_mark=weighted_mark,
                 mark_weight=mark_weight,
-                total_mark=total_mark
+                total_mark=total_mark,
+                sync_source=sync_source
             )
         except ValueError as error:
             messagebox.showerror("Error", f"Failed to add entry: {error}")
@@ -412,19 +412,21 @@ class Application:
         self.update_treeview()
 
     def add_semester(self):
-        """Adds a new semester to the data structure."""
-        semester_name = simpledialog.askstring("Add Semester", "Enter the name of the semester:")
-        if semester_name:
-            self.data_persistence.add_semester(semester_name)
-            self.semesters[semester_name] = Semester(semester_name, self.data_persistence.year, self.data_persistence)
-            self.update_semester_menu()
-            messagebox.showinfo("Success", f"Semester '{semester_name}' added successfully.")
+        """Add a new semester to the application."""
+        new_semester_name = simpledialog.askstring("Add Semester", "Enter the name of the new semester:")
+        if new_semester_name:
+            if new_semester_name in self.semesters:
+                messagebox.showerror("Error", "Semester already exists!")
+            else:
+                self.semesters[new_semester_name] = Semester(new_semester_name, self.year_var.get(), self.data_persistence)
+                self.semester_menu["menu"].add_command(label=new_semester_name, command=tk._setit(self.sheet_var, new_semester_name, self.update_semester))
+                self.sheet_var.set(new_semester_name)
+                self.update_semester()
 
     def remove_semester(self):
         """Removes an existing semester from the data structure."""
         semester_name = simpledialog.askstring("Remove Semester", "Enter the name of the semester:")
         if semester_name:
-            self.semesters.pop(semester_name)
             self.data_persistence.remove_semester(semester_name)
             self.update_semester_menu()
             messagebox.showinfo("Success", f"Semester '{semester_name}' removed successfully.")
@@ -435,7 +437,10 @@ class Application:
         sheet_menu.delete(0, "end")
         for semester in self.semesters.keys():
             sheet_menu.add_command(label=semester, command=lambda value=semester: self.sheet_var.set(value))
-        self.sheet_var.set(list(self.semesters.keys())[0]) if self.semesters else ""
+        if self.semesters:
+            self.sheet_var.set(list(self.semesters.keys())[0])
+        else:
+            self.sheet_var.set("")
     
     def sort_subjects(self, sort_by="Subject Code"):
         """
@@ -484,33 +489,22 @@ class Application:
             messagebox.showerror("Error", f"Subject {subject_code} not found.")
             self.update_treeview()
 
-    def sync_all_semesters(self):
-        """Synchronises all semesters' data into a single data structure."""
-        current_year = self.year_var.get()  # This is a string of the current year
-        autumn_data = self.data_persistence.data.get("Autumn", {}).copy()
-        spring_data = self.data_persistence.data.get("Spring", {}).copy()
-        annual_data = self.data_persistence.data.get("Annual", {}).copy()
+    def add_subject(self):
+        """Add a new subject to the selected semester."""
+        subject_code = simpledialog.askstring("Add Subject", "Enter the subject code:")
+        subject_name = simpledialog.askstring("Add Subject", "Enter the subject name:")
+        sync_source = messagebox.askyesno("Sync Subject", "Should this subject be a sync source?")
 
-        # Filter subjects from Annual that belong to the current year.
-        # This assumes each subject's details include a key "Year".
-        annual_data_current_year = {
-            subject: details
-            for subject, details in annual_data.items()
-            if details.get("Year") == current_year
-        }
+        if subject_code and subject_name:
+            semester_name = self.sheet_var.get()
+            self.semesters[semester_name].add_subject(subject_code, subject_name, sync_source)
+            self.update_treeview()
 
-        # Sync only the filtered Annual subjects to Autumn and Spring if they don't already exist
-        for subject, details in annual_data_current_year.items():
-            if subject not in autumn_data:
-                autumn_data[subject] = details
-            if subject not in spring_data:
-                spring_data[subject] = details
-        
-        combined_data = {
-            "Autumn": autumn_data,
-            "Spring": spring_data,
-            "Annual": annual_data  # Leave Annual unmodified
-        }
+    def remove_subject(self):
+        """Remove a subject from the selected semester."""
+        subject_code = simpledialog.askstring("Remove Subject", "Enter the subject code to remove:")
 
-        self.data_persistence.data = combined_data
-        self.update_treeview()
+        if subject_code:
+            semester_name = self.sheet_var.get()
+            self.semesters[semester_name].remove_subject(subject_code)
+            self.update_treeview()
