@@ -3,7 +3,6 @@ This module provides classes for data persistence in the University Marks Manage
 """
 import json
 from os import makedirs, path
-from tkinter import messagebox
 from typing import Dict, List, Union
 
 class DataPersistence:
@@ -18,10 +17,13 @@ class DataPersistence:
         self.data = self.load_data()
 
     def load_data(self) -> Dict[str, Dict[str, List[Dict[str, Union[str, float]]]]]:
-        """Load data from TinyDB or from a JSON file."""
+        """Load data from a JSON file."""
         if path.exists(self.file_path):
-            with open(self.file_path, 'r', encoding='utf-8') as json_file:
-                return json.load(json_file)
+            try:
+                with open(self.file_path, 'r', encoding='utf-8') as json_file:
+                    return json.load(json_file)
+            except (json.JSONDecodeError, IOError):
+                print(f"Error reading {self.file_path}. Initialising with empty data.")
         else:
             # Initialize structure for all semesters (Autumn, Spring, Annual)
             return {
@@ -31,8 +33,22 @@ class DataPersistence:
             }
 
     def save_data(self):
-        """Save data to TinyDB or JSON file with pretty-printing."""
+        """Save data to JSON file with pretty-printing."""
+        try:
+            with open(self.file_path, 'w', encoding='utf-8') as json_file:
+                json.dump(self.data, json_file, indent=4)
+        except IOError as error:
+            print(f"Error saving data: {error}")
+        # messagebox.showinfo("Success", f"Data saved successfully to {self.file_path}!")
 
-        with open(self.file_path, 'w', encoding='utf-8') as json_file:
-            json.dump(self.data, json_file, indent=4)
-        messagebox.showinfo("Success", f"Data saved successfully to {self.file_path}!")
+    def add_semester(self, semester_name: str) -> None:
+        """Add a new semester to the data structure."""
+        if semester_name not in self.data:
+            self.data[semester_name] = {}
+            self.save_data()
+    
+    def remove_semester(self, semester_name: str) -> None:
+        """Remove a semester from the data structure."""
+        if semester_name in self.data:
+            del self.data[semester_name]
+            self.save_data()

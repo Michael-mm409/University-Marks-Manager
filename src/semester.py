@@ -165,17 +165,18 @@ class Semester:
 
                 ])
 
-            sorted_data_list.append([
-                f"Summary for {subject_code}",
-                f"Assessments: {len(subject_data['Assignments'])}",
-                f"Total Weighted: {totals['total_weighted_mark']:.2f}",
-                f"Total Weight: {totals['total_weight']:.0f}%",
-                f"Exam Mark: {totals['exam_mark']:.2f}",
-                f"Exam Weight: {totals['exam_weight']:.0f}%",
-                f"Total Mark: {subject_data.get('Total Mark', 0):.2f}",
-            ])
+            if subject_data.get("Assignments"):
+                sorted_data_list.append([
+                    f"Summary for {subject_code}",
+                    f"Assessments: {len(subject_data['Assignments'])}",
+                    f"Total Weighted: {totals['total_weighted_mark']:.2f}",
+                    f"Total Weight: {totals['total_weight']:.0f}%",
+                    f"Exam Mark: {totals['exam_mark']:.2f}",
+                    f"Exam Weight: {totals['exam_weight']:.0f}%",
+                    f"Total Mark: {subject_data.get('Total Mark', 0):.2f}",
+                ])
 
-            sorted_data_list.append(["=" * 20] * 7)
+                sorted_data_list.append(["=" * 20] * 7)
 
         return sorted_data_list
 
@@ -184,6 +185,7 @@ class Semester:
         """Retrieve and format semester data for display."""
         # Call the sort_subjects method to get sorted data
         sorted_data = self.sort_subjects()
+        print(f"Fetching data for Semester: {self.name}, Year: {self.year}")
         return sorted_data
 
 
@@ -193,15 +195,11 @@ class Semester:
         total_mark = subject_data.get("Total Mark", 0)
         assessments_sum = sum(entry.get("Weighted Mark", 0)
                               for entry in subject_data.get("Assignments", []))
-        assessments_weight = sum(entry.get("Mark Weight", 0)
-                                 for entry in subject_data.get("Assignments", []))
 
         # Calculate exam mark
         exam_mark = max(0, round(total_mark - assessments_sum, 2))
-        exam_weight = max(0, 100 - assessments_weight)
 
         subject_data["Examinations"]["Exam Mark"] = exam_mark
-        subject_data["Examinations"]["Exam Weight"] = exam_weight
 
         self.data_persistence.save_data()
         return exam_mark

@@ -4,7 +4,7 @@ user interface of the University Marks Manager application. It also includes the
 ToolTip class for displaying tooltips when hovering over a Treeview cell.
 """
 from datetime import datetime
-from tkinter import messagebox, ttk
+from tkinter import messagebox, simpledialog, ttk
 import tkinter as tk
 from data_persistence import DataPersistence
 from semester import Semester
@@ -54,7 +54,8 @@ class ToolTip:
         Hides the tooltip window when the mouse leaves the widget.
         
         Args:
-            _event (tk.Event): The event that triggered the tooltip hide action."""
+            _event (tk.Event): The event that triggered the tooltip hide action.
+        """
         if self.tip_window:
             self.tip_window.destroy()
             self.tip_window = None
@@ -98,7 +99,7 @@ class Application:
 
     def setup_gui(self):
         self.root.title("University Marks Manager")
-        self.root.geometry("1500x900")
+        self.root.geometry("1500x800")
 
         style = ttk.Style(self.root)
         style.theme_use("clam")  # Start with the 'clam' theme and customize it
@@ -123,9 +124,9 @@ class Application:
         sheet_label = ttk.Label(form_frame, text="Select Semester:")
         sheet_label.grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
 
-        sheet_menu = ttk.OptionMenu(form_frame, self.sheet_var, list(self.semesters.keys())[0], *list(self.semesters.keys()), command=self.update_semester)
+        self.semester_menu = ttk.OptionMenu(form_frame, self.sheet_var, list(self.semesters.keys())[0], *list(self.semesters.keys()), command=self.update_semester)
         print(f"Semesters: {self.semesters.keys()}")
-        sheet_menu.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
+        self.semester_menu.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
 
         year_label = ttk.Label(form_frame, text="Select Year:")
         year_label.grid(row=0, column=2, padx=5, pady=5, sticky=tk.W)
@@ -164,7 +165,7 @@ class Application:
             ("Subject Name", "subject_name_entry"),
             ("Subject Assessment", "subject_assessment_entry"),
             ("Weighted Mark", "weighted_mark_entry"),
-            ("Mark Weight", "mark_weight_entry"),
+            ("Mark Weight (%)", "mark_weight_entry"),
             ("Total Mark", "total_mark_entry"),
         ]
 
@@ -187,8 +188,11 @@ class Application:
         calc_btn = ttk.Button(button_frame, text="Calculate Exam Mark", compound=tk.LEFT, command=self.calculate_exam_mark)
         calc_btn.grid(row=0, column=2, padx=5, pady=5)
 
-        sync_btn = ttk.Button(button_frame, text="Sync All Semesters", compound=tk.LEFT, command=self.sync_all_semesters)
-        sync_btn.grid(row=0, column=3, padx=5, pady=5)
+        add_semester_btn = ttk.Button(button_frame, text="Add Semester", compound=tk.LEFT, command=self.add_semester)
+        add_semester_btn.grid(row=0, column=3, padx=5, pady=5)
+
+        remove_semester_btn = ttk.Button(button_frame, text="Remove Semester", compound=tk.LEFT, command=self.remove_semester)
+        remove_semester_btn.grid(row=0, column=4, padx=5, pady=5)
 
         self.treeview.bind("<Motion>", self.on_treeview_motion)
         self.treeview.bind("<<TreeviewSelect>>", self.on_treeview_select)
@@ -213,11 +217,15 @@ class Application:
             selected_item_id = selected_item[0]
             values = self.treeview.item(selected_item_id, "values")
             
+            if "Summary" in values[0] or "==" in values[0]:
+                return
+                
             entries = [
                 (self.subject_code_entry, values[0]),
-                (self.subject_assessment_entry, values[1]),
-                (self.weighted_mark_entry, values[3]),
-                (self.mark_weight_entry, values[4].replace("%", ""))
+                (self.subject_name_entry, values[1]),
+                (self.subject_assessment_entry, values[2]),
+                (self.weighted_mark_entry, values[4]),
+                (self.mark_weight_entry, values[5].replace("%", ""))
             ]
 
             for entry, value in entries:
@@ -232,17 +240,17 @@ class Application:
             event (tk.Event): The event that triggered the mouse motion.
         """
         region = self.treeview.identify("region", event.x, event.y)
-        if (region == "cell"):
+        if region == "cell":
             column = self.treeview.identify_column(event.x)
             row_id = self.treeview.identify_row(event.y)
 
-            if column in [f"#{i}" for i in range(1, 3)]:  # Check if the column is Subject Assessment
+            if column in ["#2", "#3"]:  # Check if the column is Subject Name or Subject Assessment
                 values = self.treeview.item(row_id, "values")
 
                 if any("=" in value or "Assessments:" in value for value in values):
                     return
                 if len(values) > 1:
-                    text = values[1]
+                    text = values[int(column[1]) - 1]  # Get the text for the specific column
                     if self.current_tooltip:
                         self.current_tooltip.hide_tip(event)
                     self.current_tooltip = ToolTip(self.treeview, text)
@@ -305,7 +313,10 @@ class Application:
         treeview_data = semester.view_data()
         for row in self.treeview.get_children():
             self.treeview.delete(row)
+        
+        # print(f"Updating Treeview for Year: {self.year_var.get()} and Semester: {semester_name}")
         for row in treeview_data:
+            # print(f"Inserting row: {row}")
             self.treeview.insert("", "end", values=row)
 
     def add_entry(self):
@@ -400,6 +411,32 @@ class Application:
 
         self.update_treeview()
 
+    def add_semester(self):
+        """Adds a new semester to the data structure."""
+        semester_name = simpledialog.askstring("Add Semester", "Enter the name of the semester:")
+        if semester_name:
+            self.data_persistence.add_semester(semester_name)
+            self.semesters[semester_name] = Semester(semester_name, self.data_persistence.year, self.data_persistence)
+            self.update_semester_menu()
+            messagebox.showinfo("Success", f"Semester '{semester_name}' added successfully.")
+
+    def remove_semester(self):
+        """Removes an existing semester from the data structure."""
+        semester_name = simpledialog.askstring("Remove Semester", "Enter the name of the semester:")
+        if semester_name:
+            self.semesters.pop(semester_name)
+            self.data_persistence.remove_semester(semester_name)
+            self.update_semester_menu()
+            messagebox.showinfo("Success", f"Semester '{semester_name}' removed successfully.")
+
+    def update_semester_menu(self):
+        """Updates the semester menu with the latest semesters."""
+        sheet_menu = self.semester_menu["menu"]
+        sheet_menu.delete(0, "end")
+        for semester in self.semesters.keys():
+            sheet_menu.add_command(label=semester, command=lambda value=semester: self.sheet_var.set(value))
+        self.sheet_var.set(list(self.semesters.keys())[0]) if self.semesters else ""
+    
     def sort_subjects(self, sort_by="Subject Code"):
         """
         Sorts the subjects in the Treeview widget based on the selected field.
@@ -449,18 +486,31 @@ class Application:
 
     def sync_all_semesters(self):
         """Synchronises all semesters' data into a single data structure."""
-        combined_data = {
-            "Autumn": self.data_persistence.data.get("Autumn", {}).copy(),
-            "Spring": self.data_persistence.data.get("Spring", {}).copy(),
-            "Annual": self.data_persistence.data.get("Annual", {}).copy()
+        current_year = self.year_var.get()  # This is a string of the current year
+        autumn_data = self.data_persistence.data.get("Autumn", {}).copy()
+        spring_data = self.data_persistence.data.get("Spring", {}).copy()
+        annual_data = self.data_persistence.data.get("Annual", {}).copy()
+
+        # Filter subjects from Annual that belong to the current year.
+        # This assumes each subject's details include a key "Year".
+        annual_data_current_year = {
+            subject: details
+            for subject, details in annual_data.items()
+            if details.get("Year") == current_year
         }
 
-        # Add Annual data to Autumn and Spring for display purposes
-        for subject, details in combined_data["Annual"].items():
-            if subject not in combined_data["Autumn"]:
-                combined_data["Autumn"][subject] = details
-            if subject not in combined_data["Spring"]:
-                combined_data["Spring"][subject] = details
+        # Sync only the filtered Annual subjects to Autumn and Spring if they don't already exist
+        for subject, details in annual_data_current_year.items():
+            if subject not in autumn_data:
+                autumn_data[subject] = details
+            if subject not in spring_data:
+                spring_data[subject] = details
+        
+        combined_data = {
+            "Autumn": autumn_data,
+            "Spring": spring_data,
+            "Annual": annual_data  # Leave Annual unmodified
+        }
 
         self.data_persistence.data = combined_data
         self.update_treeview()
