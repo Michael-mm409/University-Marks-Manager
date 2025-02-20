@@ -15,7 +15,7 @@ def create_treeview(main_frame: ttk.Frame) -> ttk.Treeview:
         "Subject Name": "Subject Name",
         "Subject Assessment": "Subject Assessment",
         "Unweighted Mark": "Mark (Out of Full Score)",
-        "Weighted Mark": "Weighted Contribution (%)",
+        "Weighted Mark": "Weighted Contribution",
         "Mark Weight": "Assessment Weight (e.g., 30%)",
         "Total Mark": "Total Mark"
     }

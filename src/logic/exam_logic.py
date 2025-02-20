@@ -1,3 +1,5 @@
+from tkinter import messagebox
+
 def calculate_exam_mark(app):
     """Calculate the exam mark for the selected subject."""
     semester_name = app.sheet_var.get()
@@ -11,7 +13,7 @@ def calculate_exam_mark(app):
     
     app.update_treeview()
     if exam_mark is not None:
-        app.messagebox.showinfo("Success", f"Exam Mark for {subject_code}: {exam_mark}")
+        messagebox.showinfo("Success", f"Exam Mark for {subject_code}: {exam_mark}")
     else:
-        app.messagebox.showerror("Error", f"Subject {subject_code} not found.")
+        messagebox.showerror("Error", f"Subject {subject_code} not found.")
         app.update_treeview()
