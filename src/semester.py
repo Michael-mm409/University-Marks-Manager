@@ -8,7 +8,11 @@ from tkinter import messagebox
 from typing import List, Dict, Any
 
 from data_persistence import DataPersistence
-from . import add_entry, sort_subjects, view_data, calculate_exam_mark, get_subject_data, validate_float
+from semester_logic import (
+    add_entry,
+    sort_subjects,
+    view_data,
+    calculate_exam_mark)
 
 
 class Semester:
@@ -32,9 +36,9 @@ class Semester:
         self.year = year
         self.data_persistence = data_persistence
 
-    def add_entry(self, semester, subject_code, subject_name, subject_assessment,
+    def add_entry(self, subject_code, subject_name, subject_assessment,
                   weighted_mark, mark_weight, total_mark, sync_source=False) -> None:
-        add_entry(self, semester, subject_code, subject_name, subject_assessment,
+        add_entry(self, subject_code, subject_name, subject_assessment,
                   weighted_mark, mark_weight, total_mark, sync_source)
 
     def sort_subjects(self, sort_by: str = "subject_code") -> List[List[str]]:

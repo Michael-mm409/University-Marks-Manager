@@ -8,7 +8,7 @@ def add_entry(semester, subject_code, subject_name, subject_assessment,
         messagebox.showerror("Error", "Subject Code is required!")
         return
 
-    subject_data = get_subject_data(semester, subject_code, subject_name, sync_source)
+    subject_data = get_subject_data(semester, subject_code, subject_name)
 
     total_mark = validate_float(total_mark, "Total Mark must be a valid number.")
     if total_mark != -1:
@@ -22,7 +22,7 @@ def add_entry(semester, subject_code, subject_name, subject_assessment,
 
     unweighted_mark = round(weighted_mark / mark_weight, 4) if mark_weight > 0 else 0
 
-    assessments = subject_data["Assignments"]
+    assessments = subject_data.get("Assignments", [])
     for entry in assessments:
         if entry.get("Subject Assessment") == subject_assessment:
             entry.update({

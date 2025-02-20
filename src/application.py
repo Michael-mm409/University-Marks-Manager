@@ -10,7 +10,7 @@ from semester import Semester
 from ui import (configure_styles, create_main_frame,
                  create_form_frame, create_treeview,
                 create_entry_frame, create_button_frames)
-from logic import (
+from application_logic import (
     update_year, update_semester, add_semester, remove_semester, update_semester_menu,
     add_subject, remove_subject, add_entry, delete_entry, calculate_exam_mark,
     update_treeview, on_treeview_select, on_treeview_motion, on_window_resize, sort_subjects
@@ -49,8 +49,17 @@ class Application:
     def setup_gui(self):
         self.root.title("University Marks Manager")
         self.root.geometry("1850x800")
-        configure_styles(self.root)        
+        configure_styles(self.root)
         self.main_frame = create_main_frame(self.root)
+        self.create_form_frame()
+        self.create_treeview()
+        self.create_entry_frame()
+        self.create_button_frames()
+        self.bind_events()
+        self.configure_grid()
+        self.update_semester()
+
+    def create_form_frame(self):
         create_form_frame(main_frame=self.main_frame,
                           sheet_var=self.sheet_var,
                           year_var=self.year_var,
@@ -58,16 +67,25 @@ class Application:
                           year_list=self.year_list,
                           update_year=self.update_year,
                           update_semester=self.update_semester)
+
+    def create_treeview(self):
         self.treeview = create_treeview(self.main_frame)
+
+    def create_entry_frame(self):
         create_entry_frame(main_frame=self.main_frame, application_self=self)
+
+    def create_button_frames(self):
         create_button_frames(main_frame=self.main_frame, application_self=self)
+
+    def bind_events(self):
         self.treeview.bind("<Motion>", lambda event: on_treeview_motion(self, event))
         self.treeview.bind("<<TreeviewSelect>>", lambda event: on_treeview_select(self, event))
+
+    def configure_grid(self):
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
         self.main_frame.grid_rowconfigure(1, weight=1)
         self.main_frame.grid_columnconfigure(0, weight=1)
-        self.update_semester()
 
     def update_year(self, event=None):
         update_year(self, event)

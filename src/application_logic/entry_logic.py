@@ -12,7 +12,6 @@ def add_entry(app):
 
     try:
         app.semesters[semester_name].add_entry(
-            semester=semester_name,
             subject_code=subject_code,
             subject_name=subject_name,
             subject_assessment=subject_assessment,
