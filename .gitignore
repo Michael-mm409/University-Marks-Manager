@@ -1,7 +1,9 @@
+# Ignore build and dist directories
+build/
+dist/
+
 /MarksManager.exe
 /data/*
 /.idea/*
 *.pyc
-/build/*
-/dist/*
 /.vs/*
