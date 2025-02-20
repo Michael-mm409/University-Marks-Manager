@@ -4,9 +4,8 @@ in the University Marks Manager application.
 
 The Semester class is responsible for handling assignments and examinations for a given semester.
 """
-from tkinter import messagebox
-from typing import List, Dict, Any
 
+from typing import List
 from data_persistence import DataPersistence
 from semester_logic import (
     add_entry,
@@ -18,16 +17,16 @@ from semester_logic import (
 class Semester:
     """
     A class to represent a semester in the University Marks Manager application.
-    
-    This class is responsible for managing the data related to a specific semester, 
+
+    This class is responsible for managing the data related to a specific semester,
     including assignments and examinations.
-    
+
     Args:
         name (str):
             The name of the semester (e.g., "Autumn", "Spring").
         year (str):
             The academic year for the semester.
-        data_persistence (DataPersistence): 
+        data_persistence (DataPersistence):
             An instance of the DataPersistence class for managing data storage and retrieval.
     """
     def __init__(self, name: str, year: str, data_persistence: DataPersistence):

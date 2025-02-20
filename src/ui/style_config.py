@@ -1,11 +1,11 @@
-#### style_config.py ####
 import tkinter as tk
 from tkinter import ttk
+
 
 def configure_styles(root: tk.Tk):
     style = ttk.Style(root)
     style.theme_use("clam")  # Start with 'clam' theme
-    
+
     # Customize the styles for dark mode
     dark_bg = "#2e2e2e"
     dark_fg = "#ffffff"
@@ -15,8 +15,8 @@ def configure_styles(root: tk.Tk):
     style.configure("TFrame", background=dark_bg)
     style.configure("TLabel", background=dark_bg, foreground=dark_fg, font=("Helvetica", 12))
     style.configure("TButton",
-                    background=accent_color, 
-                    foreground=dark_fg, 
+                    background=accent_color,
+                    foreground=dark_fg,
                     font=("Helvetica", 12),
                     relief="flat")
     style.map("TButton",
