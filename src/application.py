@@ -4,7 +4,7 @@ user interface of the University Marks Manager application. It also includes the
 ToolTip class for displaying tooltips when hovering over a Treeview cell.
 """
 from datetime import datetime
-import tkinter as tk
+import customtkinter as tk
 from data_persistence import DataPersistence
 from semester import Semester
 from ui import (configure_styles, create_main_frame,
@@ -27,7 +27,7 @@ class Application:
         application_root (tk.Tk): The main application window.
         storage_handler (DataPersistence): An instance of the DataPersistence class.
     """
-    def __init__(self, application_root: tk.Tk, storage_handler: DataPersistence):
+    def __init__(self, application_root: tk.CTk, storage_handler: DataPersistence):
         self.root = application_root
         self.data_persistence = storage_handler
         self.semesters = {

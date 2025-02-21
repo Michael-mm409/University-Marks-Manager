@@ -1,6 +1,7 @@
 from tkinter import messagebox
 from typing import Any, Dict
 
+
 def get_subject_data(semester, subject_code: str, subject_name: str = "", sync_source: bool = False) -> Dict[str, Any]:
     if semester.name not in semester.data_persistence.data:
         semester.data_persistence.data[semester.name] = {}
@@ -20,7 +21,9 @@ def get_subject_data(semester, subject_code: str, subject_name: str = "", sync_s
 
     return semester.data_persistence.data[semester.name][subject_code]
 
+
 def validate_float(value: Any, error_message: str) -> float:
+
     if value is None or value == "":
         return 0
     try:

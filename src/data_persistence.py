@@ -9,6 +9,7 @@ from typing import Dict, List, Union
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+
 class DataPersistence:
     """The DataPersistence class is responsible for loading and saving data to a JSON file."""
     def __init__(self, year: str, file_directory: str = './data'):
@@ -30,7 +31,7 @@ class DataPersistence:
                 logging.error(f"Error reading {self.file_path}: {error}. Initialising with empty data.")
         else:
             logging.info(f"{self.file_path} does not exist. Initialising with empty data.")
-        
+
         # Initialize structure for all semesters (Autumn, Spring, Annual)
         return {
             "Autumn": {},

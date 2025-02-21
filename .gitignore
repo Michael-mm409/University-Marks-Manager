@@ -1,7 +1,7 @@
 # Ignore build and dist directories
 build/
 dist/
-
+Azure-ttk-theme-main/
 /*.spec
 *.exe
 /data/*

@@ -14,20 +14,17 @@ Usage:
     Run this script to launch the University Marks Manager.
 """
 
-import tkinter as tk
+import customtkinter as ctk
 from datetime import datetime
 from application import Application
 from data_persistence import DataPersistence
 
 if __name__ == "__main__":
-    root = tk.Tk()
-
-    # Enable window resizing (set both width and height to True)
+    root = ctk.CTk()  # Use customtkinter's CTk for consistent theming
     root.resizable(width=True, height=True)
-
     root.title("University Marks Manager")
-    data_persistence = DataPersistence(
-        str(datetime.now().year))  # Year is set as 2024 for demonstration
+
+    data_persistence = DataPersistence(str(datetime.now().year))
     app = Application(root, data_persistence)
 
     try:
