@@ -1,10 +1,17 @@
-# Ignore build and dist directories
+# Directories
 build/
 dist/
-Azure-ttk-theme-main/
+.vs/
+
+# Executables and specs
 /*.spec
 *.exe
-/data/*
-/.idea/*
+
+# Python files
 *.pyc
-/.vs/*
+
+# IDE specific files
+.idea/*
+
+# Data files (if desired; otherwise, remove if needed)
+/data/*
