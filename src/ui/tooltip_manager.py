@@ -1,4 +1,4 @@
-import customtkinter as tk
+import tkinter as tk
 
 
 class ToolTipManager:
