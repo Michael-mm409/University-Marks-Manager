@@ -1,6 +1,7 @@
 from tkinter import END  # import END from tkinter
 from ui import ToolTipManager
 
+
 def update_treeview(app):
     """Update the treeview widget in the application."""
     semester_name = app.sheet_var.get()
@@ -12,6 +13,7 @@ def update_treeview(app):
 
     for row in treeview_data:
         app.treeview.insert("", "end", values=row)
+
 
 def on_treeview_select(app, _event):
     """Update the subject code entry when a treeview row is selected."""
@@ -31,6 +33,7 @@ def on_treeview_select(app, _event):
         for entry, value in entries:
             entry.delete(0, END)
             entry.insert(0, value)
+
 
 def on_treeview_motion(app, event):
     region = app.treeview.identify("region", event.x, event.y)
@@ -55,6 +58,7 @@ def on_treeview_motion(app, event):
         if app.current_tooltip:
             app.current_tooltip.hide_tip(event)
             app.current_tooltip = None
+
 
 def on_window_resize(app, _event):
     """Update the treeview column width when the window is resized."""

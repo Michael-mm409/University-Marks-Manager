@@ -5,7 +5,7 @@ It sets up the main application window, initializes data persistence, and
 runs the Tkinter event loop.
 
 Modules:
-    tkinter (tk): Provides GUI components.
+    customtkinter (tk): Provides GUI components.
     datetime (datetime): Handles date-related operations.
     application (Application): Main application logic.
     data_persistence (DataPersistence): Handles data storage and retrieval.

@@ -1,6 +1,7 @@
 from tkinter import messagebox
 from .utils import get_subject_data, validate_float
 
+
 def add_entry(semester, subject_code, subject_name, subject_assessment,
               weighted_mark, mark_weight, total_mark, sync_source=False) -> None:
     """Add a new entry to the selected semester with assignment details."""

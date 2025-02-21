@@ -1,6 +1,6 @@
-#### form_frame.py ####
 import tkinter as tk
 from tkinter import ttk
+
 
 def create_form_frame(main_frame: ttk.Frame, sheet_var: tk.StringVar, year_var: tk.StringVar,
                       semesters: dict, year_list: list, update_year, update_semester) -> None:
