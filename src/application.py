@@ -8,7 +8,7 @@ import customtkinter as tk
 from data_persistence import DataPersistence
 from semester import Semester
 from ui import (configure_styles, create_main_frame,
-                create_form_frame, create_treeview,
+                create_form_frame as create_form_func, create_treeview,
                 create_entry_frame, create_button_frames)
 from application_logic import (
     update_year, update_semester, add_semester, remove_semester, update_semester_menu,
@@ -32,14 +32,32 @@ class Application:
         self.data_persistence = storage_handler
         self.semesters = {
             sem: Semester(sem, storage_handler.year, storage_handler)
-            for sem in self.data_persistence.data.keys()
+            for sem in sorted(self.data_persistence.data.keys())
         }
         current_year = datetime.now().year
         self.year_list = [str(year) for year in range(current_year - 2, current_year + 2, 1)]
         self.year_var = tk.StringVar()
         self.year_var.set(str(current_year))
-        self.sheet_var = tk.StringVar()
-        self.sheet_var.set("Autumn")
+
+        default_sheet = None
+        for sheet in sorted(self.data_persistence.data.keys()):
+            # Get subjects for this semester.
+            subjects = self.data_persistence.data.get(sheet, {})
+            # If there is at least one subject, check its Sync Source;
+            # if there are no subjects, you might accept this sheet.
+            if subjects:
+                # If none of the subjects have Sync Source True, use this sheet.
+                if all(not subj.get("Sync Source", False) for subj in subjects.values()):
+                    default_sheet = sheet
+                    break
+            else:
+                default_sheet = sheet
+                break
+
+        if default_sheet is None:
+            default_sheet = sorted(self.data_persistence.data.keys())[0]
+
+        self.sheet_var = tk.StringVar(value=default_sheet)
         self.sync_source_var = tk.BooleanVar()
         self.current_tooltip = None
 
@@ -60,13 +78,14 @@ class Application:
         self.update_semester()
 
     def create_form_frame(self):
-        create_form_frame(main_frame=self.main_frame,
-                          sheet_var=self.sheet_var,
-                          year_var=self.year_var,
-                          semesters=self.semesters,
-                          year_list=self.year_list,
-                          update_year=self.update_year,
-                          update_semester=self.update_semester)
+        create_form_func(self,
+                         main_frame=self.main_frame,
+                         sheet_var=self.sheet_var,
+                         year_var=self.year_var,
+                         semesters=self.semesters,
+                         year_list=self.year_list,
+                         update_year=self.update_year,
+                         update_semester=self.update_semester)
 
     def create_treeview(self):
         self.treeview = create_treeview(self.main_frame)

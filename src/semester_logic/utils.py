@@ -23,7 +23,6 @@ def get_subject_data(semester, subject_code: str, subject_name: str = "", sync_s
 
 
 def validate_float(value: Any, error_message: str) -> float:
-
     if value is None or value == "":
         return 0
     try:

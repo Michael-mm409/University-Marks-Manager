@@ -43,7 +43,7 @@ class DataPersistence:
         """Save data to JSON file with pretty-printing."""
         try:
             with open(self.file_path, 'w', encoding='utf-8') as json_file:
-                json.dump(self.data, json_file, indent=4)
+                json.dump(self.data, json_file, indent=4, sort_keys=True)
             logging.info(f"Data saved successfully to {self.file_path}")
         except IOError as error:
             logging.error(f"Error saving data: {error}")

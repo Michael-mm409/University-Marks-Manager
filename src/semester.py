@@ -5,6 +5,7 @@ in the University Marks Manager application.
 The Semester class is responsible for handling assignments and examinations for a given semester.
 """
 
+from tkinter import messagebox
 from typing import List
 from data_persistence import DataPersistence
 from semester_logic import (
@@ -48,3 +49,37 @@ class Semester:
 
     def calculate_exam_mark(self, subject_code: str) -> float:
         return calculate_exam_mark(self, subject_code)
+
+    def add_subject(self, subject_code: str, subject_name: str, sync_source: bool = False) -> None:
+        # Example implementation: store the subject in the data persistence layer.
+        # Adjust the implementation to match your app's requirements.
+        sem_data = self.data_persistence.data.get(self.name, {})
+
+        if subject_code in sem_data:
+            messagebox.showerror("Error", f"Subject '{subject_code}' already exists.")
+            return
+
+        sem_data[subject_code] = {
+            "Subject Name": subject_name,
+            "Assignments": [],
+            "Total Mark": 0,
+            "Examinations": {
+                "Exam Mark": 0,
+                "Exam Weight": 100
+            },
+            "Sync Source": sync_source
+        }
+        self.data_persistence.data[self.name] = sem_data
+        self.data_persistence.save_data()
+
+    def remove_subject(self, subject_code: str) -> None:
+        sem_data = self.data_persistence.data.get(self.name, {})
+        if subject_code in sem_data:
+            del sem_data[subject_code]
+            self.data_persistence.data[self.name] = sem_data
+            self.data_persistence.save_data()
+
+            messagebox.showinfo("Success", f"Subject '{subject_code}' removed.")
+        else:
+            # Optionally, log that the subject was not found
+            pass

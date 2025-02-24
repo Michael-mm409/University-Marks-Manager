@@ -16,16 +16,18 @@ def update_treeview(app):
 
 
 def on_treeview_select(app, _event):
-    """Update the subject code entry when a treeview row is selected."""
+    """Update the subject code and derived subject name entries when a treeview row is selected."""
     selected_item = app.treeview.selection()
     if selected_item:
         selected_item_id = selected_item[0]
         values = app.treeview.item(selected_item_id, "values")
         if "Summary" in values[0] or "==" in values[0]:
             return
+
+        subject_code = values[0]
+
         entries = [
-            (app.subject_code_entry, values[0]),
-            (app.subject_name_entry, values[1]),
+            (app.subject_code_entry, subject_code),
             (app.subject_assessment_entry, values[2]),
             (app.weighted_mark_entry, values[4]),
             (app.mark_weight_entry, values[5].replace("%", ""))

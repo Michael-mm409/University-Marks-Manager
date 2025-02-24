@@ -5,8 +5,10 @@ from .treeview_setup import create_treeview
 from .entry_frame import create_entry_frame
 from .button_frames import create_button_frames
 from .tooltip_manager import ToolTipManager
+from .add_subject_dialog import ask_add_subject
 
 __all__ = [
+    "ask_add_subject",
     "configure_styles",
     "create_main_frame",
     "create_form_frame",

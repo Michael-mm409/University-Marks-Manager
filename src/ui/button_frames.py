@@ -1,6 +1,6 @@
-#### button_frames.py ####
 import tkinter as tk
 from tkinter import ttk
+
 
 def create_button_frames(main_frame: ttk.Frame, application_self) -> None:
     subject_button_frame = ttk.Frame(main_frame)

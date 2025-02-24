@@ -1,4 +1,6 @@
 from .utils import get_subject_data
+
+
 def calculate_exam_mark(semester, subject_code: str) -> float:
     subject_data = get_subject_data(semester, subject_code)
     total_mark = subject_data.get("Total Mark", 0)
