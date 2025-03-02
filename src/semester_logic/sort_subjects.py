@@ -23,7 +23,7 @@ def sort_subjects(semester, sort_by: str = "subject_code") -> List[List[str]]:
                     f"{entry.get('Unweighted Mark', 0):.2f}",
                     f"{entry.get('Weighted Mark', 0):.2f}",
                     f"{entry.get('Mark Weight', 0):.2f}%",
-                    f"{subject_data.get('Total Mark', 0)}"
+                    f"{subject_data.get('Total Mark', 0):.2f}"
                 ])
 
             totals = {

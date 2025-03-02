@@ -3,18 +3,32 @@ This module contains the Application class which is responsible for managing the
 user interface of the University Marks Manager application. It also includes the
 ToolTip class for displaying tooltips when hovering over a Treeview cell.
 """
+
 from datetime import datetime
-import customtkinter as tk
+from os import getcwd, path
+
+import customtkinter as ctk
+
+from application_logic import (
+    add_entry,
+    add_semester,
+    add_subject,
+    calculate_exam_mark,
+    delete_entry,
+    on_treeview_motion,
+    on_treeview_select,
+    on_window_resize,
+    remove_semester,
+    remove_subject,
+    update_semester,
+    update_semester_menu,
+    update_treeview,
+    update_year,
+)
 from data_persistence import DataPersistence
 from semester import Semester
-from ui import (configure_styles, create_main_frame,
-                create_form_frame as create_form_func, create_treeview,
-                create_entry_frame, create_button_frames)
-from application_logic import (
-    update_year, update_semester, add_semester, remove_semester, update_semester_menu,
-    add_subject, remove_subject, add_entry, delete_entry, calculate_exam_mark,
-    update_treeview, on_treeview_select, on_treeview_motion, on_window_resize
-)
+from ui import configure_styles, create_button_frames, create_entry_frame, create_main_frame, create_treeview
+from ui import create_form_frame as create_form_func
 
 
 class Application:
@@ -27,7 +41,8 @@ class Application:
         application_root (tk.Tk): The main application window.
         storage_handler (DataPersistence): An instance of the DataPersistence class.
     """
-    def __init__(self, application_root: tk.CTk, storage_handler: DataPersistence):
+
+    def __init__(self, application_root: ctk.CTk, storage_handler: DataPersistence):
         self.root = application_root
         self.data_persistence = storage_handler
         self.semesters = {
@@ -36,7 +51,7 @@ class Application:
         }
         current_year = datetime.now().year
         self.year_list = [str(year) for year in range(current_year - 2, current_year + 2, 1)]
-        self.year_var = tk.StringVar()
+        self.year_var = ctk.StringVar()
         self.year_var.set(str(current_year))
 
         default_sheet = None
@@ -57,8 +72,8 @@ class Application:
         if default_sheet is None:
             default_sheet = sorted(self.data_persistence.data.keys())[0]
 
-        self.sheet_var = tk.StringVar(value=default_sheet)
-        self.sync_source_var = tk.BooleanVar()
+        self.sheet_var = ctk.StringVar(value=default_sheet)
+        self.sync_source_var = ctk.BooleanVar()
         self.current_tooltip = None
 
         self.setup_gui()
@@ -67,6 +82,11 @@ class Application:
     def setup_gui(self):
         self.root.title("University Marks Manager")
         self.root.geometry("1850x800")
+
+        # Set the application icon.
+        icon_path = path.join(getcwd(), "assets", "app_icon.ico")
+        self.root.iconbitmap(icon_path)
+
         configure_styles(self.root)
         self.main_frame = create_main_frame(self.root)
         self.create_form_frame()
@@ -78,19 +98,22 @@ class Application:
         self.update_semester()
 
     def create_form_frame(self):
-        create_form_func(self,
-                         main_frame=self.main_frame,
-                         sheet_var=self.sheet_var,
-                         year_var=self.year_var,
-                         semesters=self.semesters,
-                         year_list=self.year_list,
-                         update_year=self.update_year,
-                         update_semester=self.update_semester)
+        create_form_func(
+            self,
+            main_frame=self.main_frame,
+            sheet_var=self.sheet_var,
+            year_var=self.year_var,
+            semesters=self.semesters,
+            year_list=self.year_list,
+            update_year=self.update_year,
+            update_semester=self.update_semester,
+        )
 
     def create_treeview(self):
         self.treeview = create_treeview(self.main_frame)
 
     def create_entry_frame(self):
+        self.subject_name_entry = None
         create_entry_frame(main_frame=self.main_frame, application_self=self)
 
     def create_button_frames(self):
