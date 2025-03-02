@@ -4,15 +4,12 @@ user interface of the University Marks Manager application. It also includes the
 ToolTip class for displaying tooltips when hovering over a Treeview cell.
 """
 
+import tkinter as tk
 from datetime import datetime
-from os import getcwd, path
-
-import customtkinter as ctk
 
 from application_logic import (
     add_entry,
     add_semester,
-    add_subject,
     calculate_exam_mark,
     delete_entry,
     on_treeview_motion,
@@ -24,6 +21,9 @@ from application_logic import (
     update_semester_menu,
     update_treeview,
     update_year,
+)
+from application_logic import (
+    add_subject as add_subject_logic,  # Rename the import to avoid conflict
 )
 from data_persistence import DataPersistence
 from semester import Semester
@@ -40,18 +40,20 @@ class Application:
     Args:
         application_root (tk.Tk): The main application window.
         storage_handler (DataPersistence): An instance of the DataPersistence class.
+        icon_path (str): The path to the icon file to be used for the application and dialogs.
     """
 
-    def __init__(self, application_root: ctk.CTk, storage_handler: DataPersistence):
+    def __init__(self, application_root: tk.Tk, storage_handler: DataPersistence, icon_path: str):
         self.root = application_root
         self.data_persistence = storage_handler
+        self.icon_path = icon_path  # Store the icon path
         self.semesters = {
             sem: Semester(sem, storage_handler.year, storage_handler)
             for sem in sorted(self.data_persistence.data.keys())
         }
         current_year = datetime.now().year
         self.year_list = [str(year) for year in range(current_year - 2, current_year + 2, 1)]
-        self.year_var = ctk.StringVar()
+        self.year_var = tk.StringVar()
         self.year_var.set(str(current_year))
 
         default_sheet = None
@@ -72,8 +74,8 @@ class Application:
         if default_sheet is None:
             default_sheet = sorted(self.data_persistence.data.keys())[0]
 
-        self.sheet_var = ctk.StringVar(value=default_sheet)
-        self.sync_source_var = ctk.BooleanVar()
+        self.sheet_var = tk.StringVar(value=default_sheet)
+        self.sync_source_var = tk.BooleanVar()
         self.current_tooltip = None
 
         self.setup_gui()
@@ -82,10 +84,6 @@ class Application:
     def setup_gui(self):
         self.root.title("University Marks Manager")
         self.root.geometry("1850x800")
-
-        # Set the application icon.
-        icon_path = path.join(getcwd(), "assets", "app_icon.ico")
-        self.root.iconbitmap(icon_path)
 
         configure_styles(self.root)
         self.main_frame = create_main_frame(self.root)
@@ -96,6 +94,9 @@ class Application:
         self.bind_events()
         self.configure_grid()
         self.update_semester()
+
+        # Set the application icon
+        self.root.iconbitmap(self.icon_path)
 
     def create_form_frame(self):
         create_form_func(
@@ -117,7 +118,16 @@ class Application:
         create_entry_frame(main_frame=self.main_frame, application_self=self)
 
     def create_button_frames(self):
-        create_button_frames(main_frame=self.main_frame, application_self=self)
+        create_button_frames(
+            main_frame=self.main_frame,
+            add_subject_func=self.add_subject,
+            remove_subject_func=self.remove_subject,
+            add_semester_func=self.add_semester,
+            remove_semester_func=self.remove_semester,
+            add_entry_func=self.add_entry,
+            delete_entry_func=self.delete_entry,
+            calculate_exam_mark_func=self.calculate_exam_mark,
+        )
 
     def bind_events(self):
         self.treeview.bind("<Motion>", lambda event: on_treeview_motion(self, event))
@@ -145,7 +155,8 @@ class Application:
         update_semester_menu(self)
 
     def add_subject(self):
-        add_subject(self)
+        # Open the AddSubjectDialog
+        add_subject_logic(self)  # Use the renamed import
 
     def remove_subject(self):
         remove_subject(self)
