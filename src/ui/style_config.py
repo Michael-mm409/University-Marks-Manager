@@ -59,7 +59,3 @@ def configure_styles(root: ctk.CTk):
               background=[("active", hover_color), ("focus", accent_color)],
               highlightbackground=[("active", hover_color), ("focus", accent_color)],
               highlightcolor=[("active", hover_color), ("focus", accent_color)])
-
-    # Create a topbar frame
-    topbar_frame = ttk.Frame(root, style="Card.TFrame")
-    topbar_frame.grid(row=0, column=0, sticky="ew")
