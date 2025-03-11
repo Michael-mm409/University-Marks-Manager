@@ -10,6 +10,7 @@ from datetime import datetime
 from application_logic import (
     add_entry,
     add_semester,
+    add_total_mark,
     calculate_exam_mark,
     delete_entry,
     on_treeview_motion,
@@ -18,7 +19,6 @@ from application_logic import (
     remove_semester,
     remove_subject,
     update_semester,
-    update_semester_menu,
     update_treeview,
     update_year,
 )
@@ -27,7 +27,13 @@ from application_logic import (
 )
 from data_persistence import DataPersistence
 from semester import Semester
-from ui import configure_styles, create_button_frames, create_entry_frame, create_main_frame, create_treeview
+from ui import (
+    configure_styles,
+    create_button_frames,
+    create_entry_frame,
+    create_main_frame,
+    create_treeview,
+)
 from ui import create_form_frame as create_form_func
 
 
@@ -74,9 +80,13 @@ class Application:
         if default_sheet is None:
             default_sheet = sorted(self.data_persistence.data.keys())[0]
 
+        # Create treeview widget
+        self.main_frame = create_main_frame(self.root)
+        self.create_treeview()
+
         self.sheet_var = tk.StringVar(value=default_sheet)
         self.sync_source_var = tk.BooleanVar()
-        self.current_tooltip = None
+        self.current_tooltip = None  # Initialize current_tooltip to None
 
         self.setup_gui()
         self.root.bind("<Configure>", self.on_window_resize)
@@ -86,9 +96,7 @@ class Application:
         self.root.geometry("1850x800")
 
         configure_styles(self.root)
-        self.main_frame = create_main_frame(self.root)
         self.create_form_frame()
-        self.create_treeview()
         self.create_entry_frame()
         self.create_button_frames()
         self.bind_events()
@@ -109,6 +117,7 @@ class Application:
             update_year=self.update_year,
             update_semester=self.update_semester,
         )
+        # self.update_semester_menu()  # Call update_semester_menu after creating the form frame
 
     def create_treeview(self):
         self.treeview = create_treeview(self.main_frame)
@@ -127,6 +136,7 @@ class Application:
             add_entry_func=self.add_entry,
             delete_entry_func=self.delete_entry,
             calculate_exam_mark_func=self.calculate_exam_mark,
+            add_total_mark_func=self.add_total_mark,
         )
 
     def bind_events(self):
@@ -144,15 +154,30 @@ class Application:
 
     def update_semester(self, event=None):
         update_semester(self, event)
+        # update_semester_menu(self)
 
     def add_semester(self):
         add_semester(self)
+        self.update_semester_menu()  # Update the semester menu after adding a semester
 
     def remove_semester(self):
         remove_semester(self)
+        self.update_semester_menu()  # Update the semester menu after removing a semester
 
     def update_semester_menu(self):
-        update_semester_menu(self)
+        """Update the semester menu with the current semesters."""
+        menu = self.semester_menu["menu"]
+        menu.delete(0, "end")
+
+        for semester in sorted(self.semesters.keys()):
+            menu.add_command(
+                label=semester,
+                command=lambda value=semester: self.sheet_var.set(value),
+            )
+
+        # Set the first semester as the default selection
+        if self.semesters:
+            self.sheet_var.set(sorted(self.semesters.keys())[0])
 
     def add_subject(self):
         # Open the AddSubjectDialog
@@ -169,6 +194,9 @@ class Application:
 
     def calculate_exam_mark(self):
         calculate_exam_mark(self)
+
+    def add_total_mark(self):
+        add_total_mark(self)
 
     def update_treeview(self):
         update_treeview(self)

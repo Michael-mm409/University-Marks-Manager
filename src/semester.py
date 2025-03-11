@@ -1,12 +1,12 @@
 """
 This module provides the Semester class for managing data related to a specific semester
-in the University Marks Manager application.
+in the University Marks Manager selflication.
 
 The Semester class is responsible for handling assignments and examinations for a given semester.
 """
 
 from collections import OrderedDict
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 from typing import List
 
 from data_persistence import DataPersistence
@@ -15,7 +15,7 @@ from semester_logic import add_entry, calculate_exam_mark, sort_subjects, view_d
 
 class Semester:
     """
-    A class to represent a semester in the University Marks Manager application.
+    A class to represent a semester in the University Marks Manager selflication.
 
     This class is responsible for managing the data related to a specific semester,
     including assignments and examinations.
@@ -34,13 +34,12 @@ class Semester:
         self.name = name
         self.year = year
         self.data_persistence = data_persistence
+        self.data = self.data_persistence.data.get(self.name, {})
 
     def add_entry(
-        self, subject_code, subject_name, subject_assessment, weighted_mark, mark_weight, total_mark, sync_source=False
+        self, subject_code, subject_name, subject_assessment, weighted_mark, mark_weight, sync_source=False
     ) -> None:
-        add_entry(
-            self, subject_code, subject_name, subject_assessment, weighted_mark, mark_weight, total_mark, sync_source
-        )
+        add_entry(self, subject_code, subject_name, subject_assessment, weighted_mark, mark_weight, sync_source)
 
     def sort_subjects(self, sort_by: str = "subject_code") -> List[List[str]]:
         return sort_subjects(self, sort_by)
@@ -80,3 +79,31 @@ class Semester:
         else:
             # Optionally, log that the subject was not found
             pass
+
+    def add_total_mark(self, subject_code: str):
+        sem_data = self.data_persistence.data.get(self.name, {})
+        if subject_code in sem_data:
+            total_mark = simpledialog.askfloat("Add Total Mark", f"Enter Total Mark for {subject_code}:")
+            self.data_persistence.data[self.name][subject_code]["Total Mark"] = total_mark
+            self.data_persistence.save_data()
+            return total_mark
+        else:
+            return None
+
+
+def add_total_mark(self):
+    """Add the total mark for the selected subject."""
+    semester_name = self.sheet_var.get()
+    subject_code = self.subject_code_entry.get()
+
+    if not subject_code:
+        messagebox.showerror("Error", "Please enter a Subject Code.")
+        return
+
+    total_mark = self.semesters[semester_name].add_total_mark(subject_code)
+
+    self.update_treeview()
+    if total_mark is not None:
+        messagebox.showinfo("Success", f"Total Mark for {subject_code}: {total_mark}")
+    else:
+        messagebox.showerror("Error", f"Subject {subject_code} not found.")

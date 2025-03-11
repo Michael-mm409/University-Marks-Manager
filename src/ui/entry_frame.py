@@ -1,9 +1,9 @@
-import customtkinter as ctk
 from tkinter import ttk
 
+import customtkinter as ctk
 
-def create_entry_frame(main_frame: ttk.Frame,
-                       application_self) -> None:
+
+def create_entry_frame(main_frame: ttk.Frame, application_self) -> None:
     entry_frame = ctk.CTkFrame(main_frame)
     entry_frame.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
 
@@ -12,7 +12,6 @@ def create_entry_frame(main_frame: ttk.Frame,
         ("Subject Assessment", "subject_assessment_entry"),
         ("Weighted Mark", "weighted_mark_entry"),
         ("Mark Weight (%)", "mark_weight_entry"),
-        ("Total Mark", "total_mark_entry"),
     ]
 
     for i, (field, attr) in enumerate(fields):
@@ -24,9 +23,9 @@ def create_entry_frame(main_frame: ttk.Frame,
 
     # Add a checkbox for sync source with the existing style
     application_self.sync_source_var = ctk.BooleanVar()
-    sync_source_checkbox = ctk.CTkCheckBox(entry_frame,
-                                           text="Sync Subject Across All Semesters",
-                                           variable=application_self.sync_source_var)
+    sync_source_checkbox = ctk.CTkCheckBox(
+        entry_frame, text="Sync Subject Across All Semesters", variable=application_self.sync_source_var
+    )
     sync_source_checkbox.grid(row=3, column=0, columnspan=2, padx=2, pady=2, sticky="w")
 
     # Configure column weight

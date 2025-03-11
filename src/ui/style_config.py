@@ -20,23 +20,28 @@ def configure_styles(root: ctk.CTk):
     accent_color = "#1B263B"  # Slightly lighter blue for accents
     hover_color = "#415A77"   # Blue tone for hover states
 
-    style.configure("TFrame", background=dark_bg)
-    style.configure("TLabel", background=dark_bg, foreground=dark_fg, font=("Helvetica", 12))
+    # Set the default font for the entire application
+    default_font = ("Helvetica", 12)
+    root.option_add("*Font", default_font)
+
+    style.configure("TFrame", background=dark_bg, font=default_font)
+    style.configure("TLabel", background=dark_bg, foreground=dark_fg, font=default_font)
     style.configure("TButton",
                     background=accent_color,
                     foreground=dark_fg,
-                    font=("Helvetica", 12),
+                    font=default_font,
                     relief="flat")
     style.map("TButton",
               background=[("active", hover_color), ("focus", accent_color)],
               foreground=[("active", dark_fg), ("focus", dark_fg)],
               highlightbackground=[("active", hover_color), ("focus", accent_color)],
-              highlightcolor=[("active", hover_color), ("focus", accent_color)])
+              highlightcolor=[("active", hover_color), ("focus", accent_color)],
+              )
 
     style.configure("TCheckbutton",
                     background=dark_bg,
                     foreground=dark_fg,
-                    font=("Helvetica", 12),
+                    font=default_font,
                     selectcolor=dark_bg,
                     relief="flat")
     style.map("TCheckbutton",
@@ -45,10 +50,11 @@ def configure_styles(root: ctk.CTk):
               highlightbackground=[("active", dark_bg), ("focus", dark_bg)],
               highlightcolor=[("active", dark_bg), ("focus", dark_bg)])
 
-    style.configure("Treeview", background=dark_bg, foreground=dark_fg, fieldbackground=dark_bg)
-    style.configure("Treeview.Heading", background=accent_color, foreground=dark_fg)
+    style.configure("Treeview", background=dark_bg, foreground=dark_fg, fieldbackground=dark_bg, font=default_font)
+    style.configure("Treeview.Heading", background=accent_color, foreground=dark_fg, font=default_font)
 
-    style.configure("Card.TFrame", background=dark_bg, highlightbackground=dark_bg, highlightcolor=dark_bg)
+    style.configure("Card.TFrame", background=dark_bg, highlightbackground=dark_bg,
+                    highlightcolor=dark_bg, font=default_font)
     style.map("Card.TFrame",
               background=[("active", hover_color), ("focus", accent_color)],
               highlightbackground=[("active", hover_color), ("focus", accent_color)],

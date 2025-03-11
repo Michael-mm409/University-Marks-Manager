@@ -1,10 +1,12 @@
 from collections import OrderedDict
 from tkinter import messagebox
+
 from .utils import get_subject_data, validate_float
 
 
-def add_entry(semester, subject_code, subject_name, subject_assessment,
-              weighted_mark, mark_weight, total_mark, sync_source=False) -> None:
+def add_entry(
+    semester, subject_code, subject_name, subject_assessment, weighted_mark, mark_weight, sync_source=False
+) -> None:
     """Add a new entry to the selected semester with assignment details."""
     # Check for a subject code.
     if not subject_code:
@@ -14,18 +16,15 @@ def add_entry(semester, subject_code, subject_name, subject_assessment,
     # Retrieve the subject data. This might be a normal dict from your JSON;
     # we now convert it to an OrderedDict with the desired key order.
     original_data = get_subject_data(semester, subject_code, subject_name)
-    subject_data = OrderedDict([
-        ("Subject Name", original_data.get("Subject Name", subject_name)),
-        ("Assignments", original_data.get("Assignments", [])),
-        ("Total Mark", original_data.get("Total Mark", 0)),
-        ("Examinations", original_data.get("Examinations", {"Exam Mark": 0, "Exam Weight": 100})),
-        ("Sync Source", original_data.get("Sync Source", sync_source))
-    ])
-
-    # Validate and update Total Mark.
-    total_mark = validate_float(total_mark, "Total Mark must be a valid number.")
-    if total_mark != -1:
-        subject_data["Total Mark"] = total_mark
+    subject_data = OrderedDict(
+        [
+            ("Subject Name", original_data.get("Subject Name", subject_name)),
+            ("Assignments", original_data.get("Assignments", [])),
+            ("Total Mark", original_data.get("Total Mark", 0)),
+            ("Examinations", original_data.get("Examinations", {"Exam Mark": 0, "Exam Weight": 100})),
+            ("Sync Source", original_data.get("Sync Source", sync_source)),
+        ]
+    )
 
     # Validate weighted and mark weight.
     weighted_mark = validate_float(weighted_mark, "Weighted Mark must be a valid number.")
@@ -41,11 +40,9 @@ def add_entry(semester, subject_code, subject_name, subject_assessment,
     assessments = subject_data.get("Assignments", [])
     for entry in assessments:
         if entry.get("Subject Assessment") == subject_assessment:
-            entry.update({
-                "Unweighted Mark": unweighted_mark,
-                "Weighted Mark": weighted_mark,
-                "Mark Weight": mark_weight
-            })
+            entry.update(
+                {"Unweighted Mark": unweighted_mark, "Weighted Mark": weighted_mark, "Mark Weight": mark_weight}
+            )
             messagebox.showinfo("Success", "Assessment updated successfully!")
             # Reassign the ordered subject_data to storage and save.
             semester.data_persistence.data[semester.name][subject_code] = subject_data
@@ -53,12 +50,14 @@ def add_entry(semester, subject_code, subject_name, subject_assessment,
             break
     else:
         # Create a new assessment with ordered keys.
-        new_assessment = OrderedDict([
-            ("Subject Assessment", subject_assessment),
-            ("Unweighted Mark", unweighted_mark),
-            ("Weighted Mark", weighted_mark if mark_weight != -1 else 0),
-            ("Mark Weight", mark_weight if mark_weight != -1 else 0)
-        ])
+        new_assessment = OrderedDict(
+            [
+                ("Subject Assessment", subject_assessment),
+                ("Unweighted Mark", unweighted_mark),
+                ("Weighted Mark", weighted_mark if mark_weight != -1 else 0),
+                ("Mark Weight", mark_weight if mark_weight != -1 else 0),
+            ]
+        )
         assessments.append(new_assessment)
         subject_data["Assignments"] = assessments
         messagebox.showinfo("Success", "Assessment added successfully!")
@@ -73,6 +72,7 @@ def add_entry(semester, subject_code, subject_name, subject_assessment,
             if other_semester != semester.name:
                 try:
                     from semester import Semester
+
                     other_sem = Semester(other_semester, semester.year, semester.data_persistence)
                     other_sem.add_entry(
                         subject_code=subject_code,
@@ -80,8 +80,7 @@ def add_entry(semester, subject_code, subject_name, subject_assessment,
                         subject_assessment=subject_assessment,
                         weighted_mark=weighted_mark,
                         mark_weight=mark_weight,
-                        total_mark=total_mark,
-                        sync_source=False
+                        sync_source=False,
                     )
                 except Exception as e:
                     print(f"Error syncing entry to semester {other_semester}: {e}")
