@@ -21,7 +21,7 @@ def configure_styles(root: ctk.CTk):
     hover_color = "#415A77"   # Blue tone for hover states
 
     # Set the default font for the entire application
-    default_font = ("Helvetica", 12)
+    default_font = ("Helvetica", 14)
     root.option_add("*Font", default_font)
 
     style.configure("TFrame", background=dark_bg, font=default_font)

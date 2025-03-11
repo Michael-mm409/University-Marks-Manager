@@ -4,7 +4,7 @@ import customtkinter as ctk
 
 
 def create_entry_frame(main_frame: ttk.Frame, application_self) -> None:
-    entry_frame = ctk.CTkFrame(main_frame)
+    entry_frame = ctk.CTkFrame(main_frame, fg_color="#0D1B2A")
     entry_frame.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
 
     fields = [

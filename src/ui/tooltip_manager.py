@@ -18,7 +18,7 @@ def brighten_color(hex_color: str, factor: float = 0.3) -> str:
     hex_color = hex_color.lstrip("#")
 
     # Covnert the hex color to RGB tuple
-    rgb = tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+    rgb = tuple(int(hex_color[i: i + 2], 16) for i in (0, 2, 4))
 
     # Convert the RGB color to HLS color space (Hue, Lightness, Saturation)
     hls = colorsys.rgb_to_hls(*[x / 255.0 for x in rgb])
@@ -50,7 +50,7 @@ class ToolTipManager:
         text: str,
         bg_color: str = "#0D1B2A",
         fg_color: str = "white",
-        font: Tuple[str, int] = ("Arial", 10),
+        font: Tuple[str, int] = ("Helvetica", 14),
     ):
         """
         Constructs all the necessary attributes for the tooltip window.
