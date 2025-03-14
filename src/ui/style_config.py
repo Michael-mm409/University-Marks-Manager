@@ -51,7 +51,7 @@ def configure_styles(root: ctk.CTk):
               highlightcolor=[("active", dark_bg), ("focus", dark_bg)])
 
     style.configure("Treeview", background=dark_bg, foreground=dark_fg, fieldbackground=dark_bg, font=default_font)
-    style.configure("Treeview.Heading", background=accent_color, foreground=dark_fg, font=default_font)
+    style.configure("Treeview.Heading", background=accent_color, foreground=dark_fg, font=(default_font[0], 16))
 
     style.configure("Card.TFrame", background=dark_bg, highlightbackground=dark_bg,
                     highlightcolor=dark_bg, font=default_font)
