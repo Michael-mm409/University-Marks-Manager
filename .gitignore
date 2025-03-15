@@ -6,6 +6,7 @@ dist/
 # Executables and specs
 /*.spec
 *.exe
+/*.bat
 
 # Python files
 *.pyc

@@ -7,11 +7,8 @@ def update_semester(self, _event=None):
     """Update the semester logic in the application."""
     selected_sheet = self.sheet_var.get()
     selected_year = self.year_var.get()
-    if selected_sheet not in self.semesters:
-        self.semesters[selected_sheet] = Semester(selected_sheet, selected_year, self.data_persistence)
-    else:
-        # Refresh the semester data from data_persistence
-        self.semesters[selected_sheet] = Semester(selected_sheet, selected_year, self.data_persistence)
+    # Refresh the semester data from data_persistence
+    self.semesters[selected_sheet] = Semester(selected_sheet, selected_year, self.data_persistence)
     self.update_treeview()
     print(self.semesters.keys())
 
@@ -26,7 +23,7 @@ def add_semester(self):
             self.semesters[new_semester_name] = Semester(new_semester_name, self.year_var.get(), self.data_persistence)
             self.sheet_var.set(new_semester_name)
             self.update_semester()
-            self.update_semester_menu()
+            # self.update_semester_menu()
 
 
 def remove_semester(self):
@@ -37,7 +34,7 @@ def remove_semester(self):
         if semester_name in self.semesters:
             del self.semesters[semester_name]
         self.update_semester()
-        self.update_semester_menu()
+        # self.update_semester_menu()
         messagebox.showinfo("Success", f"Semester '{semester_name}' has been removed.")
 
 

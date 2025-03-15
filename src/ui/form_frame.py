@@ -1,5 +1,5 @@
-from customtkinter import CTkOptionMenu, CTkLabel, CTkFrame, StringVar
 import customtkinter as ctk
+from customtkinter import CTkFrame, CTkLabel, CTkOptionMenu, StringVar
 
 
 def create_form_frame(
@@ -19,8 +19,8 @@ def create_form_frame(
     sheet_label.grid(row=0, column=0, padx=2, pady=2, sticky=ctk.W)
 
     self.semester_menu = CTkOptionMenu(
-        form_frame, variable=sheet_var, values=sorted(semesters.keys()), command=update_semester)
-
+        form_frame, variable=sheet_var, values=sorted(semesters.keys()), command=update_semester
+    )
     self.semester_menu.grid(row=0, column=1, padx=2, pady=2, sticky=ctk.W)
 
     year_label = CTkLabel(form_frame, text="Select Year:")
