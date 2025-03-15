@@ -46,18 +46,18 @@ def on_treeview_motion(self, event):
     if region == "cell":
         column = self.treeview.identify_column(event.x)
         row_id = self.treeview.identify_row(event.y)
-        if column in ["#2", "#3"]:
-            values = self.treeview.item(row_id, "values")
-            if any("=" in val or "Assessments:" in val or "No assignments available" in val for val in values):
+        values = self.treeview.item(row_id, "values")
+        if column == "#2" or (column == "#3" and values[2] != "No assignments available"):
+            if any("=" in val or "Assessments:" in val for val in values):
                 if self.current_tooltip:
                     self.current_tooltip.hide_tip(event)
                 return
-            if len(values) > 1:
-                text = values[int(column[1]) - 1]
-                if self.current_tooltip:
-                    self.current_tooltip.hide_tip(event)
-                self.current_tooltip = ToolTipManager(self.treeview, text)
-                self.current_tooltip.show_tip(event)
+            # if len(values) > 1:
+            text = values[int(column[1]) - 1]
+            if self.current_tooltip:
+                self.current_tooltip.hide_tip(event)
+            self.current_tooltip = ToolTipManager(self.treeview, text)
+            self.current_tooltip.show_tip(event)
         else:
             if self.current_tooltip:
                 self.current_tooltip.hide_tip(event)
