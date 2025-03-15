@@ -62,14 +62,12 @@ class Application:
         self.year_var = tk.StringVar()
         self.year_var.set(str(current_year))
 
+        self.semester_menu = None
+
         default_sheet = None
         for sheet in sorted(self.data_persistence.data.keys()):
-            # Get subjects for this semester.
             subjects = self.data_persistence.data.get(sheet, {})
-            # If there is at least one subject, check its Sync Source;
-            # if there are no subjects, you might accept this sheet.
             if subjects:
-                # If none of the subjects have Sync Source True, use this sheet.
                 if all(not subj.get("Sync Source", False) for subj in subjects.values()):
                     default_sheet = sheet
                     break
@@ -101,6 +99,11 @@ class Application:
         self.create_button_frames()
         self.bind_events()
         self.configure_grid()
+
+        # Initialize the semester menu
+        # self.semester_menu = ctk.CTkOptionMenu(self.root, variable=self.sheet_var, values=sorted(self.semesters.keys()))
+        # self.semester_menu.grid(row=0, column=1, padx=2, pady=2, sticky=tk.W)
+
         self.update_semester()
 
         # Set the application icon
@@ -150,7 +153,9 @@ class Application:
         self.main_frame.grid_columnconfigure(0, weight=1)
 
     def update_year(self, event=None):
+        self.create_form_frame()  # Recreate the form frame after changing the year
         update_year(self, event)
+        # self.update_semester_menu()  # Update the semester menu after changing the year
 
     def update_semester(self, event=None):
         update_semester(self, event)
@@ -166,14 +171,7 @@ class Application:
 
     def update_semester_menu(self):
         """Update the semester menu with the current semesters."""
-        menu = self.semester_menu["menu"]
-        menu.delete(0, "end")
-
-        for semester in sorted(self.semesters.keys()):
-            menu.add_command(
-                label=semester,
-                command=lambda value=semester: self.sheet_var.set(value),
-            )
+        self.semester_menu.configure(values=sorted(self.semesters.keys()))
 
         # Set the first semester as the default selection
         if self.semesters:
