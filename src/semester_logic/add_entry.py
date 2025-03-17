@@ -33,6 +33,10 @@ def add_entry(
         messagebox.showerror("Error", "Mark Weight must be between 0 and 100.")
         return
 
+    if subject_assessment == "":
+        messagebox.showerror("Error", "Assessment Name is required!")
+        return
+
     # Calculate unweighted mark.
     unweighted_mark = round(weighted_mark / mark_weight, 4) if mark_weight > 0 else 0
 
@@ -43,7 +47,7 @@ def add_entry(
             entry.update(
                 {"Unweighted Mark": unweighted_mark, "Weighted Mark": weighted_mark, "Mark Weight": mark_weight}
             )
-            messagebox.showinfo("Success", "Assessment updated successfully!")
+            # messagebox.showinfo("Success", "Assessment updated successfully!")
             # Reassign the ordered subject_data to storage and save.
             semester.data_persistence.data[semester.name][subject_code] = subject_data
             semester.data_persistence.save_data()
@@ -60,9 +64,9 @@ def add_entry(
         )
         assessments.append(new_assessment)
         subject_data["Assignments"] = assessments
-        messagebox.showinfo("Success", "Assessment added successfully!")
-        if mark_weight != -1:
-            subject_data["Examinations"]["Exam Weight"] -= mark_weight
+        # messagebox.showinfo("Success", "Assessment added successfully!")
+        # if mark_weight != -1:
+        subject_data["Examinations"]["Exam Weight"] -= mark_weight
         semester.data_persistence.data[semester.name][subject_code] = subject_data
         semester.data_persistence.save_data()
 

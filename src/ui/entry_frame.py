@@ -21,13 +21,6 @@ def create_entry_frame(main_frame: ttk.Frame, application_self) -> None:
         entry.grid(row=i // 2, column=(i % 2) * 2 + 1, padx=2, pady=2, sticky="ew")
         setattr(application_self, attr, entry)
 
-    # Add a checkbox for sync source with the existing style
-    application_self.sync_source_var = ctk.BooleanVar()
-    sync_source_checkbox = ctk.CTkCheckBox(
-        entry_frame, text="Sync Subject Across All Semesters", variable=application_self.sync_source_var
-    )
-    sync_source_checkbox.grid(row=3, column=0, columnspan=2, padx=2, pady=2, sticky="w")
-
     # Configure column weight
     entry_frame.grid_columnconfigure(1, weight=1)
 
