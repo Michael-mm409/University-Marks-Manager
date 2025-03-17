@@ -5,8 +5,7 @@ from ui import ask_add_subject
 
 def add_subject(app):
     """Adds a new subject to the selected semester."""
-    subject_code, subject_name = ask_add_subject(app.root)
-    sync_source = app.sync_source_var.get()  # Reads the checkbox values
+    subject_code, subject_name, sync_source = ask_add_subject(app.root)
 
     if subject_code and subject_name:
         semester_name = app.sheet_var.get()

@@ -19,6 +19,7 @@ from application_logic import (
     remove_semester,
     remove_subject,
     update_semester,
+    update_semester_menu,
     update_treeview,
     update_year,
 )
@@ -170,12 +171,7 @@ class Application:
         self.update_semester_menu()  # Update the semester menu after removing a semester
 
     def update_semester_menu(self):
-        """Update the semester menu with the current semesters."""
-        self.semester_menu.configure(values=sorted(self.semesters.keys()))
-
-        # Set the first semester as the default selection
-        if self.semesters:
-            self.sheet_var.set(sorted(self.semesters.keys())[0])
+        update_semester_menu(self)
 
     def add_subject(self):
         # Open the AddSubjectDialog
