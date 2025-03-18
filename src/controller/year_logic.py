@@ -1,5 +1,4 @@
-from data_persistence import DataPersistence
-from semester import Semester
+from model import DataPersistence, Semester
 
 
 def update_year(self, _event=None):

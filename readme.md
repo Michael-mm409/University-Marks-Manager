@@ -35,7 +35,7 @@ The application features a graphical user interface (GUI) built with `tkinter`, 
 
 3. **Run the Application**:
    ```bash
-   python main.py
+   python src/main.py
    ```
 
 ---
@@ -62,12 +62,13 @@ The application features a graphical user interface (GUI) built with `tkinter`, 
 
 ```
 student-marks-management/
-├── data/                        # JSON data directory
-├── main.py                      # Entry point for the application
-├── data_persistence.py          # Data handling and persistence logic
-├── semester.py                  # Semester-specific data management
-├── README.md                    # Project documentation
-└── requirements.txt             # Dependencies (if applicable)
+├── data/            
+├── src/          # JSON data directory
+└──├── main.py                      # Entry point for the application
+   ├── data_persistence.py          # Data handling and persistence logic
+   ├── semester.py                  # Semester-specific data management
+   ├── README.md                    # Project documentation
+   └── requirements.txt             # Dependencies (if applicable)
 ```
 
 ---

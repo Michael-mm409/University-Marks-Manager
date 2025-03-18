@@ -16,11 +16,12 @@ Usage:
 """
 
 from datetime import datetime
+from os import path
 
 import customtkinter as ctk
 
-from application import Application
-from data_persistence import DataPersistence
+from model import DataPersistence
+from model.application import Application
 
 
 def main():
@@ -28,7 +29,7 @@ def main():
     ctk.set_appearance_mode("System")  # Options: "System", "Dark", "Light"
     ctk.set_default_color_theme("blue")  # Options: "blue", "dark-blue", "green"
 
-    icon_path = "assets/app_icon.ico"  # Use the .ico file
+    icon_path = path.abspath(r"assets\app_icon.ico")  # Use the .ico file
 
     # Create the main application window
     root = ctk.CTk()
