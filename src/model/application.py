@@ -7,7 +7,7 @@ ToolTip class for displaying tooltips when hovering over a Treeview cell.
 import tkinter as tk
 from datetime import datetime
 
-from application_logic import (
+from controller import (
     add_entry,
     add_semester,
     add_total_mark,
@@ -23,19 +23,18 @@ from application_logic import (
     update_treeview,
     update_year,
 )
-from application_logic import (
+from controller.subject_logic import (
     add_subject as add_subject_logic,  # Rename the import to avoid conflict
 )
-from data_persistence import DataPersistence
-from semester import Semester
-from ui import (
+from model import DataPersistence, Semester
+from view import (
     configure_styles,
     create_button_frames,
     create_entry_frame,
     create_main_frame,
     create_treeview,
 )
-from ui import create_form_frame as create_form_func
+from view import create_form_frame as create_form_func
 
 
 class Application:
@@ -100,10 +99,6 @@ class Application:
         self.create_button_frames()
         self.bind_events()
         self.configure_grid()
-
-        # Initialize the semester menu
-        # self.semester_menu = ctk.CTkOptionMenu(self.root, variable=self.sheet_var, values=sorted(self.semesters.keys()))
-        # self.semester_menu.grid(row=0, column=1, padx=2, pady=2, sticky=tk.W)
 
         self.update_semester()
 

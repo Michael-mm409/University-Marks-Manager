@@ -1,10 +1,6 @@
-from .button_frames import create_button_frames
-from .entry_frame import create_entry_frame
-from .form_frame import create_form_frame
-from .main_frame import create_main_frame
-from .semester_dialog import ask_add_semester, ask_confirm
+from .dialogs import ask_add_semester, ask_add_subject, ask_add_total_mark, ask_confirm, ask_remove_subject
+from .frames import create_button_frames, create_entry_frame, create_form_frame, create_main_frame
 from .style_config import configure_styles
-from .subject_dialog import ask_add_subject, ask_add_total_mark, ask_remove_subject
 from .tooltip_manager import ToolTipManager
 from .treeview_setup import create_treeview
 
