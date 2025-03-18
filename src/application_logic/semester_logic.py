@@ -17,7 +17,9 @@ def update_semester(self, _event=None):
 
 def add_semester(self):
     """Adds a new semester to the application."""
-    new_semester_name = ask_add_semester(self.root, self.icon_path)
+    new_semester_name = ask_add_semester(
+        parent=self.root, title="Add Semester", message="Enter the name of the new semester:", icon_path=self.icon_path
+    )
     if new_semester_name:
         if new_semester_name in self.semesters:
             messagebox.showerror("Error", "Semester already exists!")

@@ -6,11 +6,12 @@ The Semester class is responsible for handling assignments and examinations for 
 """
 
 from collections import OrderedDict
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox
 from typing import List
 
 from data_persistence import DataPersistence
 from semester_logic import add_entry, calculate_exam_mark, sort_subjects, view_data
+from ui import ask_add_total_mark
 
 
 class Semester:
@@ -83,11 +84,17 @@ class Semester:
     def add_total_mark(self, subject_code: str):
         sem_data = self.data_persistence.data.get(self.name, {})
         if subject_code in sem_data:
-            total_mark = simpledialog.askfloat("Add Total Mark", f"Enter Total Mark for {subject_code}:")
+            total_mark = ask_add_total_mark(None, title="Add Total Mark")
+
+            if total_mark is None:
+                messagebox.showwarning("Warning", "No total mark entered. Operatiopn canceled.")
+                return None
+
             self.data_persistence.data[self.name][subject_code]["Total Mark"] = total_mark
             self.data_persistence.save_data()
             return total_mark
         else:
+            messagebox.showerror("Error", f"Subject '{subject_code}' not found.")
             return None
 
 
