@@ -1,45 +1,23 @@
-from tkinter import simpledialog
+from tkinter import messagebox
 
 import customtkinter as ctk
 
+from .base_dialog import BaseDialog
 
-class __AddSubjectDialog(simpledialog.Dialog):
-    def __init__(self, parent, icon_path=None):
-        self.icon_path = icon_path
-        self.subject_code = None
-        self.subject_name = None
-        self.sync_source = None
-        super().__init__(parent, title="Add Subject")
 
+class AddSubjectDialog(BaseDialog):
     def body(self, master):
-        # Set the background color for the dialog
-        master.configure(background="#0D1B2A")
+        super().body(master)  # Call the base class body method
 
-        # Set the icon for the dialog
-        if self.icon_path:
-            self.iconbitmap(self.icon_path)
-
-        # Set the window size to accommodate the frame width
-        self.geometry("250x200")  # Adjusted the height to accommodate the checkbox
-        self.resizable(True, True)  # Make the dialog resizable
-
-        # Create a larger button frame with adjustable width
-        self.button_frame = ctk.CTkFrame(master, fg_color="#0D1B2A", width=1500)
-        self.button_frame.pack_propagate(False)
-        self.button_frame.pack(fill="both", expand=True)
-
-        # UI Elements
+        # Add custom UI elements for AddSubjectDialog
         ctk.CTkLabel(self.button_frame, text="Subject Code:", fg_color="#0D1B2A", text_color="white").pack(
-            side="top",
-            anchor="w",
-            padx=10,
-            pady=5,
+            side="top", anchor="w", padx=10, pady=5
         )
         self.entry_code = ctk.CTkEntry(self.button_frame, fg_color="#0D1B2A", text_color="white")
         self.entry_code.pack(fill="x", padx=10)
 
         ctk.CTkLabel(self.button_frame, text="Subject Name:", fg_color="#0D1B2A", text_color="white").pack(
-            side="top", anchor="w", padx=10
+            side="top", anchor="w", padx=10, pady=5
         )
         self.entry_name = ctk.CTkEntry(self.button_frame, fg_color="#0D1B2A", text_color="white")
         self.entry_name.pack(fill="x", padx=10)
@@ -52,100 +30,64 @@ class __AddSubjectDialog(simpledialog.Dialog):
 
         return self.entry_code  # Set initial focus
 
-    def buttonbox(self):
-        # Add OK and Cancel buttons to the button_frame
-        ctk.CTkButton(self.button_frame, text="OK", command=self.ok, fg_color="#1D3557", text_color="white").pack(
-            side="left", fill="x", expand=True, padx=5
+    def apply(self):
+        self.result = {
+            "subject_code": self.entry_code.get().strip() or None,
+            "subject_name": self.entry_name.get().strip() or None,
+            "sync_source": self.sync_source_var.get(),
+        }
+
+
+class AddTotalMarkDialog(BaseDialog):
+    def body(self, master):
+        super().body(master)  # Call the base class body method
+
+        # Add custom UI elements for AddTotalMarkDialog
+        ctk.CTkLabel(self.button_frame, text="Enter Total Mark:", fg_color="#0D1B2A", text_color="white").pack(
+            side="top", anchor="w", padx=10
         )
-        ctk.CTkButton(
-            self.button_frame, text="Cancel", command=self.cancel, fg_color="#1D3557", text_color="white"
-        ).pack(side="right", fill="x", expand=True, padx=5)
+        self.entry_total_mark = ctk.CTkEntry(self.button_frame, fg_color="#0D1B2A", text_color="white")
+        self.entry_total_mark.pack(fill="x", padx=10)
+
+        return self.entry_total_mark  # Set initial focus
 
     def apply(self):
-        self.subject_code = self.entry_code.get().strip() or None
-        self.subject_name = self.entry_name.get().strip() or None
-        self.sync_source = self.sync_source_var.get()
+        value = self.entry_total_mark.get().strip()
+        try:
+            self.result = float(value) if value else None
+        except ValueError:
+            messagebox.showerror("Error", "Invalid input. Please enter a valid number.")
+            self.result = None
 
 
-class __AddTotalMarkDialog(simpledialog.Dialog):
-    def __init__(self, parent, icon_path=None):
-        self.icon_path = icon_path
-        self.total_mark = None
-        super().__init__(parent, title="Add Total Mark")
-
+class RemoveSubjectDialog(BaseDialog):
     def body(self, master):
-        if self.icon_path:
-            self.iconbitmap(self.icon_path)
+        super().body(master)  # Call the base class body method
 
-        ctk.CTkLabel(master, text="Enter Total Mark:").grid(row=0, column=0, padx=10, pady=(10, 5), sticky="w")
-        self.entry_total_mark = ctk.CTkEntry(master)
-        self.entry_total_mark.grid(row=0, column=1, padx=10, pady=(10, 5), sticky="ew")
-        return self.entry_total_mark
-
-    def apply(self):
-        self.total_mark = self.entry_total_mark.get().strip() or None
-
-
-class RemoveSubjectDialog(simpledialog.Dialog):
-    def __init__(self, parent, icon_path=None):
-        self.icon_path = icon_path
-        self.subject_code = None
-        super().__init__(parent, title="Remove Subject")
-
-    def body(self, master):
-        # Set the background color for the dialog
-        master.configure(background="#0D1B2A")
-
-        # Set the icon for the dialog
-        if self.icon_path:
-            self.iconbitmap(self.icon_path)
-
-        # Set the window size to accommodate the frame width
-        self.geometry("250x150")  # Adjusted the height to accommodate the input field
-        self.resizable(True, True)  # Make the dialog resizable
-
-        # Create a larger button frame with adjustable width
-        self.button_frame = ctk.CTkFrame(master, fg_color="#0D1B2A", width=1500)
-        self.button_frame.pack_propagate(False)
-        self.button_frame.pack(fill="both", expand=True)
-
-        # UI Elements
+        # Add custom UI elements for RemoveSubjectDialog
         ctk.CTkLabel(self.button_frame, text="Subject Code:", fg_color="#0D1B2A", text_color="white").pack(
-            side="top",
-            anchor="w",
-            padx=10,
-            pady=5,
+            side="top", anchor="w", padx=10, pady=5
         )
         self.entry_code = ctk.CTkEntry(self.button_frame, fg_color="#0D1B2A", text_color="white")
         self.entry_code.pack(fill="x", padx=10)
 
         return self.entry_code  # Set initial focus
 
-    def buttonbox(self):
-        # Add OK and Cancel buttons to the button_frame
-        ctk.CTkButton(self.button_frame, text="OK", command=self.ok, fg_color="#1D3557", text_color="white").pack(
-            side="left", fill="x", expand=True, padx=5, pady=10
-        )
-        ctk.CTkButton(
-            self.button_frame, text="Cancel", command=self.cancel, fg_color="#1D3557", text_color="white"
-        ).pack(side="right", fill="x", expand=True, padx=5, pady=10)
-
     def apply(self):
-        self.subject_code = self.entry_code.get().strip() or None
+        self.result = self.entry_code.get().strip() or None
 
 
-def ask_remove_subject(parent, icon_path=None):
+def ask_remove_subject(parent, title=None, message=None, icon_path=None):
     """Creates the remove subject dialog and returns the input value."""
-    dialog = RemoveSubjectDialog(parent, icon_path)
-    parent.wait_window(dialog)  # Wait for the dialog window to close
-    return dialog.subject_code
+    dialog = RemoveSubjectDialog(parent, title, message, icon_path)
+    return dialog.result
 
 
-def ask_add_subject(parent, icon_path=None):
-    dialog = __AddSubjectDialog(parent, icon_path)
-    return dialog.subject_code, dialog.subject_name, dialog.sync_source
+def ask_add_subject(parent, title=None, message=None, icon_path=None):
+    dialog = AddSubjectDialog(parent, title, message, icon_path)
+    return dialog.result["subject_code"], dialog.result["subject_name"], dialog.result["sync_source"]
 
 
-def ask_add_total_mark(parent, icon_path=None):
-    dialog = __AddTotalMarkDialog(parent, icon_path)
-    return dialog.total_mark
+def ask_add_total_mark(parent, title=None, message=None, icon_path=None):
+    dialog = AddTotalMarkDialog(parent, title, message, icon_path)
+    return dialog.result

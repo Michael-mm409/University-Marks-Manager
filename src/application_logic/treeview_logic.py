@@ -6,10 +6,6 @@ from ui import ToolTipManager
 def update_treeview(self):
     """Update the treeview widget in the application."""
     semester_name = self.sheet_var.get()
-    print("Updating treeview for semester:", semester_name)
-    if semester_name not in self.semesters:
-        print(f"Error: Semester '{semester_name}' not found in self.semesters")
-        return
     semester = self.semesters[semester_name]
     treeview_data = semester.sort_subjects()
 
