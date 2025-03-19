@@ -26,7 +26,6 @@ from controller import (
 from controller.subject.subject_logic import (
     add_subject as add_subject_logic,  # Rename the import to avoid conflict
 )
-from model import DataPersistence, Semester
 from view import (
     configure_styles,
     create_button_frames,
@@ -49,7 +48,10 @@ class Application:
         icon_path (str): The path to the icon file to be used for the application and dialogs.
     """
 
-    def __init__(self, application_root: tk.Tk, storage_handler: DataPersistence, icon_path: str):
+    def __init__(self, application_root: tk.Tk, storage_handler, icon_path: str):
+        # Import DataPersistence and Semester locally to avoid circular import
+        from model.semester.semester import Semester
+
         self.root = application_root
         self.data_persistence = storage_handler
         self.icon_path = icon_path  # Store the icon path

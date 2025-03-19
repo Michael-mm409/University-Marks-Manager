@@ -3,36 +3,6 @@ import tkinter as tk
 from typing import Tuple
 
 
-def __brighten_color(hex_color: str, factor: float = 0.3) -> str:
-    """
-    Brighten a hex color by a given factor.
-
-    Args:
-        hex_color (str): The hex color to brighten.
-        factor (float): The factor by which to brighten the color.
-
-    Returns:
-        str: The brightened hex color.
-    """
-    # Remove the '#' character from the beginning of the hex color string
-    hex_color = hex_color.lstrip("#")
-
-    # Covnert the hex color to RGB tuple
-    rgb = tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
-
-    # Convert the RGB color to HLS color space (Hue, Lightness, Saturation)
-    hls = colorsys.rgb_to_hls(*[x / 255.0 for x in rgb])
-
-    # Increase the lightness component of the HLS color by the specified factor
-    rgb_bright = colorsys.hls_to_rgb(hls[0], min(1, hls[1] + factor * (1 - hls[1])), hls[2])
-
-    # Convert the brighted HLS color back to RGB color space
-    rgb_bright = tuple(int(x * 255) for x in rgb_bright)
-
-    # Convert the RGB color back to a hex color string and return it
-    return "#{:02x}{:02x}{:02x}".format(*rgb_bright)
-
-
 class ToolTipManager:
     """
     A class to represent a tooltip for displaying
@@ -62,7 +32,7 @@ class ToolTipManager:
         self.widget = widget
         self.text = text
         self.tip_window = None
-        self.bg_color = __brighten_color(bg_color)  # Brighten the background color
+        self.bg_color = self.__brighten_color(bg_color)  # Use the standalone function
         self.fg_color = fg_color
         self.font = font
 
@@ -101,3 +71,33 @@ class ToolTipManager:
         if self.tip_window:
             self.tip_window.destroy()
             self.tip_window = None
+
+    @staticmethod
+    def __brighten_color(hex_color: str, factor: float = 0.3) -> str:
+        """
+        Brighten a hex color by a given factor.
+
+        Args:
+            hex_color (str): The hex color to brighten.
+            factor (float): The factor by which to brighten the color.
+
+        Returns:
+            str: The brightened hex color.
+        """
+        # Remove the '#' character from the beginning of the hex color string
+        hex_color = hex_color.lstrip("#")
+
+        # Covnert the hex color to RGB tuple
+        rgb = tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
+
+        # Convert the RGB color to HLS color space (Hue, Lightness, Saturation)
+        hls = colorsys.rgb_to_hls(*[x / 255.0 for x in rgb])
+
+        # Increase the lightness component of the HLS color by the specified factor
+        rgb_bright = colorsys.hls_to_rgb(hls[0], min(1, hls[1] + factor * (1 - hls[1])), hls[2])
+
+        # Convert the brighted HLS color back to RGB color space
+        rgb_bright = tuple(int(x * 255) for x in rgb_bright)
+
+        # Convert the RGB color back to a hex color string and return it
+        return "#{:02x}{:02x}{:02x}".format(*rgb_bright)
