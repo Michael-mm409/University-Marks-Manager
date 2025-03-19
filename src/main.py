@@ -20,8 +20,7 @@ from os import path
 
 import customtkinter as ctk
 
-from model import DataPersistence
-from model.application import Application
+from model import Application, DataPersistence
 
 
 def main():

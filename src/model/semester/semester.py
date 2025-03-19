@@ -5,12 +5,13 @@ in the University Marks Manager application.
 The Semester class is responsible for handling assignments and examinations for a given semester.
 """
 
-from model import DataPersistence
-from model.assignment_manager import AssignmentManager
-from model.data_formatter import DataFormatter
-from model.examination_manager import ExaminationManager
-from model.subject_manager import SubjectManager
+from model.persistence.data_persistence import DataPersistence
+from model.subject.subject_manager import SubjectManager
+from model.utils.data_formatter import DataFormatter  # Direct import to avoid circular dependency
 from view.dialogs import ask_add_total_mark
+
+from .assignment_manager import AssignmentManager
+from .examination_manager import ExaminationManager
 
 
 class Semester:

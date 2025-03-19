@@ -23,7 +23,7 @@ from controller import (
     update_treeview,
     update_year,
 )
-from controller.subject_logic import (
+from controller.subject.subject_logic import (
     add_subject as add_subject_logic,  # Rename the import to avoid conflict
 )
 from model import DataPersistence, Semester

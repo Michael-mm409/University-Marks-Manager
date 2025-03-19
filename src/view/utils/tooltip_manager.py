@@ -3,7 +3,7 @@ import tkinter as tk
 from typing import Tuple
 
 
-def brighten_color(hex_color: str, factor: float = 0.3) -> str:
+def __brighten_color(hex_color: str, factor: float = 0.3) -> str:
     """
     Brighten a hex color by a given factor.
 
@@ -18,7 +18,7 @@ def brighten_color(hex_color: str, factor: float = 0.3) -> str:
     hex_color = hex_color.lstrip("#")
 
     # Covnert the hex color to RGB tuple
-    rgb = tuple(int(hex_color[i: i + 2], 16) for i in (0, 2, 4))
+    rgb = tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
 
     # Convert the RGB color to HLS color space (Hue, Lightness, Saturation)
     hls = colorsys.rgb_to_hls(*[x / 255.0 for x in rgb])
@@ -62,7 +62,7 @@ class ToolTipManager:
         self.widget = widget
         self.text = text
         self.tip_window = None
-        self.bg_color = brighten_color(bg_color)  # Brighten the background color
+        self.bg_color = __brighten_color(bg_color)  # Brighten the background color
         self.fg_color = fg_color
         self.font = font
 
