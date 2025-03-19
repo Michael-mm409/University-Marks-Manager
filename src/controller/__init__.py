@@ -1,10 +1,9 @@
 # Import only frequently used functions or classes
-from .entry_logic import add_entry, delete_entry
-from .examTotal_mark_logic import add_total_mark, calculate_exam_mark
-from .semester_logic import add_semester, remove_semester, update_semester, update_semester_menu
-from .subject_logic import remove_subject
-from .treeview_logic import on_treeview_motion, on_treeview_select, on_window_resize, update_treeview
-from .year_logic import update_year
+from .entry.entry_logic import add_entry, delete_entry
+from .exam import add_total_mark, calculate_exam_mark
+from .semester import add_semester, remove_semester, update_semester, update_semester_menu, update_year
+from .subject import remove_subject
+from .treeview import on_treeview_motion, on_treeview_select, on_window_resize, update_treeview
 
 # Avoid importing everything unless absolutely necessary
 __all__ = [
