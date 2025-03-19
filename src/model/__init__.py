@@ -1,7 +1,7 @@
-from .application import Application
+from .application.application import Application
 from .persistence.data_persistence import DataPersistence
 from .semester import AssignmentManager, ExaminationManager, Semester
-from .subject import SubjectManager
+from .subject.subject_manager import SubjectManager
 from .utils import get_subject_data, validate_float  # Removed DataFormatter
 
 __all__ = [

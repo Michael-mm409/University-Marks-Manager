@@ -2,7 +2,7 @@
 from .entry.entry_logic import add_entry, delete_entry
 from .exam import add_total_mark, calculate_exam_mark
 from .semester import add_semester, remove_semester, update_semester, update_semester_menu, update_year
-from .subject import remove_subject
+from .subject.subject_logic import remove_subject
 from .treeview import on_treeview_motion, on_treeview_select, on_window_resize, update_treeview
 
 # Avoid importing everything unless absolutely necessary
