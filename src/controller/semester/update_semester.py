@@ -1,8 +1,8 @@
-from model import Semester
-
-
 def update_semester(self, _event=None):
     """Update the semester logic in the application."""
+    # Import Semester locally to avoid circular import
+    from model import Semester
+
     # Refresh the semester data from data_persistence
     self.semesters = {
         semester_name: Semester(semester_name, self.data_persistence.year, self.data_persistence)

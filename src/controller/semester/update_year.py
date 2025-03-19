@@ -1,8 +1,8 @@
-from model import DataPersistence, Semester
-
-
 def update_year(self, _event=None):
     """Update the year logic in the application."""
+    # Import DataPersistence and Semester locally to avoid circular import
+    from model import DataPersistence, Semester
+
     selected_year = self.year_var.get()
     # Re-initialize the data persistence object and semesters
     self.data_persistence = DataPersistence(selected_year)
