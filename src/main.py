@@ -18,37 +18,38 @@ Usage:
 from datetime import datetime
 from os import path
 
-import customtkinter as ctk
+from tkinter import Tk
 
-from model import Application, DataPersistence
+from model.persistence.data_persistence import DataPersistence
+from view import ask_semesters
+from model import Application
 
 
 def main():
-    # Optionally, set the appearance mode and color theme
-    ctk.set_appearance_mode("System")  # Options: "System", "Dark", "Light"
-    ctk.set_default_color_theme("blue")  # Options: "blue", "dark-blue", "green"
+    root = Tk()
 
-    icon_path = path.abspath(r"assets\app_icon.ico")  # Use the .ico file
+    year = datetime.now().year
+    icon_path = "./assets/app_icon.ico"  # Optional icon path
 
-    # Create the main application window
-    root = ctk.CTk()
-    root.title("University Marks Manager")
-    root.resizable(width=True, height=True)
+    # Ask the user for semesters if the data file does not exist
+    file_path = f"./data/{year}.json"
+    if not path.exists(file_path):
+        selected_semesters = ask_semesters(root, icon_path)
+        if not selected_semesters:
+            print("No semesters selected. Exiting.")
+            return
+    else:
+        selected_semesters = None  # Use existing data
 
-    # Set the icon for the main window
-    try:
-        root.iconbitmap(default=icon_path)
-        print("Icon set for the main window.")
-    except Exception as e:
-        print(f"Failed to set icon: {e}")
-
-    data_persistence = DataPersistence(str(datetime.now().year))
-
+    # Initialize DataPersistence with the selected semesters
+    data_persistence = DataPersistence(year, semesters=selected_semesters)
     Application(root, data_persistence, icon_path)
+    print(f"Initialized data for year {year}: {data_persistence.data}")
 
     try:
         root.mainloop()
     except KeyboardInterrupt:
+        print("Exiting application.")
         root.destroy()
 
 

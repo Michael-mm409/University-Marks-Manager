@@ -12,14 +12,17 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 class DataPersistence:
     """The DataPersistence class is responsible for loading and saving data to a JSON file."""
-    def __init__(self, year: str, file_directory: str = './data'):
+    def __init__(self, year: str, file_directory: str = './data', semesters: list = None):
         self.year: str = year
         self.file_directory: str = file_directory
-
         self.file_path = path.join(self.file_directory, f"{self.year}.json")
         makedirs(self.file_directory, exist_ok=True)  # Ensure directory exists
 
+        # Initialize data with user-selected semesters or default structure
         self.data = self.load_data()
+        if not self.data:  # If no data exists, initialize with selected semesters
+            self.data = {semester: {} for semester in (semesters or ["Autumn", "Spring", "Annual"])}
+            self.save_data()
 
     def load_data(self) -> Dict[str, Dict[str, List[Dict[str, Union[str, float]]]]]:
         """Load data from a JSON file."""
@@ -31,13 +34,7 @@ class DataPersistence:
                 logging.error(f"Error reading {self.file_path}: {error}. Initialising with empty data.")
         else:
             logging.info(f"{self.file_path} does not exist. Initialising with empty data.")
-
-        # Initialize structure for all semesters (Autumn, Spring, Annual)
-        return {
-            "Autumn": {},
-            "Spring": {},
-            "Annual": {}
-        }
+        return {}
 
     def save_data(self):
         """Save data to JSON file with pretty-printing."""

@@ -151,7 +151,6 @@ class Application:
         self.main_frame.grid_columnconfigure(0, weight=1)
 
     def update_year(self, event=None):
-        self.create_form_frame()  # Recreate the form frame after changing the year
         update_year(self, event)
         # self.update_semester_menu()  # Update the semester menu after changing the year
 

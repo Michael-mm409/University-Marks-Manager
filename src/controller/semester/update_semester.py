@@ -17,5 +17,5 @@ def update_semester_menu(self):
     self.semester_menu.configure(values=sorted(self.semesters.keys()))
 
     # Set the first semester as the default selection
-    if self.semesters:
-        self.sheet_var.set(sorted(self.semesters.keys())[0])
+    # if self.semesters:
+    #     self.sheet_var.set(sorted(self.semesters.keys())[0])
