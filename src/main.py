@@ -23,11 +23,11 @@ from data_persistence import DataPersistence
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-   # Initialise data persistence with the current year
+    # Initialise data persistence with the current year
     data_persistence = DataPersistence(str(datetime.now().year))
 
     # Create and show the main window
-    window = Application(data_persistence) # Ensure Application inherits from QMainWindow or QWidget
+    window = Application(data_persistence)  # Ensure Application inherits from QMainWindow or QWidget
     window.show()
 
     try:
