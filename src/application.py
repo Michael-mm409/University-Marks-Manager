@@ -7,12 +7,12 @@ from datetime import datetime
 from os import path
 from pathlib import Path
 from typing import Any
-from PyQt6.QtGui import QIcon, QFont
+from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
     QPushButton, QTableWidget, QComboBox, QLineEdit, QMessageBox,
-    QAbstractItemView, QDialog, QCheckBox, QHeaderView, QInputDialog, QTableWidgetItem
+    QAbstractItemView, QDialog, QCheckBox, QHeaderView, QInputDialog, QTableWidgetItem, QSizePolicy
 )
 
 from ui import AddSubjectDialog, confirm_remove_subject
@@ -110,6 +110,7 @@ class Application(QMainWindow):
         main_layout.addLayout(button_layout)  # Add the button layout
 
         self.central_widget.setLayout(main_layout)
+        self.central_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.update_year()
 
         # Resize columns to fit content after updating the table
@@ -118,9 +119,11 @@ class Application(QMainWindow):
 
         self.table.itemSelectionChanged.connect(self.populate_entries_from_selection)
 
+        self.table.resizeRowsToContents()
+
     def setup_dropdowns(self):
         current_year = datetime.now().year
-        self.year_combo.addItems([str(year) for year in range(current_year - 3, current_year + 2)])
+        self.year_combo.addItems([str(year) for year in range(current_year - 2, current_year + 2)])
         self.year_combo.setCurrentText(str(current_year))
         self.year_combo.currentIndexChanged.connect(self.update_year)
 
@@ -141,9 +144,10 @@ class Application(QMainWindow):
 
         # Enable dynamic resizing of columns
         header = self.table.horizontalHeader()
-        for column_index in range(len(columns)):
-            header.setSectionResizeMode(column_index,
-                                        QHeaderView.ResizeMode.ResizeToContents)  # Resize columns to fit content
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # Stretch columns to fill the table width
+
+        # Enable word wrapping for the table
+        self.table.setWordWrap(True)
 
     def setup_entry_fields(self, entry_layout: QGridLayout):
         # Define labels and corresponding input fields
@@ -192,11 +196,11 @@ class Application(QMainWindow):
 
     def populate_entries_from_selection(self):
         selected_rows = self.table.selectionModel().selectedRows()
-        print(f"Selected rows: {selected_rows}")  # Debugging
+        # print(f"Selected rows: {selected_rows}")  # Debugging
 
         if selected_rows:
             row = selected_rows[0].row()  # Get the first selected row
-            print(f"Selected row: {row}")  # Debugging
+            # print(f"Selected row: {row}")  # Debugging
 
             subject_code_item = self.table.item(row, 0)
             assessment_name_item = self.table.item(row, 2)
@@ -204,7 +208,7 @@ class Application(QMainWindow):
             if subject_code_item and assessment_name_item:
                 subject_code = subject_code_item.text()
                 assessment_name = assessment_name_item.text()
-                print(f"Subject Code: {subject_code}, Assessment Name: {assessment_name}")  # Debugging
+                # print(f"Subject Code: {subject_code}, Assessment Name: {assessment_name}")  # Debugging
 
                 if "No Assignments" in assessment_name:
                     self.subject_code_entry.setText(subject_code)
@@ -228,16 +232,22 @@ class Application(QMainWindow):
         # Check if the JSON file for the selected year exists
         json_file_path = Path(f"data/{selected_year}.json")
         if path.exists(json_file_path):
-            # If the file exists, just update the storage handler
+            # If the file exists, load the data and update the storage handler
             self.storage_handler = DataPersistence(selected_year)
             self.semesters = {
                 semester_name: Semester(semester_name, selected_year, self.storage_handler)
-                for semester_name in ["Autumn", "Spring", "Annual"]
+                for semester_name in self.storage_handler.data.keys()  # Dynamically get semesters from the file
             }
+
+            # Update the semester combo box with the available semesters
+            self.semester_combo.clear()
+            self.semester_combo.addItems(self.semesters.keys())
+
             self.update_semester()
+            # print(f"Loaded data for year {selected_year}. Semesters: {self.semesters.keys()}")
             return
 
-        # Show the semester selection dialog
+        # Show the semester selection dialog if the file does not exist
         dialog = SemesterSelectionDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             selected_semesters = dialog.get_selected_semesters()
@@ -257,16 +267,20 @@ class Application(QMainWindow):
                 semester_name: Semester(semester_name, self.storage_handler.year, self.storage_handler)
                 for semester_name in selected_semesters
             }
+
+            # Update the semester combo box with the selected semesters
+            self.semester_combo.clear()
+            self.semester_combo.addItems(selected_semesters)
+
             self.update_semester()
         else:
             QMessageBox.information(self, "Info", "Year change canceled.")
 
     def update_semester(self):
         semester_name = self.semester_combo.currentText()
-        semester = self.semesters.get(semester_name, "Unknown")
+        semester = self.semesters.get(semester_name)
 
         if not semester:
-            QMessageBox.warning(self, "Error", f"Semester {semester_name} not found.")
             return
 
         # Sync subjects/assessment data from "Annual" semester to other semesters
@@ -282,7 +296,9 @@ class Application(QMainWindow):
                         if subject_code not in semester.data:
                             semester.data[subject_code] = \
                                 self.semesters["Annual"]._Semester__get_subject_data("Annual", subject_code)
-            self.update_table(semester)
+
+        # Pass the Semester object to update_table
+        self.update_table(semester)
 
     def update_table(self, semester: Semester | str):
         """Update the table with new data, simulate text wrapping, and add tooltips."""
@@ -291,45 +307,31 @@ class Application(QMainWindow):
         # Retrieve all subjects, including synced subjects
         synced_subjects = semester.get_synced_subjects() if isinstance(semester, Semester) else []
         all_data = semester.view_data() + [
-            [subject["Subject Code"], subject["Subject Name"], "Synced Subject", "", "", "", ""]
+            [subject["Subject Code"], subject["Name"], "Synced Subject", "", "", "", ""]
             for subject in synced_subjects
         ]
 
-        # Define a maximum character width for each column (adjust as needed)
-        column_char_limits = [25, 30, 25, 20, 15, 20, 20]
-
         # Insert new rows with data
-        for row_data in all_data:
-            row_index = self.table.rowCount()  # Get the current row index
+        for row_index, row_data in enumerate(all_data):
             self.table.insertRow(row_index)
+            for col_index, cell_data in enumerate(row_data):
+                table_item = QTableWidgetItem(cell_data)
 
-            # Fill the row with data and simulate text wrapping
-            for col, item in enumerate(row_data):
-                text = str(item)
-                wrapped_text = self.wrap_text(text, column_char_limits[col])  # Wrap text manually
-                table_item = QTableWidgetItem(wrapped_text)
+                # Check if the row is a separator line
+                if "=" in cell_data.strip():
+                    # Center the separator line vertically and horizontally
+                    table_item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+                else:
+                    # Default alignment for other rows
+                    table_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
 
-                # Set tooltip for Subject Name (column 1) and Assessment (column 2)
-                if col == 1 or col == 2:  # Subject Name or Assessment
-                    if col == 2 and text == "No Assignments":
-                        pass
-                    else:
-                        table_item.setToolTip(text)
-                self.table.setItem(row_index, col, table_item)
+                self.table.setItem(row_index, col_index, table_item)
 
-            # Adjust row height and alignment for separator rows
-            if "=" in row_data[0]:  # Detect separator rows
-                for col in range(self.table.columnCount()):
-                    item = self.table.item(row_index, col)
-                    if item:
-                        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)  # Center-align text vertically and horizontally
-                        item.setBackground(Qt.GlobalColor.lightGray)  # Set background color
-                        item.setFont(QFont("Arial", 10, QFont.Weight.Bold))  # Set bold font
-                self.table.setRowHeight(row_index, 20)  # Set a fixed height for separator rows
-            else:
-                self.table.resizeRowToContents(row_index)  # Adjust row height for other rows
+            # Adjust row height for wrapped text
+            self.table.resizeRowToContents(row_index)
 
-        print(f"Row count: {self.table.rowCount()}")
+        # Resize columns to fit content
+        self.table.resizeColumnsToContents()
 
     def wrap_text(self, text: str, max_chars):
         """Manually wrap text to fit within a maximum character limit."""
@@ -352,11 +354,8 @@ class Application(QMainWindow):
     def resizeEvent(self, event):
         """Handle window resizing and adjust row heights and column widths dynamically."""
         super().resizeEvent(event)
-        self.table.resizeColumnsToContents()  # Adjust column widths to fit content
 
-        # Adjust row heights to fit wrapped text
-        for row in range(self.table.rowCount()):
-            self.table.resizeRowToContents(row)
+        self.table.resizeRowsToContents()
 
     def add_subject(self):
         semester_name = self.semester_combo.currentText()
@@ -405,12 +404,16 @@ class Application(QMainWindow):
 
     def add_entry(self):
         semester_name = self.semester_combo.currentText()
-        semester = self.semesters.get(semester_name, "Unknown")
+        semester = self.semesters.get(semester_name)
 
-        subject_code = self.subject_code_entry.text()
-        assessment = self.assessment_entry.text()
-        weighted_mark = self.weighted_mark_entry.text()
-        mark_weight = self.mark_weight_entry.text()
+        if not semester:
+            QMessageBox.warning(self, "Error", f"Semester '{semester_name}' not found.")
+            return
+
+        subject_code = self.subject_code_entry.text().strip()
+        assessment = self.assessment_entry.text().strip()
+        weighted_mark = self.weighted_mark_entry.text().strip()
+        mark_weight = self.mark_weight_entry.text().strip()
 
         # Validate and convert input values to float
         weighted_mark = self.__validate_float(weighted_mark, "Weighted Mark must be a valid number.")
@@ -419,18 +422,47 @@ class Application(QMainWindow):
         if weighted_mark == -1 or mark_weight == -1:
             return  # Exit if any of the values are invalid
 
+        # Check if the subject exists in the current semester
+        target_semester = semester
+        # Search for the subject in other semesters
+        for other_semester_name, other_semester in self.semesters.items():
+            if subject_code in other_semester.data:
+                target_semester = other_semester
+                break
+
+        # If the subject belongs to a different semester, show a warning
+        if target_semester != semester:
+            QMessageBox.warning(
+                self,
+                "Warning",
+                f"Subject '{subject_code}' belongs to the '{target_semester.name}' semester. "
+                "Please switch to that semester to modify or add entries for this subject."
+            )
+            return
+
         try:
-            semester.add_entry(
-                semester=semester_name,
+            # Add or update the entry in the target semester
+            target_semester.add_entry(
+                semester=target_semester.name,
                 subject_code=subject_code,
                 subject_assessment=assessment,
                 weighted_mark=weighted_mark,
                 mark_weight=mark_weight
             )
-            self.storage_handler.save_data()  # Ensure data is saved after adding entry
+
+            # Sync the changes back to the current semester
+            self.sync_table_entries(current_semester=semester, synced_semester=target_semester)
+
+            # Refresh the table for the current semester
             self.update_table(semester)
+
+            QMessageBox.information(
+                self,
+                "Success",
+                f"Entry added or updated for subject '{subject_code}' in semester '{target_semester.name}'."
+            )
         except ValueError as error:
-            QMessageBox.critical(self, "Error", f"Failed to add entry: {error}")
+            QMessageBox.critical(self, "Error", f"Failed to add or update entry: {error}")
 
     def __validate_float(self, value: Any, error_message: str) -> float:
         """Validate the input value and return it as a float."""
@@ -459,17 +491,24 @@ class Application(QMainWindow):
             if subject_code_item and assessment_item:
                 subject_code = subject_code_item.text()
                 assessment = assessment_item.text()
-                print(f"Deleting entry: {subject_code}, {assessment}, row: {row}")  # Debugging information
                 try:
+                    # Delete the entry from the current semester
                     semester.delete_entry(subject_code, assessment)
+
+                    # Remove the row from the table
                     self.table.removeRow(row)
+
+                    # Sync the table for the current semester with the synced semester
+                    for synced_semester_name, synced_semester in self.semesters.items():
+                        if synced_semester != semester and subject_code in synced_semester.data:
+                            self.sync_table_entries(semester, synced_semester)
+
                 except ValueError as error:
                     QMessageBox.critical(self, "Error", f"Failed to delete entry: {error}")
             else:
                 QMessageBox.warning(self, "Error", "Failed to retrieve subject code or assessment.")
 
-        self.storage_handler.save_data()  # Ensure data is saved after deleting entry
-
+        # Refresh the table for the current semester
         self.update_table(semester)
 
     def calculate_exam_mark(self):
@@ -487,17 +526,33 @@ class Application(QMainWindow):
             QMessageBox.critical(self, "Error", f"Subject {subject_code} not found.")
 
     def manage_total_mark(self):
-        """Set or clear the Total Mark for the selected subject."""
+        """Set or clear the Total Mark for the subject specified in the entry fields."""
         semester_name = self.semester_combo.currentText()
-        semester = self.semesters.get(semester_name, "Unknown")
+        semester = self.semesters.get(semester_name)
 
-        # Get the selected subject code from the table
-        selected_items = self.table.selectedItems()
-        if not selected_items:
-            QMessageBox.warning(self, "Error", "Please select a subject to manage the Total Mark.")
+        if not semester:
+            QMessageBox.warning(self, "Error", f"Semester '{semester_name}' not found.")
             return
 
-        subject_code = selected_items[0].text()  # Assuming the first column contains the subject code
+        # Get the subject code from the entry field
+        subject_code = self.subject_code_entry.text().strip()
+
+        if not subject_code:
+            QMessageBox.warning(self, "Error", "Please enter a Subject Code in the entry field.")
+            return
+
+        # Check if the subject exists in the current semester
+        target_semester = semester
+        if subject_code not in semester.data:
+            # Search for the subject in other semesters
+            for other_semester_name, other_semester in self.semesters.items():
+                if subject_code in other_semester.data:
+                    target_semester = other_semester
+                    break
+
+            if target_semester == semester:
+                QMessageBox.critical(self, "Error", f"Subject '{subject_code}' not found in any semester.")
+                return
 
         # Prompt the user to set or clear the Total Mark
         total_mark, ok = QInputDialog.getDouble(
@@ -506,20 +561,61 @@ class Application(QMainWindow):
 
         if ok:  # If the user clicks OK, set the Total Mark
             try:
-                semester.data[subject_code]["Total Mark"] = total_mark
+                target_semester.data[subject_code]["Total Mark"] = total_mark
                 self.storage_handler.save_data()  # Save changes
-                self.update_table(semester)  # Refresh the table
-                QMessageBox.information(self, "Success", f"Total Mark for {subject_code} set to {total_mark}.")
+                self.update_table(semester)  # Refresh the table for the current semester
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    f"Total Mark for '{subject_code}' set to {total_mark} in semester '{target_semester.name}'."
+                )
             except KeyError:
-                QMessageBox.critical(self, "Error", f"Subject {subject_code} not found.")
+                QMessageBox.critical(self, "Error", f"Failed to set Total Mark for {subject_code}.")
         else:  # If the user cancels, clear the Total Mark
             try:
-                semester.data[subject_code]["Total Mark"] = 0
+                target_semester.data[subject_code]["Total Mark"] = 0
                 self.storage_handler.save_data()  # Save changes
-                self.update_table(semester)  # Refresh the table
-                QMessageBox.information(self, "Success", f"Total Mark for {subject_code} cleared.")
+                self.update_table(semester)  # Refresh the table for the current semester
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    f"Total Mark for '{subject_code}' cleared in semester '{target_semester.name}'."
+                )
             except KeyError:
-                QMessageBox.critical(self, "Error", f"Subject {subject_code} not found.")
+                QMessageBox.critical(self, "Error", f"Failed to clear Total Mark for {subject_code}.")
+
+    def sync_table_entries(self, current_semester: Semester, synced_semester: Semester):
+        """
+        Synchronize the table entries between the current semester and the synced semester.
+
+        Args:
+            current_semester (Semester): The current semester displayed in the table.
+            synced_semester (Semester): The synced semester to pull data from.
+        """
+        for subject_code, subject_data in synced_semester.data.items():
+            if subject_code not in current_semester.data:
+                # Add the subject to the current semester in memory (not saved to JSON)
+                current_semester.data[subject_code] = {
+                    "Subject Name": subject_data["Subject Name"],
+                    "Assignments": subject_data["Assignments"],
+                    "Total Mark": subject_data["Total Mark"],
+                    "Examinations": subject_data["Examinations"]
+                }
+            else:
+                # Update the current semester's data with the synced semester's data
+                current_subject_data = current_semester.data[subject_code]
+                for assignment in subject_data["Assignments"]:
+                    # Check if the assignment already exists in the current semester
+                    existing_assignment = next(
+                        (a for a in current_subject_data["Assignments"] if a["Subject Assessment"] == assignment["Subject Assessment"]),
+                        None
+                    )
+                    if existing_assignment:
+                        # Update the existing assignment
+                        existing_assignment.update(assignment)
+                    else:
+                        # Add the new assignment
+                        current_subject_data["Assignments"].append(assignment)
 
 
 class SemesterSelectionDialog(QDialog):

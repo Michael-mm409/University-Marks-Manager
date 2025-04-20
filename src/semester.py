@@ -88,24 +88,41 @@ class Semester:
 
     def add_entry(self, semester: str, subject_code: str, subject_assessment: str,
                   weighted_mark: float | int, mark_weight: float) -> None:
-        """Add a new entry to the selected semester with assignment details."""
-        # Check if subject_code is filled out
-        if not subject_code:
-            QMessageBox.critical(None, "Error", "Subject Code is required!")
-            return
+        """
+        Add or update an entry for a subject in the specified semester.
 
-        # Retrieve the subject data (subject_name is no longer required)
-        if subject_code not in self.data:
-            QMessageBox.critical(None, "Error", f"Subject '{subject_code}' does not exist!")
-            return
+        Args:
+            semester (str): The name of the semester.
+            subject_code (str): The code of the subject.
+            subject_assessment (str): The name of the assessment.
+            weighted_mark (float): The weighted mark for the assessment.
+            mark_weight (float): The weight of the assessment.
 
-        subject_data = self.data[subject_code]
+        Raises:
+            ValueError: If the subject does not exist in the specified semester.
+        """
+        # Ensure the semester exists in the data persistence layer
+        if semester not in self.data_persistence.data:
+            self.data_persistence.data[semester] = {}
+
+        # Retrieve or initialize the subject data for the specified semester
+        if subject_code not in self.data_persistence.data[semester]:
+            self.data_persistence.data[semester][subject_code] = {
+                "Subject Name": "N/A",
+                "Assignments": [],
+                "Total Mark": 0,
+                "Examinations": {"Exam Mark": 0, "Exam Weight": 100}
+            }
+
+        # Get the subject data for the specified semester
+        subject_data = self.data_persistence.data[semester][subject_code]
 
         # Remove "No Assignments" placeholder if it exists
-        assignments = subject_data["Assignments"]
+        assignments: List[Dict[str, Any]] = subject_data["Assignments"]
         if len(assignments) == 1 and assignments[0].get("Subject Assessment") == "No Assignments":
             assignments.clear()  # Clear the placeholder assignment
 
+        # Validate and calculate the marks
         weighted_mark = self.__validate_float(weighted_mark, "Weighted Mark must be a valid number.")
         mark_weight = self.__validate_float(mark_weight, "Mark Weight must be a valid number.")
         if mark_weight < 0 or mark_weight > 100:
@@ -114,17 +131,19 @@ class Semester:
 
         unweighted_mark = round(weighted_mark / mark_weight, 4) if mark_weight > 0 else 0
 
-        # Update assessments or add a new one
+        # Check if the assessment already exists
         for entry in assignments:
             if entry.get("Subject Assessment") == subject_assessment:
+                # Update the existing entry instead of adding a new one
                 entry.update(
                     {"Unweighted Mark": unweighted_mark,
                      "Weighted Mark": weighted_mark,
                      "Mark Weight": mark_weight})
                 self.data_persistence.save_data()
+                QMessageBox.information(None, "Info", f"Updated existing entry for '{subject_assessment}' in semester '{semester}'.")
                 return
 
-        # If new assessment, add it to the list
+        # If the assessment does not exist, add it to the list
         new_assessment = {
             "Subject Assessment": subject_assessment,
             "Unweighted Mark": unweighted_mark,
@@ -136,7 +155,10 @@ class Semester:
         # Adjust exam weight if mark weight was provided
         if mark_weight != -1:
             subject_data["Examinations"]["Exam Weight"] -= mark_weight
+
+        # Save the updated data
         self.data_persistence.save_data()
+        QMessageBox.information(None, "Info", f"Added new entry for '{subject_assessment}' in semester '{semester}'.")
 
     def delete_entry(self, subject_code: str, subject_assessment: str):
         if subject_code in self.data:
@@ -165,7 +187,8 @@ class Semester:
         """Retrieve and format semester data for display."""
         sorted_data_list = []
 
-        for subject_code, subject_data in self.data.items():
+        sorted_subjects = sorted(self.data.items(), key=lambda item: item[0])  # Sort by subject code
+        for subject_code, subject_data in sorted_subjects:
             subject_name = subject_data.get("Subject Name", "N/A")
             total_mark = subject_data.get("Total Mark", 0)
 
@@ -206,8 +229,11 @@ class Semester:
                 f"Exam Weight: {exam_weight:.0f}%"
             ])
 
-            # Add a separator row for better readability
-            sorted_data_list.append(["=" * 20] * 7)
+            # Dynamically create a centered separator line
+            max_cell_width = max(len(str(cell)) for row in sorted_data_list[-1:] for cell in row)
+            separator_line = "=" * max_cell_width
+            centered_separator = [separator_line.center(max_cell_width)] * 7
+            sorted_data_list.append(centered_separator)
 
         return sorted_data_list
 
