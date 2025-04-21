@@ -5,7 +5,7 @@ It sets up the main application window, initializes data persistence, and
 runs the Tkinter event loop.
 
 Modules:
-    PyQt5.QtWidgets (QApplication, QMainWindow): Provides GUI Components.
+    PyQt6.QtWidgets (QApplication, QMainWindow): Provides GUI Components.
     datetime (datetime): Handles date-related operations.
     application (Application): Main application logic.
     data_persistence (DataPersistence): Handles data storage and retrieval.
@@ -17,8 +17,8 @@ Usage:
 import sys
 from datetime import datetime
 from PyQt6.QtWidgets import QApplication
-from application import Application
-from data_persistence import DataPersistence
+from src.application import Application
+from src.data_persistence import DataPersistence
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

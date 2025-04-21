@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QDialog, QCheckBox, QHeaderView, QInputDialog, QTableWidgetItem, QSizePolicy
 )
 
-from ui import AddSubjectDialog, confirm_remove_subject
+from ui.subject_dialog import AddSubjectDialog, confirm_remove_subject
 
 from data_persistence import DataPersistence
 from semester import Semester
@@ -607,7 +607,8 @@ class Application(QMainWindow):
                 for assignment in subject_data["Assignments"]:
                     # Check if the assignment already exists in the current semester
                     existing_assignment = next(
-                        (a for a in current_subject_data["Assignments"] if a["Subject Assessment"] == assignment["Subject Assessment"]),
+                        (assessment for assessment in current_subject_data["Assignments"]
+                         if assessment["Subject Assessment"] == assignment["Subject Assessment"]),
                         None
                     )
                     if existing_assignment:
