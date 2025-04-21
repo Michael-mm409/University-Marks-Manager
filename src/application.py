@@ -216,6 +216,12 @@ class Application(QMainWindow):
                     self.weighted_mark_entry.clear()
                     self.mark_weight_entry.clear()
                     return
+                elif any(keyword in subject_code for keyword in ["==", "Summary"]):
+                    self.subject_code_entry.clear
+                    self.assessment_entry.clear()
+                    self.weighted_mark_entry.clear()
+                    self.mark_weight_entry.clear()
+                    return
 
                 self.subject_code_entry.setText(subject_code)
                 self.assessment_entry.setText(assessment_name)
@@ -244,7 +250,6 @@ class Application(QMainWindow):
             self.semester_combo.addItems(self.semesters.keys())
 
             self.update_semester()
-            # print(f"Loaded data for year {selected_year}. Semesters: {self.semesters.keys()}")
             return
 
         # Show the semester selection dialog if the file does not exist
@@ -364,7 +369,7 @@ class Application(QMainWindow):
         # Show the AddSubjectDialog
         dialog = AddSubjectDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            subject_code, subject_name = dialog.get_subject_data()
+            subject_code, subject_name, custom_semesters = dialog.get_subject_data()
 
             if not subject_code:
                 QMessageBox.warning(self, "Error", "Subject code cannot be empty.")
@@ -623,12 +628,12 @@ class SemesterSelectionDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Select Semesters")
-        self.setGeometry(300, 300, 300, 200)
+        self.setGeometry(300, 300, 400, 300)  # Adjusted height to fit the new field
 
         # Layout
         self.layout = QVBoxLayout()
 
-        # Checkboxes for semesters
+        # Checkboxes for predefined semesters
         self.autumn_checkbox = QCheckBox("Autumn")
         self.spring_checkbox = QCheckBox("Spring")
         self.annual_checkbox = QCheckBox("Annual")
@@ -637,6 +642,12 @@ class SemesterSelectionDialog(QDialog):
         self.layout.addWidget(self.autumn_checkbox)
         self.layout.addWidget(self.spring_checkbox)
         self.layout.addWidget(self.annual_checkbox)
+
+        # Input field for custom semesters
+        self.custom_semester_label = QLabel("Custom Semesters (comma-separated):")
+        self.custom_semester_input = QLineEdit()
+        self.layout.addWidget(self.custom_semester_label)
+        self.layout.addWidget(self.custom_semester_input)
 
         # Buttons
         button_layout = QHBoxLayout()
@@ -654,12 +665,18 @@ class SemesterSelectionDialog(QDialog):
         self.cancel_button.clicked.connect(self.reject)
 
     def get_selected_semesters(self):
-        """Return a list of selected semesters."""
-        selected_semesters = []
-        if self.autumn_checkbox.isChecked():
-            selected_semesters.append("Autumn")
-        if self.spring_checkbox.isChecked():
-            selected_semesters.append("Spring")
-        if self.annual_checkbox.isChecked():
-            selected_semesters.append("Annual")
+        """Return a list of selected semesters, including custom ones."""
+        checkboxes = {
+            "Autumn": self.autumn_checkbox.isChecked(),
+            "Spring": self.spring_checkbox.isChecked(),
+            "Annual": self.annual_checkbox.isChecked()
+        }
+        selected_semesters = [semester for semester, checkbox in checkboxes.items() if checkbox]
+
+        # Add custom semesters
+        custom_semesters = [
+            semester.strip() for semester in self.custom_semester_input.text().split(",") if semester.strip()
+        ]
+        selected_semesters.extend(custom_semesters)
+
         return selected_semesters

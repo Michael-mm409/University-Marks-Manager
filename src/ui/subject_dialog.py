@@ -1,11 +1,11 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox, QCheckBox
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QCheckBox, QMessageBox
 
 
 class AddSubjectDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Add Subject")
-        self.setGeometry(300, 300, 400, 200)
+        self.setGeometry(300, 300, 400, 300)  # Adjusted height to fit the new field
 
         # Layout
         layout = QVBoxLayout()
@@ -15,11 +15,15 @@ class AddSubjectDialog(QDialog):
         self.subject_code_input = QLineEdit()
         self.subject_name_label = QLabel("Subject Name:")
         self.subject_name_input = QLineEdit()
+        self.custom_semester_label = QLabel("Custom Semesters (comma-separated):")
+        self.custom_semester_input = QLineEdit()
 
         layout.addWidget(self.subject_code_label)
         layout.addWidget(self.subject_code_input)
         layout.addWidget(self.subject_name_label)
         layout.addWidget(self.subject_name_input)
+        layout.addWidget(self.custom_semester_label)
+        layout.addWidget(self.custom_semester_input)
 
         # Checkbox to sync subject
         self.sync_subject_checkbox = QCheckBox("Sync Subject")
@@ -40,7 +44,15 @@ class AddSubjectDialog(QDialog):
         self.cancel_button.clicked.connect(self.reject)
 
     def get_subject_data(self):
-        return self.subject_code_input.text(), self.subject_name_input.text()
+        """
+        Returns the entered subject data, including the optional custom semesters and sync status.
+        """
+        return (
+            self.subject_code_input.text(),
+            self.subject_name_input.text(),
+            [semester.strip() for semester in self.custom_semester_input.text().split(",") if semester.strip()],
+            self.sync_subject_checkbox.isChecked(),
+        )
 
 
 def confirm_remove_subject(self, subject_code: str):
