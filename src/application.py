@@ -217,7 +217,7 @@ class Application(QMainWindow):
                     self.mark_weight_entry.clear()
                     return
                 elif any(keyword in subject_code for keyword in ["==", "Summary"]):
-                    self.subject_code_entry.clear
+                    self.subject_code_entry.clear()
                     self.assessment_entry.clear()
                     self.weighted_mark_entry.clear()
                     self.mark_weight_entry.clear()
@@ -300,7 +300,7 @@ class Application(QMainWindow):
                     if "Summary" not in subject_code and "=" not in subject_code:
                         if subject_code not in semester.data:
                             semester.data[subject_code] = \
-                                self.semesters["Annual"]._Semester__get_subject_data("Annual", subject_code)
+                                self.semesters["Annual"].get_subject_data("Annual", subject_code)
 
         # Pass the Semester object to update_table
         self.update_table(semester)
@@ -469,7 +469,8 @@ class Application(QMainWindow):
         except ValueError as error:
             QMessageBox.critical(self, "Error", f"Failed to add or update entry: {error}")
 
-    def __validate_float(self, value: Any, error_message: str) -> float:
+    @staticmethod
+    def __validate_float(value: Any, error_message: str) -> float:
         """Validate the input value and return it as a float."""
         if value is None or value == "":
             return 0.0
@@ -589,7 +590,8 @@ class Application(QMainWindow):
             except KeyError:
                 QMessageBox.critical(self, "Error", f"Failed to clear Total Mark for {subject_code}.")
 
-    def sync_table_entries(self, current_semester: Semester, synced_semester: Semester):
+    @staticmethod
+    def sync_table_entries(current_semester: Semester, synced_semester: Semester):
         """
         Synchronize the table entries between the current semester and the synced semester.
 
@@ -638,7 +640,7 @@ class SemesterSelectionDialog(QDialog):
         self.spring_checkbox = QCheckBox("Spring")
         self.annual_checkbox = QCheckBox("Annual")
 
-        # Add checkboxes to layout
+        # Add checkboxes to the layout
         self.layout.addWidget(self.autumn_checkbox)
         self.layout.addWidget(self.spring_checkbox)
         self.layout.addWidget(self.annual_checkbox)
@@ -656,7 +658,7 @@ class SemesterSelectionDialog(QDialog):
         button_layout.addWidget(self.ok_button)
         button_layout.addWidget(self.cancel_button)
 
-        # Add buttons to layout
+        # Add buttons to the layout
         self.layout.addLayout(button_layout)
         self.setLayout(self.layout)
 

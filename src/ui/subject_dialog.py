@@ -15,15 +15,11 @@ class AddSubjectDialog(QDialog):
         self.subject_code_input = QLineEdit()
         self.subject_name_label = QLabel("Subject Name:")
         self.subject_name_input = QLineEdit()
-        self.custom_semester_label = QLabel("Custom Semesters (comma-separated):")
-        self.custom_semester_input = QLineEdit()
 
         layout.addWidget(self.subject_code_label)
         layout.addWidget(self.subject_code_input)
         layout.addWidget(self.subject_name_label)
         layout.addWidget(self.subject_name_input)
-        layout.addWidget(self.custom_semester_label)
-        layout.addWidget(self.custom_semester_input)
 
         # Checkbox to sync subject
         self.sync_subject_checkbox = QCheckBox("Sync Subject")
@@ -49,8 +45,7 @@ class AddSubjectDialog(QDialog):
         """
         return (
             self.subject_code_input.text(),
-            self.subject_name_input.text(),
-            [semester.strip() for semester in self.custom_semester_input.text().split(",") if semester.strip()],
+            self.subject_name_input.text(),+
             self.sync_subject_checkbox.isChecked(),
         )
 

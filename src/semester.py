@@ -35,7 +35,7 @@ class Semester:
 
         # print(self.data)
 
-    def __get_subject_data(self, semester: str, subject_code: str, subject_name: str = None) -> Dict[str, Any]:
+    def get_subject_data(self, semester: str, subject_code: str, subject_name: str = None) -> Dict[str, Any]:
         """Retrieve the subject data for a given semester and subject code."""
         if semester not in self.data_persistence.data:
             self.data_persistence.data[semester] = {}
@@ -117,7 +117,7 @@ class Semester:
         # Get the subject data for the specified semester
         subject_data = self.data_persistence.data[semester][subject_code]
 
-        # Remove "No Assignments" placeholder if it exists
+        # Remove the "No Assignments" placeholder if it exists
         assignments: List[Dict[str, Any]] = subject_data["Assignments"]
         if len(assignments) == 1 and assignments[0].get("Subject Assessment") == "No Assignments":
             assignments.clear()  # Clear the placeholder assignment
@@ -170,11 +170,10 @@ class Semester:
             else:
                 raise ValueError(f"Assessment '{subject_assessment}' not found for subject '{subject_code}'")
         else:
+            # Update the data in the persistence layer
+            self.data_persistence.data[self.name] = self.data
+            self.data_persistence.save_data()
             raise ValueError(f"Subject '{subject_code}' not found in semester '{self.name}'")
-
-        # Update the data in the persistence layer
-        self.data_persistence.data[self.name] = self.data
-        self.data_persistence.save_data()
 
     def delete_subject(self, subject_code: str):
         """Remove a subject from the semester."""
@@ -213,7 +212,7 @@ class Semester:
                     f"{total_mark:.2f}"
                 ])
 
-            # Add summary row for the subject
+            # Add a summary row for the subject
             total_weighted_mark = sum(entry.get("Weighted Mark", 0) for entry in subject_data["Assignments"])
             total_weight = sum(entry.get("Mark Weight", 0) for entry in subject_data["Assignments"])
             exam_mark = subject_data["Examinations"].get("Exam Mark", 0)
@@ -229,17 +228,18 @@ class Semester:
                 f"Exam Weight: {exam_weight:.0f}%"
             ])
 
-            # Dynamically create a centered separator line
-            max_cell_width = max(len(str(cell)) for row in sorted_data_list[-1:] for cell in row)
-            separator_line = "=" * max_cell_width
-            centered_separator = [separator_line.center(max_cell_width)] * 7
-            sorted_data_list.append(centered_separator)
+        # Dynamically calculate column widths based on all rows
+        # Compute column widths based on the maximum length of data in each column across all rows
+        separator_row = ["=" * 25 for _ in range(len(sorted_data_list[0]))]
+
+        # Append the separator row to the data list
+        sorted_data_list.append(separator_row)
 
         return sorted_data_list
 
     def calculate_exam_mark(self, subject_code: str) -> float:
         """Calculate the exam mark for a given subject based on the current semester's data."""
-        subject_data = self.__get_subject_data(self.name, subject_code)
+        subject_data = self.get_subject_data(self.name, subject_code)
         total_mark = subject_data.get("Total Mark", 0)
         assessments_sum = sum(entry.get("Weighted Mark", 0)
                               for entry in subject_data.get("Assignments", []))

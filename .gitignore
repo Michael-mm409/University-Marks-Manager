@@ -3,3 +3,5 @@
 /.idea/*
 *.pyc
 /Azure-ttk-theme-main
+/dist
+/build

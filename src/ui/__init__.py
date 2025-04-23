@@ -4,7 +4,7 @@ from .form_frame import create_form_frame
 from .treeview_setup import create_treeview
 from .entry_frame import create_entry_frame
 from .button_frames import create_button_frames
-from .tooltip_manager import ToolTipManager
+# from .tooltip_manager import ToolTipManager
 from .subject_dialog import AddSubjectDialog, confirm_remove_subject
 
 __all__ = [
@@ -16,5 +16,5 @@ __all__ = [
     "create_treeview",
     "create_entry_frame",
     "create_button_frames",
-    "ToolTipManager"
+    # "ToolTipManager"
 ]
