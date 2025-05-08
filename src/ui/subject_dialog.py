@@ -5,7 +5,7 @@ class AddSubjectDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Add Subject")
-        self.setGeometry(300, 300, 400, 300)  # Adjusted height to fit the new field
+        self.setGeometry(300, 300, 400, 150)  # Adjusted height to fit the new field
 
         # Layout
         layout = QVBoxLayout()

@@ -128,6 +128,8 @@ class Application(QMainWindow):
         self.year_combo.currentIndexChanged.connect(self.update_year)
 
         self.semester_combo.addItems(["Autumn", "Spring", "Annual"])
+        if self.semester_combo.count() > 0:
+            self.semester_combo.setCurrentIndex(0)  # Default to the first valid semester
         self.semester_combo.currentIndexChanged.connect(self.update_semester)
 
     def setup_labels(self):
@@ -240,19 +242,22 @@ class Application(QMainWindow):
         if path.exists(json_file_path):
             # If the file exists, load the data and update the storage handler
             self.storage_handler = DataPersistence(selected_year)
-            self.semesters = {
-                semester_name: Semester(semester_name, selected_year, self.storage_handler)
-                for semester_name in self.storage_handler.data.keys()  # Dynamically get semesters from the file
-            }
+            # Dynamically gather semester names from JSON keys
+            self.semesters = {semester_name: Semester(semester_name, selected_year, self.storage_handler)
+                              for semester_name in self.storage_handler.data.keys()}
 
-            # Update the semester combo box with the available semesters
+            # Clear and populate with dynamic semester names
             self.semester_combo.clear()
+
+            # Add all keys (semesters) dynamically from JSON data
             self.semester_combo.addItems(self.semesters.keys())
 
+            print("Semesters in file:", self.storage_handler.data.keys())
+            print("Self.semesters populated as:", self.semesters.keys())
             self.update_semester()
             return
 
-        # Show the semester selection dialog if the file does not exist
+        # Show the semester selection dialogue if the file does not exist
         dialog = SemesterSelectionDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             selected_semesters = dialog.get_selected_semesters()
@@ -261,12 +266,12 @@ class Application(QMainWindow):
                 QMessageBox.warning(self, "Warning", "No semesters selected. Defaulting to all semesters.")
                 selected_semesters = ["Autumn", "Spring", "Annual"]
 
-            # Initialize the storage handler and create empty semesters
+            # Initialise the storage handler and create empty semesters
             self.storage_handler = DataPersistence(selected_year)
             for semester_name in selected_semesters:
                 self.storage_handler.data[semester_name] = {}  # Create an empty dictionary for the semester
 
-            # Save the initialized data and update the semesters
+            # Save the initialised data and update the semesters
             self.storage_handler.save_data()
             self.semesters = {
                 semester_name: Semester(semester_name, self.storage_handler.year, self.storage_handler)
@@ -283,24 +288,48 @@ class Application(QMainWindow):
 
     def update_semester(self):
         semester_name = self.semester_combo.currentText()
-        semester = self.semesters.get(semester_name)
-
-        if not semester:
+        if not semester_name:
+            # QMessageBox.warning(self, "Warning", "No semester selected. Please select a semester.")
             return
+        semester = self.semesters.get(semester_name)
+        # if semester is None:
+        #     QMessageBox.warning(self, "Warning", f"Semester '{semester_name}' not found. Please check the data.")
+        #     return
 
-        # Sync subjects/assessment data from "Annual" semester to other semesters
-        if semester_name in ["Autumn", "Spring"]:
-            annual_semester = self.semesters.get("Annual")
-            if annual_semester:
-                annual_data = annual_semester.view_data()
+        # Identify sync semesters dynamically based on a property or predefined logic
+        sync_semesters = [
+            sem_name for sem_name, sem_data in self.storage_handler.data.items()
+            if sem_data.get("Sync Subject", "").lower()  # Assuming "type": "sync" is in the JSON structure
+        ]
 
-                for row_data in annual_data:
+        # Identify dynamic semesters by excluding sync semesters
+        dynamic_semesters = [
+            sem_name for sem_name in self.storage_handler.data.keys()
+            if sem_name not in sync_semesters
+        ]
+        print(f"Dynamic semesters: {dynamic_semesters}")
+
+        # Loop through each sync semester and sync its data to dynamic semesters
+        for sync_semester_name in sync_semesters:
+            sync_semester = self.semesters.get(sync_semester_name)
+            if not sync_semester:
+                continue  # Skip if the sync semester is not present in self.semesters
+
+            sync_data = sync_semester.view_data()
+            for semester_name in dynamic_semesters:
+                semester = self.semesters.get(semester_name)
+                if not semester:
+                    continue  # Skip if the semester does not exist in self.semesters
+
+                # Sync data to the dynamic semester
+                for row_data in sync_data:
                     subject_code = row_data[0]
 
                     if "Summary" not in subject_code and "=" not in subject_code:
+                        # Add data to the semester if it doesn't already contain the subject code
                         if subject_code not in semester.data:
                             semester.data[subject_code] = \
-                                self.semesters["Annual"].get_subject_data("Annual", subject_code)
+                                sync_semester.get_subject_data(sync_semester_name, subject_code)
 
         # Pass the Semester object to update_table
         self.update_table(semester)
@@ -630,7 +659,7 @@ class SemesterSelectionDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Select Semesters")
-        self.setGeometry(300, 300, 400, 300)  # Adjusted height to fit the new field
+        self.setGeometry(300, 300, 400, 200)  # Adjusted height to fit the new field
 
         # Layout
         self.layout = QVBoxLayout()
