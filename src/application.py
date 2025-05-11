@@ -3,33 +3,48 @@ This module contains the Application class which is responsible for managing the
 user interface of the University Marks Manager application. It also includes the
 ToolTip class for displaying tooltips when hovering over a Treeview cell.
 """
+
 from datetime import datetime
 from os import path
 from pathlib import Path
 from typing import Any
-from PyQt6.QtGui import QIcon
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
-    QPushButton, QTableWidget, QComboBox, QLineEdit, QMessageBox,
-    QAbstractItemView, QDialog, QCheckBox, QHeaderView, QInputDialog, QTableWidgetItem, QSizePolicy
-)
 
-from ui.subject_dialog import AddSubjectDialog, confirm_remove_subject
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import (
+    QAbstractItemView,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QGridLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from data_persistence import DataPersistence
 from semester import Semester
+from ui.subject_dialog import AddSubjectDialog, confirm_remove_subject
 
 
 class Application(QMainWindow):
     def __init__(self, storage_handler: DataPersistence):
         super().__init__()
 
-        self.setWindowIcon(QIcon('assets/app_icon.png'))
+        self.setWindowIcon(QIcon("assets/app_icon.png"))
         self.storage_handler = storage_handler
         self.semesters = {
-            sem: Semester(sem, storage_handler.year, storage_handler)
-            for sem in ["Autumn", "Spring", "Annual"]
+            sem: Semester(sem, storage_handler.year, storage_handler) for sem in ["Autumn", "Spring", "Annual"]
         }
 
         # Main Widget
@@ -137,8 +152,15 @@ class Application(QMainWindow):
         self.semester_label = QLabel("Select Semester:")
 
     def setup_tables(self):
-        columns = ["Subject Code", "Subject Name", "Assessment", "Unweighted Mark",
-                   "Weighted Mark", "Mark Weight", "Total Mark"]
+        columns = [
+            "Subject Code",
+            "Subject Name",
+            "Assessment",
+            "Unweighted Mark",
+            "Weighted Mark",
+            "Mark Weight",
+            "Total Mark",
+        ]
         self.table.setColumnCount(len(columns))
         self.table.setHorizontalHeaderLabels(columns)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -168,7 +190,7 @@ class Application(QMainWindow):
             label = QLabel(label_text)
 
             # Add label and field to the grid layout
-            entry_layout.addWidget(label, row, col)       # Add label
+            entry_layout.addWidget(label, row, col)  # Add label
             entry_layout.addWidget(field, row, col + 1)  # Add input field
 
     def setup_buttons(self, button_layout: QGridLayout):
@@ -178,7 +200,7 @@ class Application(QMainWindow):
             self.btn_add_entry,
             self.btn_delete_entry,
             self.btn_calc,
-            self.btn_set_total_mark  # New button for managing Total Mark
+            self.btn_set_total_mark,  # New button for managing Total Mark
         ]
 
         # Dynamically arrange buttons in two rows
@@ -243,8 +265,10 @@ class Application(QMainWindow):
             # If the file exists, load the data and update the storage handler
             self.storage_handler = DataPersistence(selected_year)
             # Dynamically gather semester names from JSON keys
-            self.semesters = {semester_name: Semester(semester_name, selected_year, self.storage_handler)
-                              for semester_name in self.storage_handler.data.keys()}
+            self.semesters = {
+                semester_name: Semester(semester_name, selected_year, self.storage_handler)
+                for semester_name in self.storage_handler.data.keys()
+            }
 
             # Clear and populate with dynamic semester names
             self.semester_combo.clear()
@@ -289,37 +313,42 @@ class Application(QMainWindow):
     def update_semester(self):
         semester_name = self.semester_combo.currentText()
         if not semester_name:
-            # QMessageBox.warning(self, "Warning", "No semester selected. Please select a semester.")
             return
-        semester = self.semesters.get(semester_name)
-        # if semester is None:
-        #     QMessageBox.warning(self, "Warning", f"Semester '{semester_name}' not found. Please check the data.")
-        #     return
 
-        # Identify sync semesters dynamically based on a property or predefined logic
+        semester = self.semesters.get(semester_name)
+        if not semester:
+            print(f"Semester '{semester_name}' not found.")  # Debugging
+            return
+
+        # Identify sync semesters dynamically
         sync_semesters = [
-            sem_name for sem_name, sem_data in self.storage_handler.data.items()
-            if sem_data.get("Sync Subject", "").lower()  # Assuming "type": "sync" is in the JSON structure
+            sem_name
+            for sem_name, sem_data in self.storage_handler.data.items()
+            if any(subject.get("Sync Subject", False) for subject in sem_data.values())
         ]
+        print(f"Sync semesters: {sync_semesters}")  # Debugging
 
         # Identify dynamic semesters by excluding sync semesters
         dynamic_semesters = [
-            sem_name for sem_name in self.storage_handler.data.keys()
-            if sem_name not in sync_semesters
+            sem_name for sem_name in self.storage_handler.data.keys() if sem_name not in sync_semesters
         ]
-        print(f"Dynamic semesters: {dynamic_semesters}")
+        print(f"Dynamic semesters: {dynamic_semesters}")  # Debugging
 
         # Loop through each sync semester and sync its data to dynamic semesters
         for sync_semester_name in sync_semesters:
             sync_semester = self.semesters.get(sync_semester_name)
             if not sync_semester:
-                continue  # Skip if the sync semester is not present in self.semesters
+                print(f"Sync semester '{sync_semester_name}' not found.")  # Debugging
+                continue
 
             sync_data = sync_semester.view_data()
+            print(f"Sync data for semester '{sync_semester_name}': {sync_data}")  # Debugging
+
             for semester_name in dynamic_semesters:
                 semester = self.semesters.get(semester_name)
                 if not semester:
-                    continue  # Skip if the semester does not exist in self.semesters
+                    print(f"Dynamic semester '{semester_name}' not found.")  # Debugging
+                    continue
 
                 # Sync data to the dynamic semester
                 for row_data in sync_data:
@@ -328,41 +357,45 @@ class Application(QMainWindow):
                     if "Summary" not in subject_code and "=" not in subject_code:
                         # Add data to the semester if it doesn't already contain the subject code
                         if subject_code not in semester.data:
-                            semester.data[subject_code] = \
-                                sync_semester.get_subject_data(sync_semester_name, subject_code)
+                            semester.data[subject_code] = sync_semester.get_subject_data(
+                                sync_semester_name, subject_code
+                            )
+                            print(f"Synced subject '{subject_code}' to semester '{semester_name}'.")  # Debugging
 
         # Pass the Semester object to update_table
         self.update_table(semester)
 
     def update_table(self, semester: Semester | str):
-        """Update the table with new data, simulate text wrapping, and add tooltips."""
         self.table.setRowCount(0)  # Clear existing rows
 
         # Retrieve all subjects, including synced subjects
         synced_subjects = semester.get_synced_subjects() if isinstance(semester, Semester) else []
+        print(f"Synced subjects for semester '{semester.name}': {synced_subjects}")  # Debugging
+
         all_data = semester.view_data() + [
-            [subject["Subject Code"], subject["Name"], "Synced Subject", "", "", "", ""]
+            [subject["Subject Code"], subject["Subject Name"], "Synced Subject", "", "", "", ""]
             for subject in synced_subjects
         ]
+        print(f"All data to display: {all_data}")  # Debugging
 
-        # Insert new rows with data
-        for row_index, row_data in enumerate(all_data):
-            self.table.insertRow(row_index)
+        # Track the current subject to group entries
+        current_subject_code = None
+
+        # Insert rows into the table
+        for row_data in all_data:
+            subject_code = row_data[0]  # Assuming the first column contains the subject code
+
+            # Check if we are processing a new subject
+            if subject_code != current_subject_code:
+                # Update the current subject code
+                current_subject_code = subject_code
+
+            # Add the row for the current entry
+            self.table.insertRow(self.table.rowCount())
             for col_index, cell_data in enumerate(row_data):
                 table_item = QTableWidgetItem(cell_data)
-
-                # Check if the row is a separator line
-                if "=" in cell_data.strip():
-                    # Center the separator line vertically and horizontally
-                    table_item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
-                else:
-                    # Default alignment for other rows
-                    table_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-
-                self.table.setItem(row_index, col_index, table_item)
-
-            # Adjust row height for wrapped text
-            self.table.resizeRowToContents(row_index)
+                table_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+                self.table.setItem(self.table.rowCount() - 1, col_index, table_item)
 
         # Resize columns to fit content
         self.table.resizeColumnsToContents()
@@ -375,7 +408,7 @@ class Application(QMainWindow):
 
         for word in words:
             if len(current_line) + len(word) + 1 <= max_chars:  # +1 for the space
-                current_line += (word + " ")
+                current_line += word + " "
             else:
                 lines.append(current_line.strip())
                 current_line = word + " "
@@ -470,7 +503,7 @@ class Application(QMainWindow):
                 self,
                 "Warning",
                 f"Subject '{subject_code}' belongs to the '{target_semester.name}' semester. "
-                "Please switch to that semester to modify or add entries for this subject."
+                "Please switch to that semester to modify or add entries for this subject.",
             )
             return
 
@@ -481,7 +514,7 @@ class Application(QMainWindow):
                 subject_code=subject_code,
                 subject_assessment=assessment,
                 weighted_mark=weighted_mark,
-                mark_weight=mark_weight
+                mark_weight=mark_weight,
             )
 
             # Sync the changes back to the current semester
@@ -493,7 +526,7 @@ class Application(QMainWindow):
             QMessageBox.information(
                 self,
                 "Success",
-                f"Entry added or updated for subject '{subject_code}' in semester '{target_semester.name}'."
+                f"Entry added or updated for subject '{subject_code}' in semester '{target_semester.name}'.",
             )
         except ValueError as error:
             QMessageBox.critical(self, "Error", f"Failed to add or update entry: {error}")
@@ -602,7 +635,7 @@ class Application(QMainWindow):
                 QMessageBox.information(
                     self,
                     "Success",
-                    f"Total Mark for '{subject_code}' set to {total_mark} in semester '{target_semester.name}'."
+                    f"Total Mark for '{subject_code}' set to {total_mark} in semester '{target_semester.name}'.",
                 )
             except KeyError:
                 QMessageBox.critical(self, "Error", f"Failed to set Total Mark for {subject_code}.")
@@ -612,9 +645,7 @@ class Application(QMainWindow):
                 self.storage_handler.save_data()  # Save changes
                 self.update_table(semester)  # Refresh the table for the current semester
                 QMessageBox.information(
-                    self,
-                    "Success",
-                    f"Total Mark for '{subject_code}' cleared in semester '{target_semester.name}'."
+                    self, "Success", f"Total Mark for '{subject_code}' cleared in semester '{target_semester.name}'."
                 )
             except KeyError:
                 QMessageBox.critical(self, "Error", f"Failed to clear Total Mark for {subject_code}.")
@@ -635,7 +666,7 @@ class Application(QMainWindow):
                     "Subject Name": subject_data["Subject Name"],
                     "Assignments": subject_data["Assignments"],
                     "Total Mark": subject_data["Total Mark"],
-                    "Examinations": subject_data["Examinations"]
+                    "Examinations": subject_data["Examinations"],
                 }
             else:
                 # Update the current semester's data with the synced semester's data
@@ -643,9 +674,12 @@ class Application(QMainWindow):
                 for assignment in subject_data["Assignments"]:
                     # Check if the assignment already exists in the current semester
                     existing_assignment = next(
-                        (assessment for assessment in current_subject_data["Assignments"]
-                         if assessment["Subject Assessment"] == assignment["Subject Assessment"]),
-                        None
+                        (
+                            assessment
+                            for assessment in current_subject_data["Assignments"]
+                            if assessment["Subject Assessment"] == assignment["Subject Assessment"]
+                        ),
+                        None,
                     )
                     if existing_assignment:
                         # Update the existing assignment
@@ -700,7 +734,7 @@ class SemesterSelectionDialog(QDialog):
         checkboxes = {
             "Autumn": self.autumn_checkbox.isChecked(),
             "Spring": self.spring_checkbox.isChecked(),
-            "Annual": self.annual_checkbox.isChecked()
+            "Annual": self.annual_checkbox.isChecked(),
         }
         selected_semesters = [semester for semester, checkbox in checkboxes.items() if checkbox]
 
@@ -711,3 +745,9 @@ class SemesterSelectionDialog(QDialog):
         selected_semesters.extend(custom_semesters)
 
         return selected_semesters
+
+
+def get_subject_data(self, semester_name: str, subject_code: str):
+    subject_data = self.data.get(subject_code)
+    print(f"Fetching data for subject '{subject_code}' in semester '{semester_name}': {subject_data}")  # Debugging
+    return subject_data

@@ -16,9 +16,11 @@ Usage:
 
 import sys
 from datetime import datetime
+
 from PyQt6.QtWidgets import QApplication
-from src.application import Application
-from src.data_persistence import DataPersistence
+
+from application import Application
+from data_persistence import DataPersistence
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
