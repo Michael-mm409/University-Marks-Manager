@@ -7,7 +7,7 @@ ToolTip class for displaying tooltips when hovering over a Treeview cell.
 from datetime import datetime
 from os import path
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Union, cast
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
@@ -168,7 +168,8 @@ class Application(QMainWindow):
 
         # Enable dynamic resizing of columns
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # Stretch columns to fill the table width
+        if header:
+            header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # Stretch columns to fill the table width
 
         # Enable word wrapping for the table
         self.table.setWordWrap(True)
@@ -219,7 +220,10 @@ class Application(QMainWindow):
         self.btn_set_total_mark.clicked.connect(self.manage_total_mark)  # Connect the new button
 
     def populate_entries_from_selection(self):
-        selected_rows = self.table.selectionModel().selectedRows()
+        sel_model = self.table.selectionModel()
+        if sel_model is None:
+            return
+        selected_rows = sel_model.selectedRows()
         # print(f"Selected rows: {selected_rows}")  # Debugging
 
         if selected_rows:
@@ -249,8 +253,16 @@ class Application(QMainWindow):
 
                 self.subject_code_entry.setText(subject_code)
                 self.assessment_entry.setText(assessment_name)
-                self.weighted_mark_entry.setText(self.table.item(row, 4).text())
-                self.mark_weight_entry.setText(self.table.item(row, 5).text().replace("%", ""))
+                weighted_item = self.table.item(row, 4)
+                mark_weight_item = self.table.item(row, 5)
+                if weighted_item:
+                    self.weighted_mark_entry.setText(weighted_item.text())
+                else:
+                    self.weighted_mark_entry.clear()
+                if mark_weight_item:
+                    self.mark_weight_entry.setText(mark_weight_item.text().replace("%", ""))
+                else:
+                    self.mark_weight_entry.clear()
             else:
                 print("Invalid or empty items in the selected row.")
         else:
@@ -316,15 +328,16 @@ class Application(QMainWindow):
             return
 
         semester = self.semesters.get(semester_name)
-        if not semester:
+        if semester is None:
             print(f"Semester '{semester_name}' not found.")  # Debugging
             return
+        assert semester is not None
 
         # Identify sync semesters dynamically
         sync_semesters = [
             sem_name
             for sem_name, sem_data in self.storage_handler.data.items()
-            if any(subject.get("Sync Subject", False) for subject in sem_data.values())
+            if any(isinstance(subject, dict) and subject.get("Sync Subject", False) for subject in sem_data.values())
         ]
         print(f"Sync semesters: {sync_semesters}")  # Debugging
 
@@ -357,22 +370,33 @@ class Application(QMainWindow):
                     if "Summary" not in subject_code and "=" not in subject_code:
                         # Add data to the semester if it doesn't already contain the subject code
                         if subject_code not in semester.data:
-                            semester.data[subject_code] = sync_semester.get_subject_data(
-                                sync_semester_name, subject_code
+                            semester.data[subject_code] = cast(
+                                List[Dict[str, Union[str, float]]],
+                                sync_semester.get_subject_data(sync_semester_name, subject_code),
                             )
+                            print(f"Synced subject '{subject_code}' to semester '{semester_name}'.")  # Debugging
                             print(f"Synced subject '{subject_code}' to semester '{semester_name}'.")  # Debugging
 
         # Pass the Semester object to update_table
-        self.update_table(semester)
+        self.update_table(cast(Semester, semester))
 
     def update_table(self, semester: Semester | str):
         self.table.setRowCount(0)  # Clear existing rows
 
-        # Retrieve all subjects, including synced subjects
-        synced_subjects = semester.get_synced_subjects() if isinstance(semester, Semester) else []
-        print(f"Synced subjects for semester '{semester.name}': {synced_subjects}")  # Debugging
+        # Ensure semester is a Semester object
+        if isinstance(semester, str):
+            sem_obj = self.semesters.get(semester)
+            if sem_obj is None:
+                print(f"Semester '{semester}' not found.")
+                return
+        else:
+            sem_obj = semester
 
-        all_data = semester.view_data() + [
+        # Retrieve all subjects, including synced subjects
+        synced_subjects = sem_obj.get_synced_subjects()
+        print(f"Synced subjects for semester '{sem_obj.name}': {synced_subjects}")  # Debugging
+
+        all_data = sem_obj.view_data() + [
             [subject["Subject Code"], subject["Subject Name"], "Synced Subject", "", "", "", ""]
             for subject in synced_subjects
         ]
@@ -418,15 +442,18 @@ class Application(QMainWindow):
 
         return "\n".join(lines)  # Join lines with a newline character
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, a0):
         """Handle window resizing and adjust row heights and column widths dynamically."""
-        super().resizeEvent(event)
+        super().resizeEvent(a0)
 
         self.table.resizeRowsToContents()
 
     def add_subject(self):
         semester_name = self.semester_combo.currentText()
-        semester = self.semesters.get(semester_name, "Unknown")
+        semester = self.semesters.get(semester_name)
+        if semester is None:
+            QMessageBox.critical(self, "Error", f"Semester '{semester_name}' not found.")
+            return
 
         # Show the AddSubjectDialog
         dialog = AddSubjectDialog(self)
@@ -448,7 +475,10 @@ class Application(QMainWindow):
 
     def delete_subject(self):
         semester_name = self.semester_combo.currentText()
-        semester = self.semesters.get(semester_name, "Unknown")
+        semester = self.semesters.get(semester_name)
+        if semester is None:
+            QMessageBox.critical(self, "Error", f"Semester '{semester_name}' not found.")
+            return
 
         # Get the selected subject code from the table
         selected_items = self.table.selectedItems()
@@ -544,9 +574,15 @@ class Application(QMainWindow):
 
     def delete_entry(self):
         semester_name = self.semester_combo.currentText()
-        semester = self.semesters.get(semester_name, "Unknown")
+        semester = self.semesters.get(semester_name)
+        if not semester:
+            QMessageBox.warning(self, "Error", f"Semester '{semester_name}' not found.")
+            return
 
-        selected_rows = self.table.selectionModel().selectedRows()
+        sel_model = self.table.selectionModel()
+        if sel_model is None:
+            return
+        selected_rows = sel_model.selectedRows()
         if not selected_rows:
             QMessageBox.warning(self, "Error", "Please select an entry to delete.")
             return
@@ -629,19 +665,36 @@ class Application(QMainWindow):
 
         if ok:  # If the user clicks OK, set the Total Mark
             try:
-                target_semester.data[subject_code]["Total Mark"] = total_mark
-                self.storage_handler.save_data()  # Save changes
-                self.update_table(semester)  # Refresh the table for the current semester
-                QMessageBox.information(
-                    self,
-                    "Success",
-                    f"Total Mark for '{subject_code}' set to {total_mark} in semester '{target_semester.name}'.",
-                )
+                if isinstance(target_semester.data[subject_code], list):
+                    if len(target_semester.data[subject_code]) > 0:
+                        subject_item = target_semester.data[subject_code][0]
+                    else:
+                        QMessageBox.critical(self, "Error", f"Invalid data structure for subject '{subject_code}'.")
+                        return
+                elif isinstance(target_semester.data[subject_code], dict):
+                    subject_item = target_semester.data[subject_code]
+                else:
+                    QMessageBox.critical(self, "Error", f"Invalid data structure for subject '{subject_code}'.")
             except KeyError:
-                QMessageBox.critical(self, "Error", f"Failed to set Total Mark for {subject_code}.")
+                QMessageBox.critical(self, "Error", f"Subject '{subject_code}' not found in the data structure.")
         else:  # If the user cancels, clear the Total Mark
             try:
-                target_semester.data[subject_code]["Total Mark"] = 0
+                if isinstance(target_semester.data[subject_code], list):
+                    if len(target_semester.data[subject_code]) > 0:
+                        subject_item = target_semester.data[subject_code][0]
+                    else:
+                        QMessageBox.critical(self, "Error", f"Invalid data structure for subject '{subject_code}'.")
+                        return
+                elif isinstance(target_semester.data[subject_code], dict):
+                    subject_item = target_semester.data[subject_code]
+                else:
+                    QMessageBox.critical(self, "Error", f"Invalid data structure for subject '{subject_code}'.")
+                    return
+                if isinstance(subject_item, dict):
+                    subject_item["Total Mark"] = 0
+                else:
+                    QMessageBox.critical(self, "Error", f"Invalid data structure for subject '{subject_code}'.")
+                    return
                 self.storage_handler.save_data()  # Save changes
                 self.update_table(semester)  # Refresh the table for the current semester
                 QMessageBox.information(
@@ -649,6 +702,10 @@ class Application(QMainWindow):
                 )
             except KeyError:
                 QMessageBox.critical(self, "Error", f"Failed to clear Total Mark for {subject_code}.")
+                self.update_table(semester)  # Refresh the table for the current semester
+                QMessageBox.information(
+                    self, "Success", f"Total Mark for '{subject_code}' cleared in semester '{target_semester.name}'."
+                )
 
     @staticmethod
     def sync_table_entries(current_semester: Semester, synced_semester: Semester):
@@ -662,12 +719,16 @@ class Application(QMainWindow):
         for subject_code, subject_data in synced_semester.data.items():
             if subject_code not in current_semester.data:
                 # Add the subject to the current semester in memory (not saved to JSON)
-                current_semester.data[subject_code] = {
-                    "Subject Name": subject_data["Subject Name"],
-                    "Assignments": subject_data["Assignments"],
-                    "Total Mark": subject_data["Total Mark"],
-                    "Examinations": subject_data["Examinations"],
-                }
+                current_semester.data[subject_code] = [
+                    {
+                        "Subject Name": subject_data[0]["Subject Name"]
+                        if isinstance(subject_data, list) and subject_data
+                        else subject_data.get("Subject Name", ""),
+                        "Assignments": subject_data["Assignments"],
+                        "Total Mark": subject_data["Total Mark"],
+                        "Examinations": subject_data["Examinations"],
+                    }
+                ]
             else:
                 # Update the current semester's data with the synced semester's data
                 current_subject_data = current_semester.data[subject_code]
