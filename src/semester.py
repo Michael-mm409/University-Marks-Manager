@@ -110,15 +110,6 @@ class Semester:
     ) -> None:
         """
         Add or update an entry for a subject in the specified semester.
-
-        Args:
-            subject_code (str): The code of the subject.
-            subject_assessment (str): The name of the assessment.
-            weighted_mark (float): The weighted mark for the assessment.
-            mark_weight (float): The weight of the assessment.
-
-        Raises:
-            ValueError: If the subject does not exist in the specified semester.
         """
         if subject_code not in self.subjects:
             QMessageBox.critical(None, "Error", f"Subject '{subject_code}' does not exist in {self.name}.")
@@ -130,21 +121,32 @@ class Semester:
             QMessageBox.critical(None, "Error", "Mark Weight must be between 0 and 100.")
             return
         unweighted_mark = round(weighted_mark / mark_weight, 4) if mark_weight > 0 else 0
-        if any(a.subject_assessment == subject_assessment for a in subject.assignments):
-            QMessageBox.critical(
-                None, "Error", f"Assessment '{subject_assessment}' already exists for '{subject_code}' in {self.name}."
+
+        updated = False
+        for a in subject.assignments:
+            if a.subject_assessment == subject_assessment:
+                a.unweighted_mark = unweighted_mark
+                a.weighted_mark = weighted_mark
+                a.mark_weight = mark_weight
+                updated = True
+                break
+        else:
+            assignment = Assignment(
+                subject_assessment=subject_assessment,
+                unweighted_mark=unweighted_mark,
+                weighted_mark=weighted_mark,
+                mark_weight=mark_weight,
             )
-            return
-        assignment = Assignment(
-            subject_assessment=subject_assessment,
-            unweighted_mark=unweighted_mark,
-            weighted_mark=weighted_mark,
-            mark_weight=mark_weight,
-        )
-        subject.assignments.append(assignment)
+            subject.assignments.append(assignment)
+
         self.data_persistence.data[self.name] = self.subjects
         self.data_persistence.save_data(self.data_persistence.data)
-        QMessageBox.information(None, "Info", f"Added new entry for '{subject_assessment}' in semester '{self.name}'.")
+        if updated:
+            QMessageBox.information(
+                None, "Info", f"Entry for '{subject_assessment}' updated in semester '{self.name}'."
+            )
+        else:
+            QMessageBox.information(None, "Info", f"Entry for '{subject_assessment}' added in semester '{self.name}'.")
 
     def delete_entry(self, subject_code: str, subject_assessment: str):
         """Delete an assessment entry for a specific subject in this semester."""
