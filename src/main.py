@@ -19,7 +19,7 @@ from datetime import datetime
 
 from PyQt6.QtWidgets import QApplication
 
-from application import Application
+from application.main_window import Application
 from data_persistence import DataPersistence
 
 if __name__ == "__main__":
