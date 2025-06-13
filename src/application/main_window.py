@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
 
 from data_persistence import DataPersistence
 from semester import Semester
-from ui.semester_selection_dialog import SemesterSelectionDialog
+from ui import SemesterSelectionDialog
 
 from .entry_logic import add_entry, calculate_exam_mark, delete_entry, manage_total_mark
 from .subject_logic import add_subject, delete_subject
