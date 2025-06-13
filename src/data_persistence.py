@@ -6,6 +6,8 @@ import json
 import os
 from dataclasses import asdict, is_dataclass
 
+from PyQt6.QtWidgets import QMessageBox
+
 from models import Assignment, Examination, Subject
 
 
@@ -78,7 +80,7 @@ class DataPersistence:
                 for sem_name, subjects in raw_data.items():
                     data[sem_name] = {}
                     for subj_code, subj_dict in subjects.items():
-                        print(subj_dict)
+                        # print(subj_dict)
                         assignments = [
                             Assignment(
                                 subject_assessment=assignment_record.get("subject_assessment")
@@ -147,8 +149,10 @@ class DataPersistence:
                         for subj_code, subject in subjects.items()
                     }
                 else:
-                    print(f"Warning: Semester '{sem_name}' does not contain a dict of subjects. Skipping.")
+                    QMessageBox.warning(
+                        None, "Warning", f"Semester '{sem_name}' does not contain a dict of subjects. Skipping."
+                    )
             with open(self.file_path, "w") as file:
                 json.dump(serializable_data, file, indent=4)
         except (IOError, json.JSONDecodeError) as e:
-            print(f"Failed to save data: {e}")
+            QMessageBox.critical(None, "Error", f"Failed to save data: {e}")

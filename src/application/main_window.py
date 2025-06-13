@@ -350,6 +350,7 @@ class Application(QMainWindow):
 
             # Add label and field to the grid layout
             entry_layout.addWidget(label, row, col)  # Add label
+
             entry_layout.addWidget(field, row, col + 1)  # Add input field
 
     def setup_buttons(self, button_layout: QGridLayout):
@@ -477,60 +478,49 @@ class Application(QMainWindow):
     def update_year(self) -> None:
         """
         Updates the application's state based on the selected year from the year combo box.
-
-        This method performs the following actions:
-        1. Checks if a JSON file corresponding to the selected year exists.
-           - If the file exists:
-             - Loads the data from the file using the DataPersistence class.
-             - Dynamically initializes Semester objects based on the JSON keys (semester names).
-             - Updates the semester combo box with the semester names.
-           - If the file does not exist:
-             - Opens a SemesterSelectionDialog to allow the user to select semesters.
-             - Initializes the storage handler with the selected year and creates empty semester data.
-             - Saves the initialized data and updates the semester combo box with the selected semesters.
-
-        If the user cancels the year change, an informational message is displayed.
-
-        Returns:
-            None
+        Loads semesters from file if they exist, or prompts the user to select semesters if not.
         """
         selected_year = self.year_combo.currentText()
 
+        # Build the expected JSON file path for the selected year
         json_file_path = Path(f"data/{selected_year}.json")
         if os.path.exists(json_file_path):
             # If the file exists, load the data and update the storage handler
             self.storage_handler = DataPersistence(selected_year)
-            # Dynamically gather semester names from JSON keys
+            # Dynamically gather semester names from JSON keys in the loaded data
             self.semesters = {
                 semester_name: Semester(semester_name, selected_year, self.storage_handler)
                 for semester_name in self.storage_handler.data.keys()
             }
 
-            # Clear and populate with dynamic semester names
+            # Clear and populate the semester combo box with dynamic semester names
             self.semester_combo.clear()
-
-            # Add all keys (semesters) dynamically from JSON data
             self.semester_combo.addItems(self.semesters.keys())
 
+            # Update the UI to reflect the selected semester
             self.update_semester()
             return
 
-        # Show the semester selection dialogue if the file does not exist
+        # If the file does not exist, prompt the user to select which semesters to create
         dialog = SemesterSelectionDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             selected_semesters = dialog.get_selected_semesters()
 
+            # If no semesters are selected, default to all standard semesters
             if not selected_semesters:
                 QMessageBox.warning(self, "Warning", "No semesters selected. Defaulting to all semesters.")
                 selected_semesters = ["Autumn", "Spring", "Annual"]
 
-            # Initialise the storage handler and create empty semesters
+            # Initialise the storage handler for the new year
             self.storage_handler = DataPersistence(selected_year)
+            # Create an empty dictionary for each selected semester in the data
             for semester_name in selected_semesters:
-                self.storage_handler.data[semester_name] = {}  # Create an empty dictionary for the semester
+                self.storage_handler.data[semester_name] = {}
 
-            # Save the initialised data and update the semesters
-            self.storage_handler.save_data(self.semesters)
+            # Save the initialized data structure to the JSON file
+            self.storage_handler.save_data(self.storage_handler.data)
+
+            # Now create Semester objects for each selected semester
             self.semesters = {
                 semester_name: Semester(semester_name, self.storage_handler.year, self.storage_handler)
                 for semester_name in selected_semesters
@@ -540,8 +530,10 @@ class Application(QMainWindow):
             self.semester_combo.clear()
             self.semester_combo.addItems(selected_semesters)
 
+            # Update the UI to reflect the selected semester
             self.update_semester()
         else:
+            # If the user cancels, show an informational message
             QMessageBox.information(self, "Info", "Year change canceled.")
 
     def update_semester(self) -> None:
@@ -549,23 +541,6 @@ class Application(QMainWindow):
         Updates the semester data and synchronizes information between sync semesters
         and dynamic semesters. This method identifies sync semesters based on specific
         criteria and ensures their data is propagated to dynamic semesters.
-
-        Steps:
-        1. Retrieves the selected semester name from the combo box.
-        2. Validates the existence of the selected semester.
-        3. Identifies sync semesters dynamically based on the presence of "Sync Subject"
-           in their data.
-        4. Identifies dynamic semesters by excluding sync semesters.
-        5. Synchronizes data from sync semesters to dynamic semesters.
-        6. Updates the table with the data of the selected semester.
-
-        Debugging:
-        - Prints the names of sync semesters and dynamic semesters.
-        - Prints sync data for each sync semester.
-        - Prints error messages if a semester is not found.
-
-        Returns:
-            None
         """
         semester_name = self.semester_combo.currentText()
         if not semester_name:
@@ -577,7 +552,7 @@ class Application(QMainWindow):
             return
         assert semester is not None
 
-        # Identify sync semesters dynamically
+        # Identify sync semesters dynamically by checking for "Sync Subject" in their data
         sync_semesters = [
             sem_name
             for sem_name, sem_data in self.storage_handler.data.items()
@@ -591,7 +566,7 @@ class Application(QMainWindow):
                 QMessageBox.critical(None, "Error", f"Sync semester '{sync_semester_name}' not found.")  # Debugging
                 continue
 
-        # Pass the Semester object to update_table
+        # Pass the Semester object to update_table to refresh the table view
         self.update_table(cast(Semester, semester))
 
     def update_table(self, semester: Semester | str):
@@ -609,15 +584,6 @@ class Application(QMainWindow):
             - Sorts subjects by their codes.
             - Builds rows for each subject, including assignment details, summary rows, and separators.
             - Inserts rows into the table and adjusts column sizes to fit content.
-
-        Row Structure:
-            - Assignment rows: Display details for each assignment, including assessment name, marks, weights, and
-              whether the subject is synced.
-            - Summary rows: Provide a summary of the subject, including total marks, weights, exam marks, and exam weights.
-            - Separator rows: Separate subjects visually with a row of equal signs.
-
-        Notes:
-            - If the semester is not found, a message is printed and the table is not updated.
         """
         self.table.setRowCount(0)
 
@@ -633,11 +599,11 @@ class Application(QMainWindow):
         # 1. Gather all subjects (including synced ones)
         subject_map = {}
 
-        # Add normal subjects
+        # Add normal subjects from the current semester
         for subject_code, subject in sem_obj.subjects.items():
             subject_map.setdefault(subject_code, []).append((subject, False))  # False = not synced
 
-        # Add synced subjects (from other semesters)
+        # Add synced subjects from other semesters (if sync_subject is True)
         for sync_semester in self.semesters.values():
             if sync_semester is sem_obj:
                 continue
@@ -645,7 +611,7 @@ class Application(QMainWindow):
                 if getattr(subj, "sync_subject", False):
                     subject_map.setdefault(code, []).append((subj, True))  # True = synced
 
-        # 2. Sort subject codes
+        # 2. Sort subject codes for display order
         sorted_subject_codes = sorted(subject_map.keys())
 
         # 3. Build rows for each subject, keeping separator after each
@@ -668,7 +634,7 @@ class Application(QMainWindow):
                             "Synced" if is_synced else "",
                         ]
                     )
-                # Summary row
+                # Summary row for the subject
                 total_weighted_mark = sum(entry.weighted_mark for entry in subject.assignments)
                 total_weight = sum(entry.mark_weight for entry in subject.assignments)
                 exam_mark = subject.examinations.exam_mark if hasattr(subject, "examinations") else 0
@@ -678,17 +644,17 @@ class Application(QMainWindow):
                         f"Summary for {subject_code}",
                         f"Assessments: {len(subject.assignments)}",
                         f"Total Weighted: {total_weighted_mark:.2f}",
-                        f"Total Weight: {total_weight:.0f}%",
+                        f"Total Weight: {total_weight:.0f}",
                         f"Total Mark: {total_mark:.0f}",
                         f"Exam Mark: {exam_mark:.2f}",
-                        f"Exam Weight: {exam_weight:.0f}%",
+                        f"Exam Weight: {exam_weight:.0f}",
                         "Synced" if is_synced else "",
                     ]
                 )
-                # Separator row
+                # Separator row for visual separation
                 all_rows.append(["=" * 25 for _ in range(8)])
 
-        # 4. Insert rows into the table
+        # 4. Insert rows into the table widget
         self.table.setRowCount(0)
         for row_data in all_rows:
             self.table.insertRow(self.table.rowCount())
@@ -697,7 +663,7 @@ class Application(QMainWindow):
                 table_item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
                 self.table.setItem(self.table.rowCount() - 1, col_index, table_item)
 
-        # Resize columns to fit content
+        # Resize columns to fit content after populating
         self.table.resizeColumnsToContents()
 
     def wrap_text(self, text: str, max_chars) -> str:

@@ -19,7 +19,7 @@ from datetime import datetime
 
 from PyQt6.QtWidgets import QApplication
 
-from application.main_window import Application
+from application import Application
 from data_persistence import DataPersistence
 
 if __name__ == "__main__":
@@ -35,4 +35,4 @@ if __name__ == "__main__":
     try:
         sys.exit(app.exec())
     except KeyboardInterrupt:
-        print("Application closed.")
+        raise SystemExit(0)

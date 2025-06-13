@@ -167,8 +167,8 @@ class Semester:
     def view_data(self) -> List[List[str]]:
         sorted_data_list = []
         sorted_subjects = sorted(self.subjects.items(), key=lambda item: item[0])
-        print(f"Viewing data for semester: {self.name}")
-        print(sorted_subjects)
+        # print(f"Viewing data for semester: {self.name}")
+        # print(sorted_subjects)
         for subject_code, subject_data in sorted_subjects:
             subject_name = subject_data.subject_name
             total_mark = subject_data.total_mark if hasattr(subject_data, "total_mark") else 0
