@@ -399,8 +399,8 @@ class Application(QMainWindow):
         self.btn_add_entry.clicked.connect(lambda: add_entry(self))
         self.btn_delete_entry.clicked.connect(lambda: delete_entry(self))
         self.btn_calc.clicked.connect(lambda: calculate_exam_mark(self))
-        self.btn_add_subject.clicked.connect(add_subject)
-        self.btn_delete_subject.clicked.connect(delete_subject)
+        self.btn_add_subject.clicked.connect(lambda: add_subject(self))
+        self.btn_delete_subject.clicked.connect(lambda: delete_subject(self))
         self.btn_set_total_mark.clicked.connect(lambda: manage_total_mark(self))  # Connect the new button
 
     def populate_entries_from_selection(self) -> None:
@@ -473,8 +473,6 @@ class Application(QMainWindow):
                     self.mark_weight_entry.clear()
             else:
                 QMessageBox.critical(None, "Error", "Invalid or empty items in the selected row.")
-        else:
-            QMessageBox.warning(None, "Warning", "No rows selected.")
 
     def update_year(self) -> None:
         """

@@ -1,4 +1,15 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QCheckBox, QMessageBox
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+)
 
 
 class AddSubjectDialog(QDialog):
@@ -45,8 +56,8 @@ class AddSubjectDialog(QDialog):
         """
         return (
             self.subject_code_input.text(),
-            self.subject_name_input.text(),+
-            self.sync_subject_checkbox.isChecked(),
+            self.subject_name_input.text(),
+            +self.sync_subject_checkbox.isChecked(),
         )
 
 
@@ -58,3 +69,25 @@ def confirm_remove_subject(self, subject_code: str):
         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
     )
     return reply == QMessageBox.StandardButton.Yes
+
+
+class DeleteSubjectDialog(QDialog):
+    def __init__(self, subjects, default_subject=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Delete Subject from Semester")
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Select subject(s) to delete from this semester:"))
+        self.list_widget = QListWidget(self)
+        self.list_widget.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+        for subj in subjects:
+            item = QListWidgetItem(subj)
+            self.list_widget.addItem(item)
+            if subj == default_subject:
+                item.setSelected(True)
+        layout.addWidget(self.list_widget)
+        btn = QPushButton("Delete", self)
+        btn.clicked.connect(self.accept)
+        layout.addWidget(btn)
+
+    def selected_subjects(self):
+        return [item.text() for item in self.list_widget.selectedItems()]

@@ -152,13 +152,9 @@ class Semester:
         """Delete an assessment entry for a specific subject in this semester."""
         if subject_code in self.subjects:
             subject = self.subjects[subject_code]
-            before = len(subject.assignments)
             subject.assignments = [a for a in subject.assignments if a.subject_assessment != subject_assessment]
-            after = len(subject.assignments)
             self.data_persistence.data[self.name] = self.subjects
             self.data_persistence.save_data(self.data_persistence.data)
-            if before != after:
-                print(f"Deleted '{subject_assessment}' from subject '{subject_code}' in semester '{self.name}'.")
 
     def delete_subject(self, subject_code: str):
         """Remove a subject from the semester."""

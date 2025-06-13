@@ -1,9 +1,14 @@
+from typing import TYPE_CHECKING
+
 from PyQt6.QtWidgets import QDialog, QMessageBox
 
-from ui.subject_dialog import AddSubjectDialog, confirm_remove_subject
+from ui.subject_dialog import AddSubjectDialog, DeleteSubjectDialog, confirm_remove_subject
+
+if TYPE_CHECKING:
+    from .main_window import Application
 
 
-def add_subject(self):
+def add_subject(self: "Application"):
     """
     Adds a subject to the selected semester.
 
@@ -44,8 +49,8 @@ def add_subject(self):
             return
 
         try:
-            # Add the subject with the "sync subject" flag set to True
-            semester.add_subject(subject_code, subject_name, sync_subject=True)
+            # Add the subject with the "sync subject" flag set to False
+            semester.add_subject(subject_code, subject_name, sync_subject=False)
 
             # Refresh the table to include synced subjects
             self.update_table(semester)
@@ -53,38 +58,10 @@ def add_subject(self):
             QMessageBox.critical(self, "Error", f"Failed to add subject: {error}")
 
 
-def delete_subject(self):
+def delete_subject(self: "Application"):
     """
-    Deletes a selected subject from the currently selected semester.
-
-    This method retrieves the selected semester and subject from the UI,
-    confirms the deletion with the user, and removes the subject from the
-    semester. It then saves the updated data and refreshes the table view.
-
-    Raises:
-        ValueError: If an error occurs while deleting the subject.
-
-    Steps:
-        1. Retrieve the currently selected semester from the combo box.
-        2. Validate that the semester exists.
-        3. Retrieve the selected subject code from the table.
-        4. Confirm the deletion with the user.
-        5. Remove the subject from the semester.
-        6. Save the updated data to persistent storage.
-        7. Refresh the table view to reflect changes.
-
-    Error Handling:
-        - Displays an error message if the semester is not found.
-        - Displays a warning if no subject is selected.
-        - Displays an error message if the deletion fails.
-
-    UI Components:
-        - `semester_combo`: Combo box for selecting the semester.
-        - `table`: Table displaying subjects for the selected semester.
-
-    Confirmation Dialog:
-        - Uses `confirm_remove_subject` to confirm the deletion.
-
+    Deletes one or more selected subjects from the currently selected semester,
+    using a dialog to let the user choose which subject(s) to delete.
     """
     semester_name = self.semester_combo.currentText()
     semester = self.semesters.get(semester_name)
@@ -92,21 +69,33 @@ def delete_subject(self):
         QMessageBox.critical(self, "Error", f"Semester '{semester_name}' not found.")
         return
 
-    # Get the selected subject code from the table
+    # Get all subject codes in the current semester
+    subject_codes = list(semester.subjects.keys())
+    if not subject_codes:
+        QMessageBox.warning(self, "Error", "There are no subjects to delete in this semester.")
+        return
+
+    # Optionally, get the currently selected subject in the table
     selected_items = self.table.selectedItems()
-    if not selected_items:
-        QMessageBox.warning(self, "Error", "Please select a subject to delete.")
+    default_subject = selected_items[0].text() if selected_items else None
+
+    # Show the DeleteSubjectDialog
+    dialog = DeleteSubjectDialog(subject_codes, default_subject, self)
+    if dialog.exec() != QDialog.DialogCode.Accepted:
+        return
+    selected_subjects = dialog.selected_subjects()
+    if not selected_subjects:
+        QMessageBox.warning(self, "Error", "No subjects selected for deletion.")
         return
 
-    subject_code = selected_items[0].text()  # Assuming the first column contains the subject code
+    # Confirm removal for each subject
+    for subject_code in selected_subjects:
+        if not confirm_remove_subject(self, subject_code):
+            continue
+        try:
+            semester.delete_subject(subject_code)
+        except ValueError as error:
+            QMessageBox.critical(self, "Error", f"Failed to delete subject: {error}")
 
-    # Confirm removal
-    if not confirm_remove_subject(self, subject_code):
-        return
-
-    try:
-        semester.delete_subject(subject_code)  # Remove the subject from the semester
-        self.storage_handler.save_data(self.semesters)  # Save changes
-        self.update_table(semester)  # Refresh the table
-    except ValueError as error:
-        QMessageBox.critical(self, "Error", f"Failed to delete subject: {error}")
+    self.storage_handler.save_data(self.semesters)
+    self.update_table(semester)
