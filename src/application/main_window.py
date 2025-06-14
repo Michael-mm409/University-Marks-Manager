@@ -125,46 +125,59 @@ class Application(QMainWindow):
     """
 
     def __init__(self, storage_handler: DataPersistence):
+        """
+        Initializes the Application main window and its core components.
+
+        Args:
+            storage_handler (DataPersistence): The handler for loading and saving persistent data.
+        """
         super().__init__()
 
+        # Set the application window icon
         self.setWindowIcon(QIcon("assets/app_icon.png"))
-        self.storage_handler = storage_handler
-        self.semesters = {
-            sem: Semester(sem, storage_handler.year, storage_handler) for sem in ["Autumn", "Spring", "Annual"]
-        }
 
-        # Main Widget
+        # Store the data persistence handler
+        self.storage_handler = storage_handler
+
+        # List of semester names loaded from the storage handler's data (e.g., ["Autumn", "Spring", ...])
+        self.semester_names = list(self.storage_handler.data.keys())
+
+        # Dictionary to cache loaded Semester objects for quick access
+        self._semesters = {}
+
+        # Main central widget for the window
         self.central_widget = QWidget()
 
-        # Dropdowns
+        # Dropdown widgets for selecting year and semester
         self.year_combo = QComboBox()
         self.semester_combo = QComboBox()
 
-        # Labels
+        # Labels for the dropdowns (initialized as None, set up later)
         self.year_label = None
         self.semester_label = None
 
-        # Table (equivalent to Treeview)
+        # Table widget for displaying subjects, assessments, and marks
         self.table = QTableWidget()
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.setWordWrap(True)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)  # Select entire rows
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)     # Only one row at a time
+        self.table.setWordWrap(True)  # Enable word wrapping in table cells
 
-        # Entry Fields
+        # Entry fields for user input (subject code, name, assessment, marks, etc.)
         self.subject_code_entry = QLineEdit()
         self.subject_name_entry = QLineEdit()
         self.assessment_entry = QLineEdit()
         self.weighted_mark_entry = QLineEdit()
         self.mark_weight_entry = QLineEdit()
 
-        # Buttons
+        # Buttons for various actions (add/delete entry/subject, calculate, set total mark)
         self.btn_add_entry = QPushButton("Add Entry", self)
         self.btn_delete_entry = QPushButton("Delete Entry", self)
         self.btn_calc = QPushButton("Calculate Exam Mark", self)
         self.btn_add_subject = QPushButton("Add Subject", self)
         self.btn_delete_subject = QPushButton("Delete Subject", self)
-        self.btn_set_total_mark = QPushButton("Set Total Mark", self)  # New button for managing Total Mark
+        self.btn_set_total_mark = QPushButton("Set Total Mark", self)  # Button for managing total mark
 
+        # Initialize the user interface and layout
         self.init_ui()
 
     def init_ui(self):
@@ -482,6 +495,7 @@ class Application(QMainWindow):
         """
         selected_year = self.year_combo.currentText()
 
+        self._semesters.clear()  # Clear the existing semesters
         # Build the expected JSON file path for the selected year
         json_file_path = Path(f"data/{selected_year}.json")
         if os.path.exists(json_file_path):
@@ -546,7 +560,7 @@ class Application(QMainWindow):
         if not semester_name:
             return
 
-        semester = self.semesters.get(semester_name)
+        semester = self.get_semester(semester_name)
         if semester is None:
             QMessageBox.warning(None, "Warning", f"Semester '{semester_name}' not found.")
             return
@@ -706,3 +720,12 @@ class Application(QMainWindow):
         super().resizeEvent(a0)
 
         self.table.resizeRowsToContents()
+
+    def get_semester(self, semester_name: str) -> Semester:
+        if semester_name not in self._semesters:
+            print(f"Loading semester: {semester_name}")
+            # Only load/create the Semester when first accessed
+            self._semesters[semester_name] = Semester(
+                semester_name, self.storage_handler.year, self.storage_handler
+            )
+        return self._semesters[semester_name]

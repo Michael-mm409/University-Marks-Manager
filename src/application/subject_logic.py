@@ -34,7 +34,7 @@ def add_subject(self: "Application"):
         - AddSubjectDialog: Collects subject details from the user.
     """
     semester_name = self.semester_combo.currentText()
-    semester = self.semesters.get(semester_name)
+    semester = self.get_semester(semester_name)
     if semester is None:
         QMessageBox.critical(self, "Error", f"Semester '{semester_name}' not found.")
         return
@@ -64,7 +64,7 @@ def delete_subject(self: "Application"):
     using a dialog to let the user choose which subject(s) to delete.
     """
     semester_name = self.semester_combo.currentText()
-    semester = self.semesters.get(semester_name)
+    semester = self.get_semester(semester_name)
     if semester is None:
         QMessageBox.critical(self, "Error", f"Semester '{semester_name}' not found.")
         return
