@@ -19,8 +19,8 @@ from datetime import datetime
 
 from PyQt6.QtWidgets import QApplication
 
-from application import Application
-from data_persistence import DataPersistence
+from model import DataPersistence
+from view import Application
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

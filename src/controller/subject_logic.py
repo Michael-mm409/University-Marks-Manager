@@ -2,10 +2,10 @@ from typing import TYPE_CHECKING
 
 from PyQt6.QtWidgets import QDialog, QMessageBox
 
-from ui.subject_dialog import AddSubjectDialog, DeleteSubjectDialog, confirm_remove_subject
+from view.ui import AddSubjectDialog, DeleteSubjectDialog, confirm_remove_subject
 
 if TYPE_CHECKING:
-    from .main_window import Application
+    from ..view.main_window import Application
 
 
 def add_subject(self: "Application"):

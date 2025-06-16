@@ -23,12 +23,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from data_persistence import DataPersistence
-from semester import Semester
-from ui import SemesterSelectionDialog
+from controller.entry_logic import add_entry, calculate_exam_mark, delete_entry, manage_total_mark
+from controller.subject_logic import add_subject, delete_subject
+from model.data_persistence import DataPersistence
+from model.semester import Semester
 
-from .entry_logic import add_entry, calculate_exam_mark, delete_entry, manage_total_mark
-from .subject_logic import add_subject, delete_subject
+from .ui.semester_selection_dialog import SemesterSelectionDialog
 
 
 class Application(QMainWindow):
@@ -159,7 +159,7 @@ class Application(QMainWindow):
         # Table widget for displaying subjects, assessments, and marks
         self.table = QTableWidget()
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)  # Select entire rows
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)     # Only one row at a time
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)  # Only one row at a time
         self.table.setWordWrap(True)  # Enable word wrapping in table cells
 
         # Entry fields for user input (subject code, name, assessment, marks, etc.)
@@ -725,7 +725,5 @@ class Application(QMainWindow):
         if semester_name not in self._semesters:
             print(f"Loading semester: {semester_name}")
             # Only load/create the Semester when first accessed
-            self._semesters[semester_name] = Semester(
-                semester_name, self.storage_handler.year, self.storage_handler
-            )
+            self._semesters[semester_name] = Semester(semester_name, self.storage_handler.year, self.storage_handler)
         return self._semesters[semester_name]

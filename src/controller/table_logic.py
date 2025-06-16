@@ -3,11 +3,10 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMessageBox, QTableWidgetItem
 
-from models import Assignment, Examination, Subject
-from semester import Semester
+from model import Assignment, Examination, Semester, Subject
 
 if TYPE_CHECKING:
-    from .main_window import Application
+    from ..view.main_window import Application
 
 
 def update_table(app: "Application", semester: Semester | str):

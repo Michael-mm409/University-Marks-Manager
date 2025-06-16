@@ -10,8 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from PyQt6.QtWidgets import QMessageBox
 
-from data_persistence import DataPersistence
-from models import Assignment, Examination, Subject
+from model import Assignment, DataPersistence, Examination, Subject
 
 
 class Semester:
