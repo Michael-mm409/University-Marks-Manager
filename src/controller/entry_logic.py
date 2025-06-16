@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QInputDialog, QMessageBox
 from .table_logic import sync_table_entries
 
 if TYPE_CHECKING:
-    from view.main_window import Application
+    from view import Application
 
 
 def add_entry(self: "Application") -> None:

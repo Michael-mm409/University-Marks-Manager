@@ -8,7 +8,7 @@ from dataclasses import asdict, is_dataclass
 
 from PyQt6.QtWidgets import QMessageBox
 
-from model.models import Assignment, Examination, Subject
+from model import Assignment, Examination, Subject
 
 
 class DataPersistence:

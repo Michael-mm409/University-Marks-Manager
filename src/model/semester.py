@@ -125,12 +125,21 @@ class Semester:
     def add_subject(self, subject_code: str, subject_name: str, sync_subject: bool = False):
         """
         Adds a new subject to the semester.
-
+        This method validates the provided subject code and name, ensures the subject
+        does not already exist, and then creates and adds a new Subject instance to the
+        semester's subjects. The updated data is saved persistently.
         Args:
             subject_code (str): The unique code identifying the subject.
             subject_name (str): The name of the subject.
-            sync_subject (bool, optional): Indicates whether the subject should be synchronized. Defaults to False.
+            sync_subject (bool, optional): Indicates whether the subject should be synchronized.
+                                           Defaults to False.
+        Returns:
+            None: Displays a message box indicating success or failure.
+        Raises:
+            QMessageBox: Displays an error message if the subject code already exists or
+                         if the subject code or name is empty.
         """
+
         if subject_code in self.subjects:
             QMessageBox.critical(None, "Error", f"Subject '{subject_code}' already exists.")
             return
@@ -155,6 +164,27 @@ class Semester:
         self.data_persistence.save_data(self.data_persistence.data)
         QMessageBox.information(None, "Info", f"Added new subject '{subject_name}' with code '{subject_code}'.")
 
+    def delete_subject(self, subject_code: str):
+        """
+        Deletes a subject from the semester.
+
+        Args:
+            subject_code (str): The code of the subject to be deleted.
+
+        Raises:
+            ValueError: If the subject with the given code does not exist.
+
+        Side Effects:
+            - Removes the subject from the `subjects` dictionary.
+            - Updates the persistent data storage to reflect the changes.
+            - Saves the updated data to the persistence layer.
+        """
+        if subject_code not in self.subjects:
+            raise ValueError(f"Subject '{subject_code}' does not exist.")
+        del self.subjects[subject_code]
+        self.data_persistence.data[self.name] = {code: subj.to_dict() for code, subj in self.subjects.items()}
+        self.data_persistence.save_data(self.data_persistence.data)
+
     def add_entry(
         self,
         subject_code: str,
@@ -164,6 +194,34 @@ class Semester:
         mark_weight: Optional[float],
         grade_type: Literal["numeric", "S", "U"],
     ) -> None:
+        """
+        Adds or updates an entry for a subject assessment in the semester.
+
+        Parameters:
+            subject_code (str): The code of the subject to which the assessment belongs.
+            subject_assessment (str): The name or identifier of the assessment.
+            weighted_mark (Union[float, str]): The weighted mark for the assessment.
+                If the grade type is "S" or "U", this will be the grade itself.
+            unweighted_mark (Optional[float]): The unweighted mark for the assessment.
+                Calculated as weighted_mark divided by mark_weight if applicable.
+            mark_weight (Optional[float]): The weight of the assessment mark.
+                Used to calculate the unweighted mark.
+            grade_type (Literal["numeric", "S", "U"]): The type of grade for the assessment.
+                "numeric" indicates a numeric grade, "S" indicates satisfactory, and "U" indicates unsatisfactory.
+
+        Returns:
+            None
+
+        Behavior:
+            - If the subject code does not exist in the semester, an error message is displayed.
+            - If the grade type is "S" or "U", unweighted_mark and mark_weight are set to None,
+              and weighted_mark is set to the grade type.
+            - If weighted_mark or mark_weight is None for numeric grades, an error message is displayed.
+            - If the assessment already exists, its marks and weight are updated.
+            - If the assessment does not exist, it is added to the subject's assignments.
+            - Updates the persistent data storage and saves the changes.
+            - Displays an informational message indicating whether the entry was added or updated.
+        """
         if subject_code not in self.subjects:
             QMessageBox.critical(None, "Error", f"Subject '{subject_code}' does not exist in {self.name}.")
             return
@@ -214,23 +272,22 @@ class Semester:
             self.data_persistence.data[self.name] = {code: subj.to_dict() for code, subj in self.subjects.items()}
             self.data_persistence.save_data(self.data_persistence.data)
 
-    def delete_subject(self, subject_code: str):
-        if subject_code not in self.subjects:
-            raise ValueError(f"Subject '{subject_code}' does not exist.")
-        del self.subjects[subject_code]
-        self.data_persistence.data[self.name] = {code: subj.to_dict() for code, subj in self.subjects.items()}
-        self.data_persistence.save_data(self.data_persistence.data)
-
     def calculate_exam_mark(self, subject_code: str) -> Optional[float]:
         """
-        Calculates the exam mark for the given subject code.
-
+        Calculate the exam mark for a given subject based on its assignments and examinations.
         Args:
-            subject_code (str): The code of the subject.
-
+            subject_code (str): The code of the subject for which the exam mark is to be calculated.
         Returns:
-            Optional[float]: The calculated exam mark, or None if the subject is not found.
+            Optional[float]: The calculated exam mark rounded to two decimal places, or None if the subject
+            does not exist or the necessary data is unavailable.
+        Notes:
+            - If the subject has an `examinations` field with `exam_mark` and `exam_weight`, the exam mark
+            is calculated as `exam_mark / exam_weight`.
+            - If the subject does not have an `examinations` field or the necessary data is missing, the
+            exam mark is calculated based on the weighted marks and weights of the assignments.
+            - If neither method can provide a valid calculation, the function returns None.
         """
+
         subject = self.subjects.get(subject_code)
         if subject:
             # If you want to sum all assignment weighted marks and weights:

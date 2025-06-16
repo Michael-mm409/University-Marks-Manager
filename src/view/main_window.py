@@ -23,12 +23,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from controller.entry_logic import add_entry, calculate_exam_mark, delete_entry, manage_total_mark
-from controller.subject_logic import add_subject, delete_subject
-from model.data_persistence import DataPersistence
-from model.semester import Semester
+from controller import add_entry, add_subject, calculate_exam_mark, delete_entry, delete_subject, manage_total_mark
+from model import DataPersistence, Semester
 
-from .ui.semester_selection_dialog import SemesterSelectionDialog
+from .ui import SemesterSelectionDialog
 
 
 class Application(QMainWindow):

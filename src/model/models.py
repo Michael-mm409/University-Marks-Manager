@@ -21,8 +21,16 @@ class Assignment:
 
     def to_dict(self) -> Dict[str, Any]:
         """
-        Converts the Assignment instance into a dictionary representation.
+        Converts the instance attributes to a dictionary representation.
+        Returns:
+            Dict[str, Any]: A dictionary containing the following key-value pairs:
+                - "subject_assessment": The subject assessment details.
+                - "weighted_mark": The weighted mark of the assessment.
+                - "unweighted_mark": The unweighted mark of the assessment.
+                - "mark_weight": The weight of the mark in the overall grade.
+                - "grade_type": The type of grade associated with the assessment.
         """
+
         return {
             "subject_assessment": self.subject_assessment,
             "weighted_mark": self.weighted_mark,
@@ -46,8 +54,12 @@ class Examination:
 
     def to_dict(self) -> Dict[str, Any]:
         """
-        Converts the Examination instance into a dictionary representation.
+        Converts the instance attributes to a dictionary representation.
+        Returns:
+            Dict[str, Any]: A dictionary containing the exam mark and exam weight
+            with their corresponding values.
         """
+
         return {
             "exam_mark": self.exam_mark,
             "exam_weight": self.exam_weight,

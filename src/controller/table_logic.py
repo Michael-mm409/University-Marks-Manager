@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QMessageBox, QTableWidgetItem
 from model import Assignment, Examination, Semester, Subject
 
 if TYPE_CHECKING:
-    from ..view.main_window import Application
+    from view import Application
 
 
 def update_table(app: "Application", semester: Semester | str):
