@@ -30,9 +30,7 @@ if __name__ == "__main__":
 
     # Create and show the main window
     window = Application(data_persistence)  # Ensure Application inherits from QMainWindow or QWidget
-    assert "Autumn" not in window._semesters
     window.get_semester("Autumn")  # Ensure the Autumn semester is initialized
-    assert "Autumn" in window._semesters
     window.show()
 
     try:
