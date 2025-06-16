@@ -60,9 +60,35 @@ def add_subject(self: "Application"):
 
 def delete_subject(self: "Application"):
     """
-    Deletes one or more selected subjects from the currently selected semester,
-    using a dialog to let the user choose which subject(s) to delete.
+    Deletes one or more subjects from the currently selected semester.
+
+    This method interacts with the user interface to determine the semester and subjects
+    to delete. It displays dialogs for subject selection and confirmation, and handles
+    errors that may occur during the deletion process.
+
+    Steps:
+    1. Retrieve the currently selected semester from the UI.
+    2. Check if the semester exists and contains subjects.
+    3. Display a dialog for the user to select subjects to delete.
+    4. Confirm deletion for each selected subject.
+    5. Update the semester data and save changes.
+
+    Args:
+        self (Application): The main application instance.
+
+    Raises:
+        ValueError: If an error occurs during subject deletion.
+
+    User Interaction:
+        - Displays error messages if the semester is not found or contains no subjects.
+        - Opens a dialog for subject selection.
+        - Prompts for confirmation before deleting each subject.
+
+    Updates:
+        - Saves updated semester data to persistent storage.
+        - Refreshes the subject table in the UI.
     """
+
     semester_name = self.semester_combo.currentText()
     semester = self.get_semester(semester_name)
     if semester is None:

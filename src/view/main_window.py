@@ -490,9 +490,31 @@ class Application(QMainWindow):
 
     def update_year(self) -> None:
         """
-        Updates the application's state based on the selected year from the year combo box.
-        Loads semesters from file if they exist, or prompts the user to select semesters if not.
+        Updates the application state based on the selected academic year.
+        This method handles the following:
+        - Clears existing semester data.
+        - Checks if a JSON file for the selected year exists.
+            - If the file exists:
+                - Loads the data from the file.
+                - Initializes the storage handler with the loaded data.
+                - Dynamically creates Semester objects based on the JSON keys.
+                - Updates the semester combo box with the available semesters.
+                - Updates the UI to reflect the selected semester.
+            - If the file does not exist:
+                - Prompts the user to select semesters to create via a dialog.
+                - Initializes the storage handler for the new year.
+                - Creates empty data structures for the selected semesters.
+                - Saves the initialized data to a new JSON file.
+                - Creates Semester objects for the selected semesters.
+                - Updates the semester combo box with the selected semesters.
+                - Updates the UI to reflect the selected semester.
+        - If the user cancels the year change, displays an informational message.
+        Raises:
+            None
+        Returns:
+            None
         """
+
         selected_year = self.year_combo.currentText()
 
         self._semesters.clear()  # Clear the existing semesters
@@ -552,9 +574,17 @@ class Application(QMainWindow):
 
     def update_semester(self) -> None:
         """
-        Updates the semester data and synchronizes information between sync semesters
-        and dynamic semesters. This method identifies sync semesters based on specific
-        criteria and ensures their data is propagated to dynamic semesters.
+        Updates the current semester based on the selected semester name from the combo box.
+
+        This method performs the following actions:
+        1. Retrieves the selected semester name from the combo box.
+        2. Validates the existence of the selected semester and displays a warning if not found.
+        3. Identifies semesters marked as "Sync Subject" dynamically from the storage handler's data.
+        4. Loops through each identified sync semester and attempts to synchronize its data.
+        5. Refreshes the table view by passing the updated Semester object to the `update_table` method.
+
+        Returns:
+            None
         """
         semester_name = self.semester_combo.currentText()
         if not semester_name:
@@ -653,7 +683,7 @@ class Application(QMainWindow):
                     mark_weight_display = (
                         ""
                         if entry.grade_type in ("S", "U")
-                        else f"{entry.mark_weight:.2f}"
+                        else f"{entry.mark_weight:.2f}%"
                         if entry.mark_weight is not None and isinstance(entry.mark_weight, (float, int))
                         else str(entry.mark_weight)
                         if entry.mark_weight is not None
@@ -687,12 +717,11 @@ class Application(QMainWindow):
                     [
                         f"Summary for {subject_code}",
                         f"Assessments: {len(subject.assignments)}",
-                        f"Total Weighted: {total_weighted_mark:.2f}",
-                        f"Total Weight: {total_weight:.0f}",
-                        f"Total Mark: {total_mark:.0f}",
-                        f"Exam Mark: {exam_mark:.2f}",
-                        f"Exam Weight: {exam_weight:.0f}",
-                        "Synced" if is_synced else "",
+                        f"Weighted Marks: {total_weighted_mark:.2f}",
+                        f"Mark Weight {total_weight:.0f}%",
+                        f"Exam Marks: {exam_mark:.2f}",
+                        f"Exam Weight: {exam_weight:.0f}%",
+                        f"Total Marks: {total_mark:.0f}",
                     ]
                 )
                 # Separator row for visual separation

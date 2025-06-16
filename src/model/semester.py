@@ -6,11 +6,12 @@ The Semester class is responsible for handling assignments and examinations for 
 """
 
 from collections import OrderedDict
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 from PyQt6.QtWidgets import QMessageBox
 
-from model import Assignment, DataPersistence, Examination, Subject
+from .data_persistence import DataPersistence
+from .models import Assignment, Examination, Subject
 
 
 class Semester:
@@ -30,14 +31,58 @@ class Semester:
     """
 
     def __init__(self, name: str, year: str, data_persistence: DataPersistence):
-        """Initialize Semester with its name, year, and data persistence."""
+        """
+        Initializes a Semester instance.
+        Args:
+            name (str): The name of the semester (e.g., "Spring", "Fall").
+            year (str): The year associated with the semester (e.g., "2023").
+            data_persistence (DataPersistence): An instance of DataPersistence used to manage
+                persistent data storage and retrieval.
+        Attributes:
+            name (str): The name of the semester.
+            year (str): The year associated with the semester.
+            data_persistence (DataPersistence): The data persistence instance for managing data.
+            subjects (Dict[str, Subject]): A dictionary of subjects associated with the semester,
+                initialized from the data persistence layer if available.
+        """
+
         self.name = name
         self.year = year
         self.data_persistence = data_persistence
         # Initialize subjects from loaded data if available
-        self.subjects: Dict[str, Subject] = self.data_persistence.data.get(self.name, {})
+        # Ensure all loaded subjects are Subject instances, not raw dicts
+        loaded_subjects = self.data_persistence.data.get(self.name, {})
+        self.subjects: Dict[str, Subject] = {}
+        for code, subj in loaded_subjects.items():
+            if isinstance(subj, Subject):
+                self.subjects[code] = subj
+            elif isinstance(subj, dict):
+                self.subjects[code] = Subject(
+                    subject_code=subj.get("subject_code", code),
+                    subject_name=subj.get("subject_name", subj.get("Subject Name", "N/A")),
+                    assignments=subj.get("assignments", subj.get("Assignments", [])),
+                    total_mark=subj.get("total_mark", subj.get("Total Mark", 0)),
+                    examinations=subj.get("examinations", subj.get("Examinations", Examination())),
+                    sync_subject=subj.get("sync_subject", subj.get("Sync Subject", False)),
+                )
 
     def get_subject_data(self, subject_code: str, subject_name: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Retrieves or initializes subject data for a given subject code within the semester.
+
+        If the subject data does not exist in the persistence layer, it initializes the subject
+        with default values. If the subject data already exists, it optionally updates the subject
+        name if provided and different from the existing one.
+
+        Args:
+            subject_code (str): The unique code identifying the subject.
+            subject_name (Optional[str]): The name of the subject. Defaults to None. If not provided,
+                          "N/A" will be used as the default name.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the subject data, including assignments,
+                    total marks, examinations, and other relevant information.
+        """
         if self.name not in self.data_persistence.data:
             self.data_persistence.data[self.name] = {}
 
@@ -67,6 +112,14 @@ class Semester:
         return self.data_persistence.data[self.name][subject_code]
 
     def add_subject(self, subject_code: str, subject_name: str, sync_subject: bool = False):
+        """
+        Adds a new subject to the semester.
+
+        Args:
+            subject_code (str): The unique code identifying the subject.
+            subject_name (str): The name of the subject.
+            sync_subject (bool, optional): Indicates whether the subject should be synchronized. Defaults to False.
+        """
         if subject_code in self.subjects:
             QMessageBox.critical(None, "Error", f"Subject '{subject_code}' already exists.")
             return
@@ -86,8 +139,8 @@ class Semester:
         # Add the subject to the semester's subjects
         self.subjects[subject_code] = subject
 
-        # Save the updated data
-        self.data_persistence.data[self.name] = self.subjects
+        # Save the updated data as serializable dictionaries
+        self.data_persistence.data[self.name] = {code: subj.__dict__ for code, subj in self.subjects.items()}
         self.data_persistence.save_data(self.data_persistence.data)
         QMessageBox.information(None, "Info", f"Added new subject '{subject_name}' with code '{subject_code}'.")
 
@@ -134,7 +187,7 @@ class Semester:
             )
             subject.assignments.append(assignment)
 
-        self.data_persistence.data[self.name] = self.subjects
+        self.data_persistence.data[self.name] = {code: subj.to_dict() for code, subj in self.subjects.items()}
         self.data_persistence.save_data(self.data_persistence.data)
         if updated:
             QMessageBox.information(
@@ -147,90 +200,40 @@ class Semester:
         if subject_code in self.subjects:
             subject = self.subjects[subject_code]
             subject.assignments = [a for a in subject.assignments if a.subject_assessment != subject_assessment]
-            self.data_persistence.data[self.name] = self.subjects
+            self.data_persistence.data[self.name] = {code: subj.to_dict() for code, subj in self.subjects.items()}
             self.data_persistence.save_data(self.data_persistence.data)
 
     def delete_subject(self, subject_code: str):
         if subject_code not in self.subjects:
             raise ValueError(f"Subject '{subject_code}' does not exist.")
         del self.subjects[subject_code]
-        self.data_persistence.data[self.name] = self.subjects
+        self.data_persistence.data[self.name] = {code: subj.to_dict() for code, subj in self.subjects.items()}
         self.data_persistence.save_data(self.data_persistence.data)
 
-    def view_data(self) -> List[List[str]]:
-        sorted_data_list = []
-        sorted_subjects = sorted(self.subjects.items(), key=lambda item: item[0])
+    def calculate_exam_mark(self, subject_code: str) -> Optional[float]:
+        """
+        Calculates the exam mark for the given subject code.
 
-        for subject_code, subject_data in sorted_subjects:
-            subject_name = subject_data.subject_name
-            total_mark = subject_data.total_mark if hasattr(subject_data, "total_mark") else 0
-            # Add assignment rows
-            for entry in subject_data.assignments:
-                weighted_mark_display = (
-                    entry.weighted_mark if isinstance(entry.weighted_mark, str) else f"{entry.weighted_mark:.2f}"
-                )
-                unweighted_mark_display = "" if entry.unweighted_mark is None else f"{entry.unweighted_mark:.2f}"
-                mark_weight_display = "" if entry.mark_weight is None else f"{entry.mark_weight:.2f}"
-                sorted_data_list.append(
-                    [
-                        subject_code,
-                        subject_name,
-                        entry.subject_assessment.strip("\n") if entry.subject_assessment else "N/A",
-                        unweighted_mark_display,
-                        weighted_mark_display,
-                        mark_weight_display,
-                        f"{total_mark:.2f}",
-                    ]
-                )
-            # Add summary row
-            total_weighted_mark = sum(
-                entry.weighted_mark
-                for entry in subject_data.assignments
-                if isinstance(entry.weighted_mark, (float, int))
+        Args:
+            subject_code (str): The code of the subject.
+
+        Returns:
+            Optional[float]: The calculated exam mark, or None if the subject is not found.
+        """
+        subject = self.subjects.get(subject_code)
+        if subject:
+            # If you want to sum all assignment weighted marks and weights:
+            total_weighted = sum(
+                a.weighted_mark for a in subject.assignments if isinstance(a.weighted_mark, (float, int))
             )
-            total_weight = sum(entry.mark_weight for entry in subject_data.assignments if entry.mark_weight is not None)
-            exam_mark = subject_data.examinations.exam_mark if hasattr(subject_data, "examinations") else 0
-            exam_weight = subject_data.examinations.exam_weight if hasattr(subject_data, "examinations") else 100
-            sorted_data_list.append(
-                [
-                    f"Summary for {subject_code}",
-                    f"Assessments: {len(subject_data.assignments)}",
-                    f"Total Weighted: {total_weighted_mark:.2f}",
-                    f"Total Weight: {total_weight:.0f}%",
-                    f"Exam Mark: {exam_mark:.2f}",
-                    f"Exam Weight: {exam_weight:.0f}%",
-                    f"Total Mark: {total_mark:.0f}",
-                ]
-            )
-            # Add separator row
-            separator_row = ["=" * 25 for _ in range(7)]
-            sorted_data_list.append(separator_row)
-        return sorted_data_list
-
-    def calculate_exam_mark(self, subject_code: str) -> float:
-        subject_obj = self.subjects[subject_code]
-        total_mark = getattr(subject_obj, "total_mark", 0)
-        assessments_sum = sum(getattr(entry, "weighted_mark", 0) for entry in subject_obj.assignments)
-        assessments_weight = sum(getattr(entry, "mark_weight", 0) for entry in subject_obj.assignments)
-
-        # Calculate exam mark
-        exam_mark = max(0, round(total_mark - assessments_sum, 2))
-        exam_weight = max(0, 100 - assessments_weight)
-
-        subject_obj.examinations.exam_mark = exam_mark
-        subject_obj.examinations.exam_weight = exam_weight
-
-        self.data_persistence.save_data(self.data_persistence.data)
-        QMessageBox.information(None, "Success", f"Exam mark calculated: {exam_mark}")
-        return exam_mark
-
-    def get_synced_subjects(self) -> List[Dict[str, Any]]:
-        return [
-            {
-                "Subject Code": code,
-                "Subject Name": getattr(data, "subject_name", ""),
-                "Sync Subject": getattr(data, "sync_subject", False),
-            }
-            for code, data in self.subjects.items()
-            if hasattr(data, "sync_subject") and getattr(data, "sync_subject", False)
-        ]
+            total_weight = sum(a.mark_weight for a in subject.assignments if a.mark_weight is not None)
+            # If you want to use the exam mark from the examinations field:
+            if hasattr(subject, "examinations") and subject.examinations is not None:
+                exam_mark = getattr(subject.examinations, "exam_mark", None)
+                exam_weight = getattr(subject.examinations, "exam_weight", None)
+                if exam_mark is not None and exam_weight and exam_weight > 0:
+                    return round(exam_mark / exam_weight, 2)
+            # Or, if you want to calculate based on assignments:
+            if total_weighted is not None and total_weight:
+                return round(total_weighted / total_weight, 2)
+        return None

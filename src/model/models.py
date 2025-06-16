@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 
 @dataclass
@@ -19,6 +19,18 @@ class Assignment:
     mark_weight: Optional[float] = None
     grade_type: Literal["numeric", "S", "U"] = "numeric"
 
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Converts the Assignment instance into a dictionary representation.
+        """
+        return {
+            "subject_assessment": self.subject_assessment,
+            "weighted_mark": self.weighted_mark,
+            "unweighted_mark": self.unweighted_mark,
+            "mark_weight": self.mark_weight,
+            "grade_type": self.grade_type,
+        }
+
 
 @dataclass
 class Examination:
@@ -31,6 +43,15 @@ class Examination:
 
     exam_mark: float = 0.0
     exam_weight: float = 100.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Converts the Examination instance into a dictionary representation.
+        """
+        return {
+            "exam_mark": self.exam_mark,
+            "exam_weight": self.exam_weight,
+        }
 
 
 @dataclass
@@ -52,3 +73,16 @@ class Subject:
     examinations: Examination = field(default_factory=Examination)
     sync_subject: bool = False
     total_mark: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Converts the Subject instance into a dictionary representation.
+        """
+        return {
+            "subject_code": self.subject_code,
+            "subject_name": self.subject_name,
+            "assignments": [assignment.to_dict() for assignment in self.assignments],
+            "total_mark": self.total_mark,
+            "examinations": self.examinations.to_dict() if hasattr(self.examinations, "to_dict") else {},
+            "sync_subject": self.sync_subject,
+        }

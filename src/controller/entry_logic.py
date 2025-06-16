@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Literal, Optional, Union
 
 from PyQt6.QtWidgets import QInputDialog, QMessageBox
 
@@ -6,28 +6,6 @@ from .table_logic import sync_table_entries
 
 if TYPE_CHECKING:
     from view.main_window import Application
-
-
-@staticmethod
-def __validate_float(value: Any, error_message: str) -> float:
-    """
-    Validate the input value and return it as a float.
-
-    Args:
-        value (Any): The input value to validate. Can be of any type.
-        error_message (str): The error message to display if the value cannot be converted to a float.
-
-    Returns:
-        float: The validated float value. Returns 0.0 if the input is None or an empty string.
-                Returns -1 if the input cannot be converted to a float and displays an error message.
-    """
-    if value is None or value == "":
-        return 0.0
-    try:
-        return float(value)
-    except ValueError:
-        QMessageBox.critical(None, "Error", error_message)
-        return -1
 
 
 def add_entry(self: "Application") -> None:
