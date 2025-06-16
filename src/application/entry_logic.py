@@ -108,12 +108,6 @@ def add_entry(self: "Application") -> None:
 
         # Refresh the table for the current semester
         self.update_table(semester)
-
-        QMessageBox.information(
-            self,
-            "Success",
-            f"Entry added or updated for subject '{subject_code}' in semester '{target_semester.name}'.",
-        )
     except ValueError as error:
         QMessageBox.critical(self, "Error", f"Failed to add or update entry: {error}")
 
