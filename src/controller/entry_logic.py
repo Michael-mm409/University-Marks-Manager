@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from PyQt6.QtWidgets import QInputDialog, QMessageBox
 
@@ -66,25 +66,40 @@ def add_entry(self: "Application") -> None:
 
     subject_code = self.subject_code_entry.text().strip()
     assessment = self.assessment_entry.text().strip()
-    weighted_mark = self.weighted_mark_entry.text().strip()
-    mark_weight = self.mark_weight_entry.text().strip()
+    weighted_mark_text = self.weighted_mark_entry.text().strip().upper()
+    mark_weight_text = self.mark_weight_entry.text().strip()
 
-    # Validate and convert input values to float
-    weighted_mark = __validate_float(weighted_mark, "Weighted Mark must be a valid number.")
-    mark_weight = __validate_float(mark_weight, "Mark Weight must be a valid number.")
+    # Default values
+    weighted_mark: Union[float, str]
+    unweighted_mark: Optional[float] = None
+    mark_weight: Optional[float] = None
+    grade_type: Literal["numeric", "S", "U"] = "numeric"
 
-    if weighted_mark == -1 or mark_weight == -1:
-        return  # Exit if any of the values are invalid
+    if weighted_mark_text in ("S", "U"):
+        weighted_mark = weighted_mark_text
+        grade_type = weighted_mark_text  # "S" or "U"
+        # For S/U, unweighted_mark and mark_weight are not needed
+        unweighted_mark = None
+        mark_weight = None
+    else:
+        try:
+            weighted_mark = float(weighted_mark_text)
+            mark_weight = float(mark_weight_text)
+            unweighted_mark = round(weighted_mark / mark_weight, 4) if mark_weight > 0 else 0
+            grade_type = "numeric"
+        except ValueError:
+            QMessageBox.warning(
+                self, "Invalid Input", "Weighted mark and mark weight must be numbers, or S/U for mark."
+            )
+            return
 
     # Check if the subject exists in the current semester
     target_semester = semester
-    # Search for the subject in other semesters
     for _, other_semester in self.semesters.items():
         if subject_code in other_semester.subjects:
             target_semester = other_semester
             break
 
-    # If the subject belongs to a different semester, show a warning
     if target_semester != semester:
         QMessageBox.warning(
             self,
@@ -100,13 +115,12 @@ def add_entry(self: "Application") -> None:
             subject_code=subject_code,
             subject_assessment=assessment,
             weighted_mark=weighted_mark,
+            unweighted_mark=unweighted_mark,
             mark_weight=mark_weight,
+            grade_type=grade_type,
         )
 
-        # Sync the changes back to the current semester
         sync_table_entries(current_semester=semester, synced_semester=target_semester)
-
-        # Refresh the table for the current semester
         self.update_table(semester)
     except ValueError as error:
         QMessageBox.critical(self, "Error", f"Failed to add or update entry: {error}")
@@ -281,49 +295,22 @@ def manage_total_mark(self: "Application") -> None:
             QMessageBox.critical(self, "Error", f"Subject '{subject_code}' not found in any semester.")
             return
 
-    # Prompt the user to set or clear the Total Mark
     total_mark, ok = QInputDialog.getDouble(self, "Set Total Mark", f"Enter Total Mark for {subject_code}:", decimals=2)
 
-    if ok:  # If the user clicks OK, set the Total Mark
+    if ok:
         try:
-            if isinstance(target_semester.subjects[subject_code], list):
-                if target_semester.subjects[subject_code] is not None:
-                    subject_item = target_semester.subjects[subject_code]
-                else:
-                    QMessageBox.critical(self, "Error", f"Invalid data structure for subject '{subject_code}'.")
-                    return
-            elif isinstance(target_semester.subjects[subject_code], dict):
-                subject_item = target_semester.subjects[subject_code]
+            subject_item = target_semester.subjects[subject_code]
+            if isinstance(subject_item, dict):
+                subject_item["Total Mark"] = total_mark
+                self.storage_handler.save_data(self.semesters)
+                self.update_table(semester)
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    f"Total Mark for '{subject_code}' set to {total_mark} in semester '{target_semester.name}'.",
+                )
             else:
                 QMessageBox.critical(self, "Error", f"Invalid data structure for subject '{subject_code}'.")
         except KeyError:
             QMessageBox.critical(self, "Error", f"Subject '{subject_code}' not found in the data structure.")
-    else:  # If the user cancels, clear the Total Mark
-        try:
-            if isinstance(target_semester.subjects[subject_code], list):
-                if target_semester.subjects[subject_code] is not None:
-                    subject_item = target_semester.subjects[subject_code]
-                else:
-                    QMessageBox.critical(self, "Error", f"Invalid data structure for subject '{subject_code}'.")
-                    return
-            elif isinstance(target_semester.subjects[subject_code], dict):
-                subject_item = target_semester.subjects[subject_code]
-            else:
-                QMessageBox.critical(self, "Error", f"Invalid data structure for subject '{subject_code}'.")
-                return
-            if isinstance(subject_item, dict):
-                subject_item["Total Mark"] = 0
-            else:
-                QMessageBox.critical(self, "Error", f"Invalid data structure for subject '{subject_code}'.")
-                return
-            self.storage_handler.save_data(self.semesters)  # Save changes
-            self.update_table(semester)  # Refresh the table for the current semester
-            QMessageBox.information(
-                self, "Success", f"Total Mark for '{subject_code}' cleared in semester '{target_semester.name}'."
-            )
-        except KeyError:
-            QMessageBox.critical(self, "Error", f"Failed to clear Total Mark for {subject_code}.")
-            self.update_table(semester)  # Refresh the table for the current semester
-            QMessageBox.information(
-                self, "Success", f"Total Mark for '{subject_code}' cleared in semester '{target_semester.name}'."
-            )
+    # If user cancels (ok is False), do nothing

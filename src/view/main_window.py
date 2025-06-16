@@ -636,21 +636,51 @@ class Application(QMainWindow):
                 total_mark = subject.total_mark if hasattr(subject, "total_mark") else 0
                 # Assignment rows
                 for entry in subject.assignments:
+                    # For weighted mark
+                    weighted_mark_display = (
+                        entry.weighted_mark if isinstance(entry.weighted_mark, str) else f"{entry.weighted_mark:.2f}"
+                    )
+                    # For unweighted mark and mark weight
+                    unweighted_mark_display = (
+                        ""
+                        if entry.grade_type in ("S", "U")
+                        else f"{entry.unweighted_mark:.2f}"
+                        if entry.unweighted_mark is not None and isinstance(entry.unweighted_mark, (float, int))
+                        else str(entry.unweighted_mark)
+                        if entry.unweighted_mark is not None
+                        else ""
+                    )
+                    mark_weight_display = (
+                        ""
+                        if entry.grade_type in ("S", "U")
+                        else f"{entry.mark_weight:.2f}"
+                        if entry.mark_weight is not None and isinstance(entry.mark_weight, (float, int))
+                        else str(entry.mark_weight)
+                        if entry.mark_weight is not None
+                        else ""
+                    )
                     all_rows.append(
                         [
                             subject_code,
                             subject_name,
                             entry.subject_assessment.strip("\n") if entry.subject_assessment else "N/A",
-                            f"{entry.unweighted_mark:.2f}",
-                            f"{entry.weighted_mark:.2f}",
-                            f"{entry.mark_weight:.2f}%",
+                            unweighted_mark_display,
+                            weighted_mark_display,
+                            mark_weight_display,
                             f"{total_mark:.2f}",
-                            "Synced" if is_synced else "",
                         ]
                     )
                 # Summary row for the subject
-                total_weighted_mark = sum(entry.weighted_mark for entry in subject.assignments)
-                total_weight = sum(entry.mark_weight for entry in subject.assignments)
+                total_weighted_mark = sum(
+                    entry.weighted_mark
+                    for entry in subject.assignments
+                    if entry.grade_type == "numeric" and isinstance(entry.weighted_mark, (float, int))
+                )
+                total_weight = sum(
+                    entry.mark_weight
+                    for entry in subject.assignments
+                    if entry.grade_type == "numeric" and isinstance(entry.mark_weight, (float, int))
+                )
                 exam_mark = subject.examinations.exam_mark if hasattr(subject, "examinations") else 0
                 exam_weight = subject.examinations.exam_weight if hasattr(subject, "examinations") else 100
                 all_rows.append(

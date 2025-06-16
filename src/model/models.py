@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Literal, Optional, Union
 
 
 @dataclass
@@ -12,10 +12,12 @@ class Assignment:
         weighted_mark (float): The mark adjusted by the weight of the assignment.
         mark_weight (float): The weight of the assignment as a percentage or fraction.
     """
+
     subject_assessment: str
-    unweighted_mark: float = 0.0
-    weighted_mark: float = 0.0
-    mark_weight: float = 0.0
+    weighted_mark: Union[float, str] = 0.0  # float for numeric, str for "S"/"U"
+    unweighted_mark: Optional[float] = None
+    mark_weight: Optional[float] = None
+    grade_type: Literal["numeric", "S", "U"] = "numeric"
 
 
 @dataclass
@@ -26,6 +28,7 @@ class Examination:
         exam_mark (float): The mark obtained in the examination. Defaults to 0.0.
         exam_weight (float): The weight of the examination in percentage. Defaults to 100.0.
     """
+
     exam_mark: float = 0.0
     exam_weight: float = 100.0
 
@@ -42,6 +45,7 @@ class Subject:
         sync_subject (bool): Indicates whether the subject is synchronized with an external system.
         total_mark (float): The total mark achieved in the subject.
     """
+
     subject_code: str
     subject_name: str
     assignments: List[Assignment] = field(default_factory=list)

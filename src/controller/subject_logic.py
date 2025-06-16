@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QDialog, QMessageBox
 from view.ui import AddSubjectDialog, DeleteSubjectDialog, confirm_remove_subject
 
 if TYPE_CHECKING:
-    from ..view.main_window import Application
+    from view.main_window import Application
 
 
 def add_subject(self: "Application"):
