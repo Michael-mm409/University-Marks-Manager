@@ -57,12 +57,23 @@ class Semester:
             if isinstance(subj, Subject):
                 self.subjects[code] = subj
             elif isinstance(subj, dict):
+                # Convert assignments
+                assignments = [
+                    a if isinstance(a, Assignment) else Assignment(**a)
+                    for a in subj.get("assignments", subj.get("Assignments", []))
+                ]
+                # Convert examinations
+                examinations = subj.get("examinations", subj.get("Examinations", None))
+                if examinations and isinstance(examinations, dict):
+                    examinations = Examination(**examinations)
+                elif not examinations:
+                    examinations = Examination()
                 self.subjects[code] = Subject(
                     subject_code=subj.get("subject_code", code),
                     subject_name=subj.get("subject_name", subj.get("Subject Name", "N/A")),
-                    assignments=subj.get("assignments", subj.get("Assignments", [])),
+                    assignments=assignments,
                     total_mark=subj.get("total_mark", subj.get("Total Mark", 0)),
-                    examinations=subj.get("examinations", subj.get("Examinations", Examination())),
+                    examinations=examinations,
                     sync_subject=subj.get("sync_subject", subj.get("Sync Subject", False)),
                 )
 
@@ -140,7 +151,7 @@ class Semester:
         self.subjects[subject_code] = subject
 
         # Save the updated data as serializable dictionaries
-        self.data_persistence.data[self.name] = {code: subj.__dict__ for code, subj in self.subjects.items()}
+        self.data_persistence.data[self.name] = {code: subj for code, subj in self.subjects.items()}
         self.data_persistence.save_data(self.data_persistence.data)
         QMessageBox.information(None, "Info", f"Added new subject '{subject_name}' with code '{subject_code}'.")
 
