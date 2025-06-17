@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 from PyQt6.QtWidgets import QDialog, QMessageBox
 
-from view import AddSubjectDialog, DeleteSubjectDialog, confirm_remove_subject
+from view.ui.subject_dialog import AddSubjectDialog, DeleteSubjectDialog, confirm_remove_subject
 
 if TYPE_CHECKING:
     from view.main_window import Application

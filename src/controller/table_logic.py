@@ -1,9 +1,11 @@
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFontMetrics
 from PyQt6.QtWidgets import QMessageBox, QTableWidgetItem
 
-from model import Assignment, Examination, Semester, Subject
+from model import Semester
+from model.models import Assignment, Examination, Subject
 
 if TYPE_CHECKING:
     from view import Application
@@ -65,6 +67,7 @@ def update_table(app: "Application", semester: Semester | str):
 
     # 3. Build rows for each subject, keeping separator after each
     all_rows = []
+    separator_row_indices = []
     for subject_code in sorted_subject_codes:
         for subject, is_synced in subject_map[subject_code]:
             subject_name = subject.subject_name
@@ -76,16 +79,31 @@ def update_table(app: "Application", semester: Semester | str):
                         subject_code,
                         subject_name,
                         entry.subject_assessment.strip("\n") if entry.subject_assessment else "N/A",
-                        f"{entry.unweighted_mark:.2f}",
-                        f"{entry.weighted_mark:.2f}",
-                        f"{entry.mark_weight:.2f}%",
+                        f"{entry.unweighted_mark:.2f}"
+                        if isinstance(entry.unweighted_mark, (float, int))
+                        else str(entry.unweighted_mark)
+                        if entry.unweighted_mark is not None
+                        else "",
+                        f"{entry.weighted_mark:.2f}"
+                        if isinstance(entry.weighted_mark, (float, int))
+                        else str(entry.weighted_mark)
+                        if entry.weighted_mark is not None
+                        else "",
+                        f"{entry.mark_weight:.2f}%"
+                        if isinstance(entry.mark_weight, (float, int))
+                        else str(entry.mark_weight) + "%"
+                        if entry.mark_weight is not None
+                        else "",
                         f"{total_mark:.2f}",
-                        "Synced" if is_synced else "",
                     ]
                 )
             # Summary row
-            total_weighted_mark = sum(entry.weighted_mark for entry in subject.assignments)
-            total_weight = sum(entry.mark_weight for entry in subject.assignments)
+            total_weighted_mark = sum(
+                entry.weighted_mark for entry in subject.assignments if isinstance(entry.weighted_mark, (int, float))
+            )
+            total_weight = sum(
+                entry.mark_weight for entry in subject.assignments if isinstance(entry.mark_weight, (int, float))
+            )
             exam_mark = subject.examinations.exam_mark if hasattr(subject, "examinations") else 0
             exam_weight = subject.examinations.exam_weight if hasattr(subject, "examinations") else 100
             all_rows.append(
@@ -100,8 +118,9 @@ def update_table(app: "Application", semester: Semester | str):
                     "Synced" if is_synced else "",
                 ]
             )
-            # Separator row
-            all_rows.append(["=" * 25 for _ in range(8)])
+            # Placeholder separator row (will be filled after sizing)
+            separator_row_indices.append(len(all_rows))
+            all_rows.append(["" for _ in range(8)])
 
     # 4. Insert rows into the table
     app.table.setRowCount(0)
@@ -114,6 +133,16 @@ def update_table(app: "Application", semester: Semester | str):
 
     # Resize columns to fit content
     app.table.resizeColumnsToContents()
+
+    # Fill separator rows based on column width (once, after populating)
+    font = app.table.font()
+    metrics = QFontMetrics(font)
+    for sep_row in separator_row_indices:
+        for col in range(app.table.columnCount()):
+            col_width = app.table.columnWidth(col)
+            eq_width = metrics.horizontalAdvance("=")
+            num_eq = max(1, col_width // eq_width)
+            app.table.setItem(sep_row, col, QTableWidgetItem("=" * num_eq))
 
 
 @staticmethod
