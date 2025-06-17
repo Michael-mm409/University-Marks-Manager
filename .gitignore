@@ -1,0 +1,7 @@
+/MarksManager.exe
+/data/*
+/.idea/*
+*.pyc
+/Azure-ttk-theme-main
+/dist
+/build
