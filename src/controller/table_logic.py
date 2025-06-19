@@ -1,7 +1,33 @@
+from model.data_persistence import DataPersistence
 from model.models import Assignment, Examination, Subject
+from model.semester import Semester
 
 
-def get_all_subjects(sem_obj, data_persistence):
+def get_all_subjects(sem_obj: Semester, data_persistence: DataPersistence) -> dict:
+    """
+    Retrieve all subjects for a given semester object, including synchronized subjects
+    from other semesters.
+
+    This function collects all subjects associated with the provided semester object
+    (`sem_obj`) and adds any synchronized subjects from other semesters stored in the
+    `data_persistence` object. Synchronized subjects are identified by the `sync_subject`
+    attribute or key.
+
+    Args:
+        sem_obj (Semester): The semester object containing the current semester's subjects.
+        data_persistence (DataPersistence): An object containing data for all semesters.
+
+    Returns:
+        dict: A dictionary of subjects where the keys are subject codes and the values
+        are `Subject` objects. This includes both the subjects from the current semester
+        and any synchronized subjects from other semesters.
+
+    Notes:
+        - If a subject is represented as a dictionary, it is converted into a `Subject`
+          object with its associated assignments and examinations.
+        - Synchronized subjects are only added if they are not already present in the
+          current semester's subjects.
+    """
     subjects = dict(sem_obj.subjects)
     for sem_name, sem_data in data_persistence.data.items():
         if sem_name == sem_obj.name:
@@ -30,7 +56,28 @@ def get_all_subjects(sem_obj, data_persistence):
     return subjects
 
 
-def get_summary(subject):
+def get_summary(subject: Subject) -> tuple:
+    """
+    Calculate and return a summary of marks and weights for a given subject.
+
+    Args:
+        subject (object): An object representing a subject, which contains:
+            - assignments (list): A list of assignment objects, each having:
+                - weighted_mark (int or float): The weighted mark of the assignment.
+                - mark_weight (int or float): The weight of the assignment.
+            - examinations (object, optional): An object representing the examination, with:
+                - exam_mark (int or float): The mark obtained in the examination.
+                - exam_weight (int or float): The weight of the examination.
+            - total_mark (int or float): The total mark for the subject.
+
+    Returns:
+        tuple: A tuple containing:
+            - total_weighted_mark (float): The sum of all weighted marks from assignments.
+            - total_weight (float): The sum of all weights from assignments.
+            - exam_mark (float): The mark obtained in the examination (0 if no examination exists).
+            - exam_weight (float): The weight of the examination (100 if no examination exists).
+            - total_mark (float): The total mark for the subject.
+    """
     total_weighted_mark = sum(
         entry.weighted_mark for entry in subject.assignments if isinstance(entry.weighted_mark, (int, float))
     )

@@ -5,6 +5,8 @@ This module provides classes for data persistence in the University Marks Manage
 import json
 import os
 from dataclasses import asdict, is_dataclass
+from typing import Dict
+
 import streamlit as st  # <-- Use Streamlit for feedback
 
 from model.models import Assignment, Examination, Subject
@@ -17,12 +19,16 @@ class DataPersistence:
     the organization of semesters, subjects, assignments, and examinations.
     """
 
-    def __init__(self, year: str):
-        self.year = year
-        self.file_path = f"data/{year}.json"
-        self.data = self.load_data()
+    year: str
+    file_path: str
+    data: Dict[str, Dict[str, Subject]]
 
-    def load_data(self) -> dict:
+    def __init__(self, year: str):
+        self.year: str = year
+        self.file_path: str = f"data/{year}.json"
+        self.data: Dict[str, Dict[str, Subject]] = self.load_data()
+
+    def load_data(self) -> Dict[str, Dict[str, Subject]]:
         """
         Load data from a JSON file and convert it into a structured dictionary of Subject objects.
         Returns:
@@ -71,7 +77,7 @@ class DataPersistence:
         else:
             return {}
 
-    def save_data(self, semesters: dict):
+    def save_data(self, semesters: Dict[str, Dict[str, Subject]]) -> None:
         """
         Saves semester data to a JSON file at the specified file path.
         Uses Streamlit for error/warning messages.
