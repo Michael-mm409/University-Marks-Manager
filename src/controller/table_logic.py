@@ -1,114 +1,43 @@
-import streamlit as st
-import pandas as pd
-from model.semester import Semester
 from model.models import Assignment, Examination, Subject
 
 
-def update_table(app, semester: Semester | str):
-    """
-    Displays the table for the specified semester using Streamlit,
-    using the dataclasses from models.py for all data access.
-    """
-    # Ensure semester is a Semester object
-    if isinstance(semester, str):
-        sem_obj = app.semesters.get(semester)
-        if sem_obj is None:
-            st.warning(f"Semester '{semester}' not found.")
-            return
-    else:
-        sem_obj = semester
-
-    # 1. Gather all subjects (including synced ones)
-    subject_map = {}
-
-    # Add normal subjects
-    for subject_code, subject in sem_obj.subjects.items():
-        if isinstance(subject, Subject):
-            subject_map.setdefault(subject_code, []).append((subject, False))  # False = not synced
-
-    # Add synced subjects (from other semesters)
-    for sync_semester in app.semesters.values():
-        if sync_semester is sem_obj:
+def get_all_subjects(sem_obj, data_persistence):
+    subjects = dict(sem_obj.subjects)
+    for sem_name, sem_data in data_persistence.data.items():
+        if sem_name == sem_obj.name:
             continue
-        for code, subj in sync_semester.subjects.items():
-            if isinstance(subj, Subject) and getattr(subj, "sync_subject", False):
-                subject_map.setdefault(code, []).append((subj, True))  # True = synced
+        for subj_code, subj in sem_data.items():
+            is_synced = False
+            if isinstance(subj, dict):
+                is_synced = subj.get("sync_subject", False)
+            elif hasattr(subj, "sync_subject"):
+                is_synced = subj.sync_subject
+            if is_synced and subj_code not in subjects:
+                if isinstance(subj, dict):
+                    assignments = [Assignment(**a) for a in subj["assignments"]] if "assignments" in subj else []
+                    examinations = Examination(**subj.get("examinations", {})) if "examinations" in subj else None
+                    subject = Subject(
+                        subject_code=subj_code,
+                        subject_name=subj.get("subject_name", "N/A"),
+                        assignments=assignments,
+                        total_mark=subj.get("total_mark", 0.0),
+                        examinations=examinations or Examination(exam_mark=0, exam_weight=100),
+                        sync_subject=True,
+                    )
+                else:
+                    subject = subj
+                subjects[subj_code] = subject
+    return subjects
 
-    # 2. Sort subject codes
-    sorted_subject_codes = sorted(subject_map.keys())
 
-    # 3. Build rows for each subject, keeping separator after each
-    all_rows = []
-    for subject_code in sorted_subject_codes:
-        for subject, is_synced in subject_map[subject_code]:
-            subject_name = subject.subject_name
-            total_mark = subject.total_mark
-            # Assignment rows
-            for entry in subject.assignments:
-                if not isinstance(entry, Assignment):
-                    continue
-                all_rows.append(
-                    [
-                        subject_code,
-                        subject_name,
-                        entry.subject_assessment.strip("\n") if entry.subject_assessment else "N/A",
-                        f"{entry.unweighted_mark:.2f}"
-                        if isinstance(entry.unweighted_mark, (float, int))
-                        else str(entry.unweighted_mark)
-                        if entry.unweighted_mark is not None
-                        else "",
-                        f"{entry.weighted_mark:.2f}"
-                        if isinstance(entry.weighted_mark, (float, int))
-                        else str(entry.weighted_mark)
-                        if entry.weighted_mark is not None
-                        else "",
-                        f"{entry.mark_weight:.2f}%"
-                        if isinstance(entry.mark_weight, (float, int))
-                        else str(entry.mark_weight) + "%"
-                        if entry.mark_weight is not None
-                        else "",
-                        f"{total_mark:.2f}",
-                        "Synced" if is_synced else "",
-                    ]
-                )
-            # Summary row
-            total_weighted_mark = sum(
-                entry.weighted_mark for entry in subject.assignments
-                if isinstance(entry, Assignment) and isinstance(entry.weighted_mark, (int, float))
-            )
-            total_weight = sum(
-                entry.mark_weight for entry in subject.assignments
-                if isinstance(entry, Assignment) and isinstance(entry.mark_weight, (int, float))
-            )
-            exam_mark = subject.examinations.exam_mark if isinstance(subject.examinations, Examination) else 0
-            exam_weight = subject.examinations.exam_weight if isinstance(subject.examinations, Examination) else 100
-            all_rows.append(
-                [
-                    f"Summary for {subject_code}",
-                    f"Assessments: {len(subject.assignments)}",
-                    f"Total Weighted: {total_weighted_mark:.2f}",
-                    f"Total Weight: {total_weight:.0f}%",
-                    f"Total Mark: {total_mark:.0f}",
-                    f"Exam Mark: {exam_mark:.2f}",
-                    f"Exam Weight: {exam_weight:.0f}%",
-                    "Synced" if is_synced else "",
-                ]
-            )
-            # Separator row (fixed length, or you can use "" for a blank row)
-            all_rows.append(["-----"] * 8)
-
-    # 4. Display as a table in Streamlit
-    df = pd.DataFrame(
-        all_rows,
-        columns=[
-            "Subject Code",
-            "Subject Name",
-            "Assessment",
-            "Unweighted Mark",
-            "Weighted Mark",
-            "Mark Weight",
-            "Total Mark",
-            "Status",
-        ],
+def get_summary(subject):
+    total_weighted_mark = sum(
+        entry.weighted_mark for entry in subject.assignments if isinstance(entry.weighted_mark, (int, float))
     )
-    st.table(df)
+    total_weight = sum(
+        entry.mark_weight for entry in subject.assignments if isinstance(entry.mark_weight, (int, float))
+    )
+    exam_mark = subject.examinations.exam_mark if subject.examinations else 0
+    exam_weight = subject.examinations.exam_weight if subject.examinations else 100
+    total_mark = subject.total_mark
+    return total_weighted_mark, total_weight, exam_mark, exam_weight, total_mark
