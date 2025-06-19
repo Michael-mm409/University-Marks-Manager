@@ -1,16 +1,12 @@
-from typing import TYPE_CHECKING, Literal, Optional, Union
-
-from PyQt6.QtWidgets import QInputDialog, QMessageBox
+import streamlit as st
+from typing import Literal, Optional, Union
 
 from .table_logic import sync_table_entries
 
-if TYPE_CHECKING:
-    from view import Application
 
-
-def add_entry(self: "Application") -> None:
+def add_entry(self):
     """
-    Adds or updates an entry for a subject in the selected semester.
+    Adds or updates an entry for a subject in the selected semester using Streamlit widgets.
 
     This method validates user input, checks for the existence of the subject in the current
     or other semesters, and ensures that entries are added or updated in the correct semester.
@@ -35,17 +31,17 @@ def add_entry(self: "Application") -> None:
         QMessageBox.information: On successful addition or update of the entry.
         QMessageBox.critical: If an error occurs during the process.
     """
-    semester_name = self.semester_combo.currentText()
+    semester_name = st.selectbox("Select Semester", list(self.semesters.keys()))
     semester = self.semesters.get(semester_name)
 
     if not semester:
-        QMessageBox.warning(self, "Error", f"Semester '{semester_name}' not found.")
+        st.warning(f"Semester '{semester_name}' not found.")
         return
 
-    subject_code = self.subject_code_entry.text().strip()
-    assessment = self.assessment_entry.text().strip()
-    weighted_mark_text = self.weighted_mark_entry.text().strip().upper()
-    mark_weight_text = self.mark_weight_entry.text().strip()
+    subject_code = st.text_input("Subject Code")
+    assessment = st.text_input("Assessment Name")
+    weighted_mark_text = st.text_input("Weighted Mark (number or S/U)").upper()
+    mark_weight_text = st.text_input("Mark Weight")
 
     # Default values
     weighted_mark: Union[float, str]
@@ -55,8 +51,7 @@ def add_entry(self: "Application") -> None:
 
     if weighted_mark_text in ("S", "U"):
         weighted_mark = weighted_mark_text
-        grade_type = weighted_mark_text  # "S" or "U"
-        # For S/U, unweighted_mark and mark_weight are not needed
+        grade_type = weighted_mark_text
         unweighted_mark = None
         mark_weight = None
     else:
@@ -66,12 +61,10 @@ def add_entry(self: "Application") -> None:
             unweighted_mark = round(weighted_mark / mark_weight, 4) if mark_weight > 0 else 0
             grade_type = "numeric"
         except ValueError:
-            QMessageBox.warning(
-                self, "Invalid Input", "Weighted mark and mark weight must be numbers, or S/U for mark."
-            )
+            st.warning("Weighted mark and mark weight must be numbers, or S/U for mark.")
             return
 
-    # Check if the subject exists in the current semester
+    # Check if the subject exists in the current semester or others
     target_semester = semester
     for _, other_semester in self.semesters.items():
         if subject_code in other_semester.subjects:
@@ -79,34 +72,32 @@ def add_entry(self: "Application") -> None:
             break
 
     if target_semester != semester:
-        QMessageBox.warning(
-            self,
-            "Warning",
+        st.warning(
             f"Subject '{subject_code}' belongs to the '{target_semester.name}' semester. "
-            "Please switch to that semester to modify or add entries for this subject.",
+            "Please switch to that semester to modify or add entries for this subject."
         )
         return
 
-    try:
-        # Add or update the entry in the target semester
-        target_semester.add_entry(
-            subject_code=subject_code,
-            subject_assessment=assessment,
-            weighted_mark=weighted_mark,
-            unweighted_mark=unweighted_mark,
-            mark_weight=mark_weight,
-            grade_type=grade_type,
-        )
+    if st.button("Add/Update Entry"):
+        try:
+            target_semester.add_entry(
+                subject_code=subject_code,
+                subject_assessment=assessment,
+                weighted_mark=weighted_mark,
+                unweighted_mark=unweighted_mark,
+                mark_weight=mark_weight,
+                grade_type=grade_type,
+            )
+            sync_table_entries(current_semester=semester, synced_semester=target_semester)
+            self.update_table(semester)
+            st.success("Entry added or updated successfully.")
+        except ValueError as error:
+            st.error(f"Failed to add or update entry: {error}")
 
-        sync_table_entries(current_semester=semester, synced_semester=target_semester)
-        self.update_table(semester)
-    except ValueError as error:
-        QMessageBox.critical(self, "Error", f"Failed to add or update entry: {error}")
 
-
-def calculate_exam_mark(self: "Application") -> None:
+def calculate_exam_mark(self):
     """
-    Calculates the exam mark for a specific subject in the selected semester.
+    Calculates the exam mark for a specific subject in the selected semester using Streamlit.
 
     This method retrieves the semester name from the combo box and the subject code
     from the text entry field. It validates the input and calculates the exam mark
@@ -117,23 +108,26 @@ def calculate_exam_mark(self: "Application") -> None:
         None: Updates the table with the semester data and displays error messages
         if necessary.
     """
-    semester_name = self.semester_combo.currentText()
-    subject_code = self.subject_code_entry.text()
+    semester_name = st.selectbox("Select Semester", list(self.semesters.keys()))
+    subject_code = st.text_input("Subject Code for Exam Mark Calculation")
 
-    if not subject_code:
-        QMessageBox.critical(self, "Error", "Please enter a Subject Code.")
-        return
+    if st.button("Calculate Exam Mark"):
+        if not subject_code:
+            st.error("Please enter a Subject Code.")
+            return
 
-    exam_mark = self.semesters[semester_name].calculate_exam_mark(subject_code)
-    self.update_table(self.semesters[semester_name])
+        exam_mark = self.semesters[semester_name].calculate_exam_mark(subject_code)
+        self.update_table(self.semesters[semester_name])
 
-    if exam_mark is None:
-        QMessageBox.critical(self, "Error", f"Subject {subject_code} not found.")
+        if exam_mark is None:
+            st.error(f"Subject {subject_code} not found.")
+        else:
+            st.success(f"Exam mark for {subject_code}: {exam_mark}")
 
 
-def delete_entry(self: "Application") -> None:
+def delete_entry(self):
     """
-    Deletes selected entries from the current semester and updates the table.
+    Deletes selected entries from the current semester using Streamlit.
 
     This method allows the user to delete one or more selected entries from the
     table corresponding to the current semester. It performs the following steps:
@@ -166,52 +160,38 @@ def delete_entry(self: "Application") -> None:
     - The `semesters` dictionary should contain valid semester objects with a `delete_entry` method.
 
     """
-    semester_name = self.semester_combo.currentText()
+    semester_name = st.selectbox("Select Semester", list(self.semesters.keys()))
     semester = self.semesters.get(semester_name)
     if not semester:
-        QMessageBox.warning(self, "Error", f"Semester '{semester_name}' not found.")
+        st.warning(f"Semester '{semester_name}' not found.")
         return
 
-    sel_model = self.table.selectionModel()
-    if sel_model is None:
+    subject_codes = list(semester.subjects.keys())
+    subject_code = st.selectbox("Select Subject to Delete Entry From", subject_codes)
+    subject = semester.subjects.get(subject_code)
+    if not subject:
+        st.warning("Subject not found.")
         return
-    selected_rows = sel_model.selectedRows()
-    if not selected_rows:
-        QMessageBox.warning(self, "Error", "Please select an entry to delete.")
-        return
 
-    for index in sorted(selected_rows, reverse=True):
-        row = index.row()
-        subject_code_item = self.table.item(row, 0)
-        assessment_item = self.table.item(row, 2)
+    assessments = [a.subject_assessment for a in subject.assignments]
+    assessment = st.selectbox("Select Assessment to Delete", assessments)
 
-        if subject_code_item and assessment_item:
-            subject_code = subject_code_item.text()
-            assessment = assessment_item.text()
-            try:
-                # Delete the entry from the current semester
-                semester.delete_entry(subject_code, assessment)
-
-                # Remove the row from the table
-                self.table.removeRow(row)
-
-                # Sync the table for the current semester with the synced semester
-                for _, synced_semester in self.semesters.items():
-                    if synced_semester != semester and subject_code in synced_semester.subjects:
-                        sync_table_entries(semester, synced_semester)
-
-            except ValueError as error:
-                QMessageBox.critical(self, "Error", f"Failed to delete entry: {error}")
-        else:
-            QMessageBox.warning(self, "Error", "Failed to retrieve subject code or assessment.")
-
-    # Refresh the table for the current semester
-    self.update_table(semester)
+    if st.button("Delete Entry"):
+        try:
+            semester.delete_entry(subject_code, assessment)
+            # Sync the table for the current semester with the synced semester
+            for _, synced_semester in self.semesters.items():
+                if synced_semester != semester and subject_code in synced_semester.subjects:
+                    sync_table_entries(semester, synced_semester)
+            self.update_table(semester)
+            st.success(f"Deleted assessment '{assessment}' from subject '{subject_code}'.")
+        except ValueError as error:
+            st.error(f"Failed to delete entry: {error}")
 
 
-def manage_total_mark(self: "Application") -> None:
+def manage_total_mark(self):
     """
-    Manage the Total Mark for a specified subject in the selected semester.
+    Manage the Total Mark for a specified subject in the selected semester using Streamlit.
 
     This method allows the user to set or clear the Total Mark for a subject.
     It validates the input fields, checks if the subject exists in the current
@@ -246,49 +226,28 @@ def manage_total_mark(self: "Application") -> None:
     Returns:
     None
     """
-    semester_name = self.semester_combo.currentText()
+    semester_name = st.selectbox("Select Semester", list(self.semesters.keys()))
     semester = self.semesters.get(semester_name)
 
     if not semester:
-        QMessageBox.warning(self, "Error", f"Semester '{semester_name}' not found.")
+        st.warning(f"Semester '{semester_name}' not found.")
         return
 
-    # Get the subject code from the entry field
-    subject_code = self.subject_code_entry.text().strip()
+    subject_codes = list(semester.subjects.keys())
+    subject_code = st.selectbox("Select Subject to Set Total Mark", subject_codes)
 
     if not subject_code:
-        QMessageBox.warning(self, "Error", "Please enter a Subject Code in the entry field.")
+        st.warning("Please select a Subject Code.")
         return
 
-    # Check if the subject exists in the current semester
-    target_semester = semester
-    if subject_code not in semester.subjects:
-        # Search for the subject in other semesters
-        for _, other_semester in self.semesters.items():
-            if subject_code in other_semester.subjects:
-                target_semester = other_semester
-                break
+    total_mark = st.number_input(f"Enter Total Mark for {subject_code}:", min_value=0.0, format="%.2f")
 
-        if target_semester == semester:
-            QMessageBox.critical(self, "Error", f"Subject '{subject_code}' not found in any semester.")
-            return
-
-    total_mark, ok = QInputDialog.getDouble(self, "Set Total Mark", f"Enter Total Mark for {subject_code}:", decimals=2)
-
-    if ok:
+    if st.button("Set Total Mark"):
         try:
-            subject_item = target_semester.subjects[subject_code]
-            if isinstance(subject_item, dict):
-                subject_item["Total Mark"] = total_mark
-                self.storage_handler.save_data(self.semesters)
-                self.update_table(semester)
-                QMessageBox.information(
-                    self,
-                    "Success",
-                    f"Total Mark for '{subject_code}' set to {total_mark} in semester '{target_semester.name}'.",
-                )
-            else:
-                QMessageBox.critical(self, "Error", f"Invalid data structure for subject '{subject_code}'.")
+            subject_item = semester.subjects[subject_code]
+            subject_item.total_mark = total_mark
+            self.storage_handler.save_data(self.semesters)
+            self.update_table(semester)
+            st.success(f"Total Mark for '{subject_code}' set to {total_mark} in semester '{semester.name}'.")
         except KeyError:
-            QMessageBox.critical(self, "Error", f"Subject '{subject_code}' not found in the data structure.")
-    # If user cancels (ok is False), do nothing
+            st.error(f"Subject '{subject_code}' not found in the data structure.")

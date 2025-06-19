@@ -8,7 +8,7 @@ The Semester class is responsible for handling assignments and examinations for 
 from collections import OrderedDict
 from typing import Any, Dict, Literal, Optional, Union
 
-from PyQt6.QtWidgets import QMessageBox
+import streamlit as st  # Use Streamlit for feedback
 
 from .data_persistence import DataPersistence
 from .models import Assignment, Examination, Subject
@@ -33,24 +33,11 @@ class Semester:
     def __init__(self, name: str, year: str, data_persistence: DataPersistence):
         """
         Initializes a Semester instance.
-        Args:
-            name (str): The name of the semester (e.g., "Spring", "Fall").
-            year (str): The year associated with the semester (e.g., "2023").
-            data_persistence (DataPersistence): An instance of DataPersistence used to manage
-                persistent data storage and retrieval.
-        Attributes:
-            name (str): The name of the semester.
-            year (str): The year associated with the semester.
-            data_persistence (DataPersistence): The data persistence instance for managing data.
-            subjects (Dict[str, Subject]): A dictionary of subjects associated with the semester,
-                initialized from the data persistence layer if available.
         """
-
         self.name = name
         self.year = year
         self.data_persistence = data_persistence
         # Initialize subjects from loaded data if available
-        # Ensure all loaded subjects are Subject instances, not raw dicts
         loaded_subjects = self.data_persistence.data.get(self.name, {})
         self.subjects: Dict[str, Subject] = {}
         for code, subj in loaded_subjects.items():
@@ -80,19 +67,6 @@ class Semester:
     def get_subject_data(self, subject_code: str, subject_name: Optional[str] = None) -> Dict[str, Any]:
         """
         Retrieves or initializes subject data for a given subject code within the semester.
-
-        If the subject data does not exist in the persistence layer, it initializes the subject
-        with default values. If the subject data already exists, it optionally updates the subject
-        name if provided and different from the existing one.
-
-        Args:
-            subject_code (str): The unique code identifying the subject.
-            subject_name (Optional[str]): The name of the subject. Defaults to None. If not provided,
-                          "N/A" will be used as the default name.
-
-        Returns:
-            Dict[str, Any]: A dictionary containing the subject data, including assignments,
-                    total marks, examinations, and other relevant information.
         """
         if self.name not in self.data_persistence.data:
             self.data_persistence.data[self.name] = {}
@@ -105,7 +79,7 @@ class Semester:
                 ),
                 assignments=[],
                 total_mark=0,
-                examinations=Examination(),  # Initialize with an instance of Examination
+                examinations=Examination(),
                 sync_subject=False,
             )
         else:
@@ -125,65 +99,39 @@ class Semester:
     def add_subject(self, subject_code: str, subject_name: str, sync_subject: bool = False):
         """
         Adds a new subject to the semester.
-        This method validates the provided subject code and name, ensures the subject
-        does not already exist, and then creates and adds a new Subject instance to the
-        semester's subjects. The updated data is saved persistently.
-        Args:
-            subject_code (str): The unique code identifying the subject.
-            subject_name (str): The name of the subject.
-            sync_subject (bool, optional): Indicates whether the subject should be synchronized.
-                                           Defaults to False.
-        Returns:
-            None: Displays a message box indicating success or failure.
-        Raises:
-            QMessageBox: Displays an error message if the subject code already exists or
-                         if the subject code or name is empty.
+        Uses Streamlit for feedback instead of QMessageBox.
         """
-
         if subject_code in self.subjects:
-            QMessageBox.critical(None, "Error", f"Subject '{subject_code}' already exists.")
+            st.error(f"Subject '{subject_code}' already exists.")
             return
 
-        # Validate the subject code and name
         if not subject_code or not subject_name:
-            QMessageBox.critical(None, "Error", "Subject code and name cannot be empty.")
+            st.error("Subject code and name cannot be empty.")
             return
 
-        # Create a new Subject instance
         subject = Subject(
             subject_code=subject_code,
             subject_name=subject_name,
             sync_subject=sync_subject,
         )
 
-        # Add the subject to the semester's subjects
         self.subjects[subject_code] = subject
 
-        # Save the updated data as serializable dictionaries
         self.data_persistence.data[self.name] = {code: subj for code, subj in self.subjects.items()}
         self.data_persistence.save_data(self.data_persistence.data)
-        QMessageBox.information(None, "Info", f"Added new subject '{subject_name}' with code '{subject_code}'.")
+        st.success(f"Added new subject '{subject_name}' with code '{subject_code}'.")
 
     def delete_subject(self, subject_code: str):
         """
         Deletes a subject from the semester.
-
-        Args:
-            subject_code (str): The code of the subject to be deleted.
-
-        Raises:
-            ValueError: If the subject with the given code does not exist.
-
-        Side Effects:
-            - Removes the subject from the `subjects` dictionary.
-            - Updates the persistent data storage to reflect the changes.
-            - Saves the updated data to the persistence layer.
         """
         if subject_code not in self.subjects:
-            raise ValueError(f"Subject '{subject_code}' does not exist.")
+            st.error(f"Subject '{subject_code}' does not exist.")
+            return
         del self.subjects[subject_code]
         self.data_persistence.data[self.name] = {code: subj.to_dict() for code, subj in self.subjects.items()}
         self.data_persistence.save_data(self.data_persistence.data)
+        st.success(f"Deleted subject '{subject_code}'.")
 
     def add_entry(
         self,
@@ -196,44 +144,19 @@ class Semester:
     ) -> None:
         """
         Adds or updates an entry for a subject assessment in the semester.
-
-        Parameters:
-            subject_code (str): The code of the subject to which the assessment belongs.
-            subject_assessment (str): The name or identifier of the assessment.
-            weighted_mark (Union[float, str]): The weighted mark for the assessment.
-                If the grade type is "S" or "U", this will be the grade itself.
-            unweighted_mark (Optional[float]): The unweighted mark for the assessment.
-                Calculated as weighted_mark divided by mark_weight if applicable.
-            mark_weight (Optional[float]): The weight of the assessment mark.
-                Used to calculate the unweighted mark.
-            grade_type (Literal["numeric", "S", "U"]): The type of grade for the assessment.
-                "numeric" indicates a numeric grade, "S" indicates satisfactory, and "U" indicates unsatisfactory.
-
-        Returns:
-            None
-
-        Behavior:
-            - If the subject code does not exist in the semester, an error message is displayed.
-            - If the grade type is "S" or "U", unweighted_mark and mark_weight are set to None,
-              and weighted_mark is set to the grade type.
-            - If weighted_mark or mark_weight is None for numeric grades, an error message is displayed.
-            - If the assessment already exists, its marks and weight are updated.
-            - If the assessment does not exist, it is added to the subject's assignments.
-            - Updates the persistent data storage and saves the changes.
-            - Displays an informational message indicating whether the entry was added or updated.
+        Uses Streamlit for feedback.
         """
         if subject_code not in self.subjects:
-            QMessageBox.critical(None, "Error", f"Subject '{subject_code}' does not exist in {self.name}.")
+            st.error(f"Subject '{subject_code}' does not exist in {self.name}.")
             return
         subject = self.subjects[subject_code]
-        # Only assign float or None to unweighted_mark and mark_weight
         if grade_type in ("S", "U"):
             unweighted_mark = None
             mark_weight = None
-            weighted_mark = grade_type  # "S" or "U"
+            weighted_mark = grade_type
         else:
             if weighted_mark is None or mark_weight is None:
-                QMessageBox.critical(None, "Error", "Weighted mark and mark weight must not be empty.")
+                st.error("Weighted mark and mark weight must not be empty.")
                 return
             weighted_mark = float(weighted_mark)
             mark_weight = float(mark_weight)
@@ -259,49 +182,36 @@ class Semester:
         self.data_persistence.data[self.name] = {code: subj.to_dict() for code, subj in self.subjects.items()}
         self.data_persistence.save_data(self.data_persistence.data)
         if updated:
-            QMessageBox.information(
-                None, "Info", f"Entry for '{subject_assessment}' updated in semester '{self.name}'."
-            )
+            st.info(f"Entry for '{subject_assessment}' updated in semester '{self.name}'.")
         else:
-            QMessageBox.information(None, "Info", f"Entry for '{subject_assessment}' added in semester '{self.name}'.")
+            st.success(f"Entry for '{subject_assessment}' added in semester '{self.name}'.")
 
     def delete_entry(self, subject_code: str, subject_assessment: str):
+        """
+        Deletes an assignment entry from a subject.
+        """
         if subject_code in self.subjects:
             subject = self.subjects[subject_code]
             subject.assignments = [a for a in subject.assignments if a.subject_assessment != subject_assessment]
             self.data_persistence.data[self.name] = {code: subj.to_dict() for code, subj in self.subjects.items()}
             self.data_persistence.save_data(self.data_persistence.data)
+            st.success(f"Deleted assessment '{subject_assessment}' from subject '{subject_code}'.")
 
     def calculate_exam_mark(self, subject_code: str) -> Optional[float]:
         """
         Calculate the exam mark for a given subject based on its assignments and examinations.
-        Args:
-            subject_code (str): The code of the subject for which the exam mark is to be calculated.
-        Returns:
-            Optional[float]: The calculated exam mark rounded to two decimal places, or None if the subject
-            does not exist or the necessary data is unavailable.
-        Notes:
-            - If the subject has an `examinations` field with `exam_mark` and `exam_weight`, the exam mark
-            is calculated as `exam_mark / exam_weight`.
-            - If the subject does not have an `examinations` field or the necessary data is missing, the
-            exam mark is calculated based on the weighted marks and weights of the assignments.
-            - If neither method can provide a valid calculation, the function returns None.
         """
-
         subject = self.subjects.get(subject_code)
         if subject:
-            # If you want to sum all assignment weighted marks and weights:
             total_weighted = sum(
                 a.weighted_mark for a in subject.assignments if isinstance(a.weighted_mark, (float, int))
             )
             total_weight = sum(a.mark_weight for a in subject.assignments if a.mark_weight is not None)
-            # If you want to use the exam mark from the examinations field:
             if hasattr(subject, "examinations") and subject.examinations is not None:
                 exam_mark = getattr(subject.examinations, "exam_mark", None)
                 exam_weight = getattr(subject.examinations, "exam_weight", None)
                 if exam_mark is not None and exam_weight and exam_weight > 0:
                     return round(exam_mark / exam_weight, 2)
-            # Or, if you want to calculate based on assignments:
             if total_weighted is not None and total_weight:
                 return round(total_weighted / total_weight, 2)
         return None
