@@ -1,16 +1,15 @@
 from typing import TYPE_CHECKING
 
-from PyQt6.QtWidgets import QDialog, QMessageBox
-
-from view.ui.subject_dialog import AddSubjectDialog, DeleteSubjectDialog, confirm_remove_subject
-
 if TYPE_CHECKING:
     from view.main_window import Application
 
 
+import streamlit as st
+
+
 def add_subject(self: "Application"):
     """
-    Adds a subject to the selected semester.
+    Adds a subject to the selected semester using Streamlit widgets.
 
     This method retrieves the currently selected semester from the combo box
     and attempts to add a new subject to it. If the semester is not found,
@@ -33,34 +32,32 @@ def add_subject(self: "Application"):
         - QMessageBox: Displays error or warning messages.
         - AddSubjectDialog: Collects subject details from the user.
     """
-    semester_name = self.semester_combo.currentText()
+    semester_name = st.selectbox("Select Semester", list(self.semesters.keys()))
     semester = self.get_semester(semester_name)
     if semester is None:
-        QMessageBox.critical(self, "Error", f"Semester '{semester_name}' not found.")
+        st.error(f"Semester '{semester_name}' not found.")
         return
 
-    # Show the AddSubjectDialog
-    dialog = AddSubjectDialog(self)
-    if dialog.exec() == QDialog.DialogCode.Accepted:
-        subject_code, subject_name, custom_semesters = dialog.get_subject_data()
-
-        if not subject_code:
-            QMessageBox.warning(self, "Error", "Subject code cannot be empty.")
-            return
-
-        try:
-            # Add the subject with the "sync subject" flag set to False
-            semester.add_subject(subject_code, subject_name, sync_subject=False)
-
-            # Refresh the table to include synced subjects
-            self.update_table(semester)
-        except ValueError as error:
-            QMessageBox.critical(self, "Error", f"Failed to add subject: {error}")
+    with st.form("Add Subject"):
+        subject_code = st.text_input("Subject Code")
+        subject_name = st.text_input("Subject Name")
+        sync_subject = st.checkbox("Sync Subject", value=False)
+        submitted = st.form_submit_button("Add Subject")
+        if submitted:
+            if not subject_code:
+                st.warning("Subject code cannot be empty.")
+                return
+            try:
+                semester.add_subject(subject_code, subject_name, sync_subject=sync_subject)
+                self.update_table(semester)
+                st.success(f"Added subject '{subject_code}'.")
+            except ValueError as error:
+                st.error(f"Failed to add subject: {error}")
 
 
 def delete_subject(self: "Application"):
     """
-    Deletes one or more subjects from the currently selected semester.
+    Deletes one or more subjects from the currently selected semester using Streamlit widgets.
 
     This method interacts with the user interface to determine the semester and subjects
     to delete. It displays dialogs for subject selection and confirmation, and handles
@@ -89,39 +86,25 @@ def delete_subject(self: "Application"):
         - Refreshes the subject table in the UI.
     """
 
-    semester_name = self.semester_combo.currentText()
+    semester_name = st.selectbox("Select Semester", list(self.semesters.keys()))
     semester = self.get_semester(semester_name)
     if semester is None:
-        QMessageBox.critical(self, "Error", f"Semester '{semester_name}' not found.")
+        st.error(f"Semester '{semester_name}' not found.")
         return
 
-    # Get all subject codes in the current semester
     subject_codes = list(semester.subjects.keys())
     if not subject_codes:
-        QMessageBox.warning(self, "Error", "There are no subjects to delete in this semester.")
+        st.warning("There are no subjects to delete in this semester.")
         return
 
-    # Optionally, get the currently selected subject in the table
-    selected_items = self.table.selectedItems()
-    default_subject = selected_items[0].text() if selected_items else None
+    selected_subjects = st.multiselect("Select Subjects to Delete", subject_codes)
 
-    # Show the DeleteSubjectDialog
-    dialog = DeleteSubjectDialog(subject_codes, default_subject, self)
-    if dialog.exec() != QDialog.DialogCode.Accepted:
-        return
-    selected_subjects = dialog.selected_subjects()
-    if not selected_subjects:
-        QMessageBox.warning(self, "Error", "No subjects selected for deletion.")
-        return
-
-    # Confirm removal for each subject
-    for subject_code in selected_subjects:
-        if not confirm_remove_subject(self, subject_code):
-            continue
-        try:
-            semester.delete_subject(subject_code)
-        except ValueError as error:
-            QMessageBox.critical(self, "Error", f"Failed to delete subject: {error}")
-
-    self.storage_handler.save_data(self.semesters)
-    self.update_table(semester)
+    if st.button("Delete Selected Subjects"):
+        for subject_code in selected_subjects:
+            try:
+                semester.delete_subject(subject_code)
+            except ValueError as error:
+                st.error(f"Failed to delete subject: {error}")
+        self.storage_handler.save_data(self.semesters)
+        self.update_table(semester)
+        st.success("Selected subjects deleted.")
