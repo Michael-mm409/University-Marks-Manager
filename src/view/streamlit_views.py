@@ -5,8 +5,8 @@ import streamlit as st
 
 from controller.entry_logic import add_assignment, delete_assignment
 from controller.subject_logic import add_subject, delete_subject, set_total_mark
+from controller.table_logic import get_all_subjects, get_summary
 from model.data_persistence import DataPersistence
-from model.models import Assignment, Examination, Subject
 from model.semester import Semester
 
 if TYPE_CHECKING:
@@ -14,13 +14,59 @@ if TYPE_CHECKING:
 
 
 def safe_float(val):
+    """
+    Safely converts a value to a float, or returns None for 'S'/'U' (non-marked assignments).
+
+    Args:
+        val: The value to be converted to a float. Can be of any type.
+
+    Returns:
+        float or None: The converted float value, or None if the value is 'S' or 'U'.
+    """
+    if isinstance(val, str) and val.strip().upper() in {"S", "U"}:
+        return None
     try:
         return float(val)
     except (ValueError, TypeError):
-        return 0.0
+        return None
 
 
 def render_main_page(app: "App"):
+    """
+    Render the main page of the University Marks Manager application using Streamlit.
+    This function sets up the layout and user interface for managing university subjects,
+    assignments, and marks. It provides functionality for adding, deleting, and updating
+    subjects and assignments, as well as calculating exam marks and displaying data in a
+    tabular format.
+    Args:
+        app (App): The main application object containing the semester data, persistence
+                   layer, and current subject/semester context.
+    Streamlit Components:
+        - Page Configuration: Sets the page title, layout, and icon.
+        - Subject Management:
+            - Add New Subject: Allows users to add a new subject with a code, name, and
+              optional synchronization.
+            - Delete Subject: Enables users to delete the currently selected subject.
+            - Set Total Mark: Allows users to set the total mark for a selected subject.
+        - Assignment Management:
+            - Add Assignment: Provides functionality to add a new assignment to a subject.
+            - Delete Assignment: Enables users to delete an assignment from a subject.
+            - Calculate Exam Mark: Calculates and displays the exam mark for a subject.
+        - Display Table: Displays a table of subjects and their assessments for the
+          selected semester and year.
+    Notes:
+        - The function uses Streamlit's layout components (e.g., columns, expanders) to
+          organize the UI.
+        - Users are advised to refresh the page after adding or deleting subjects or
+          assignments to see the updates in the displayed table.
+    Dependencies:
+        - Streamlit (st): Used for building the user interface.
+        - Semester: Represents the semester object containing subjects and assignments.
+        - DataPersistence: Handles data persistence for subjects and assignments.
+        - Helper functions (e.g., add_subject, delete_subject, set_total_mark, add_assignment,
+          delete_assignment, build_tables_per_subject) are used for performing specific
+          operations.
+    """
     st.set_page_config(page_title="University Marks Manager", layout="wide", page_icon="assets/app_icon.ico")
     st.title("University Marks Manager (Streamlit Edition)")
 
@@ -62,7 +108,10 @@ def render_main_page(app: "App"):
                     "Total Mark", min_value=0.0, value=subject.total_mark if subject else 0.0, key="set_total_mark"
                 )
                 if st.button("Set Total Mark", key="set_total_mark_btn"):
-                    success, message = set_total_mark(subject, total_mark, data_persistence)
+                    if subject is not None:
+                        success, message = set_total_mark(subject, total_mark, data_persistence)
+                    else:
+                        st.warning("No subject selected. Please select a valid subject.")
                     if success:
                         st.success(message)
                     else:
@@ -143,7 +192,40 @@ def render_main_page(app: "App"):
     st.caption("Tip: Refresh the page after adding or deleting subjects/assignments to see updates.")
 
 
-def build_tables_per_subject(sem_obj, data_persistence):
+def build_tables_per_subject(sem_obj: Semester, data_persistence: DataPersistence):
+    """
+    Builds and displays tables for each subject in a given semester object.
+    This function retrieves all subjects associated with the given semester object,
+    sorts them by their subject codes, and displays their assignment details in
+    tabular format using Streamlit. It also allows users to select specific assignments
+    via radio buttons and stores the selected assignment details in the Streamlit
+    session state.
+    Args:
+        sem_obj (Semester): The semester object containing information about the semester
+                          (e.g., name, year).
+        data_persistence (DataPersistence): The data persistence layer used to retrieve subject
+                                   and assignment data.
+    Functionality:
+        - Retrieves all subjects for the given semester.
+        - Displays assignment details for each subject in a table.
+        - Allows users to select an assignment using radio buttons.
+        - Stores the selected assignment details in Streamlit session state.
+        - Displays a summary of total weighted marks, total weight, exam marks, and
+          total marks for each subject.
+    Session State Keys:
+        - `select_row_<subject_code>`: Stores the index of the selected assignment row
+          for each subject.
+        - `selected_assignment_<subject_code>`: Stores details of the selected assignment
+          for each subject, including assessment name, weighted mark, and mark weight.
+    Notes:
+        - If no assignments are available for a subject, the radio buttons and table
+          are disabled.
+        - The summary row is displayed as a markdown section below each subject's table.
+    Dependencies:
+        - Requires the `get_all_subjects`, `safe_float`, and `get_summary` helper functions.
+        - Uses the `pandas` library for creating and manipulating dataframes.
+        - Relies on the `streamlit` library for UI rendering.
+    """
     subjects = get_all_subjects(sem_obj, data_persistence)
 
     # Now sort all subject codes (current + synced)
@@ -221,51 +303,3 @@ def build_tables_per_subject(sem_obj, data_persistence):
             f"Total Mark: `{total_mark:.0f}`"
         )
         st.markdown("---")
-
-
-def get_all_subjects(sem_obj, data_persistence):
-    """Retrieve all subjects for the given semester, including synced subjects from other semesters."""
-    subjects = dict(sem_obj.subjects)  # Start with current semester's subjects
-
-    # Add synced subjects from other semesters
-    for sem_name, sem_data in data_persistence.data.items():
-        if sem_name == sem_obj.name:
-            continue
-        for subj_code, subj in sem_data.items():
-            is_synced = False
-            if isinstance(subj, dict):
-                is_synced = subj.get("sync_subject", False)
-            elif hasattr(subj, "sync_subject"):
-                is_synced = subj.sync_subject
-            if is_synced and subj_code not in subjects:
-                if isinstance(subj, dict):
-                    assignments = [Assignment(**a) for a in subj["assignments"]] if "assignments" in subj else []
-                    examinations = Examination(**subj.get("examinations", {})) if "examinations" in subj else None
-                    subject = Subject(
-                        subject_code=subj_code,
-                        subject_name=subj.get("subject_name", "N/A"),
-                        assignments=assignments,
-                        total_mark=subj.get("total_mark", 0.0),
-                        examinations=examinations or Examination(exam_mark=0, exam_weight=100),
-                        sync_subject=True,
-                    )
-                else:
-                    subject = subj
-                subjects[subj_code] = subject
-
-    return subjects
-
-
-def get_summary(subject):
-    """Calculate the summary values for a subject."""
-    total_weighted_mark = sum(
-        entry.weighted_mark for entry in subject.assignments if isinstance(entry.weighted_mark, (int, float))
-    )
-    total_weight = sum(
-        entry.mark_weight for entry in subject.assignments if isinstance(entry.mark_weight, (int, float))
-    )
-    exam_mark = subject.examinations.exam_mark if subject.examinations else 0
-    exam_weight = subject.examinations.exam_weight if subject.examinations else 100
-    total_mark = subject.total_mark
-
-    return total_weighted_mark, total_weight, exam_mark, exam_weight, total_mark

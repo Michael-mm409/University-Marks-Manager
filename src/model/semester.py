@@ -5,8 +5,7 @@ in the University Marks Manager application.
 The Semester class is responsible for handling assignments and examinations for a given semester.
 """
 
-from collections import OrderedDict
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Dict, Literal, Optional, Union
 
 import streamlit as st  # Use Streamlit for feedback
 
@@ -47,7 +46,7 @@ class Semester:
                 # Convert assignments
                 assignments = [
                     a if isinstance(a, Assignment) else Assignment(**a)
-                    for a in subj.get("assignments", subj.get("Assignments", []))
+                    for a in list(subj.get("assignments", subj.get("Assignments", [])) or [])
                 ]
                 # Convert examinations
                 examinations = subj.get("examinations", subj.get("Examinations", None))
@@ -64,37 +63,23 @@ class Semester:
                     sync_subject=subj.get("sync_subject", subj.get("Sync Subject", False)),
                 )
 
-    def get_subject_data(self, subject_code: str, subject_name: Optional[str] = None) -> Dict[str, Any]:
+    def get_subject_data(self, subject_code: str, subject_name: Optional[str] = None) -> Subject:
         """
         Retrieves or initializes subject data for a given subject code within the semester.
         """
-        if self.name not in self.data_persistence.data:
-            self.data_persistence.data[self.name] = {}
-
-        if subject_code not in self.data_persistence.data[self.name]:
-            self.data_persistence.data[self.name][subject_code] = Subject(
+        if subject_code not in self.subjects:
+            self.subjects[subject_code] = Subject(
                 subject_code=subject_code,
-                subject_name=self.data_persistence.data[self.name][subject_code].get(
-                    "Subject Name", subject_name or "N/A"
-                ),
+                subject_name=subject_name or "N/A",
                 assignments=[],
                 total_mark=0,
                 examinations=Examination(),
                 sync_subject=False,
             )
-        else:
-            # Update the subject name if it is provided and different from the existing one
-            if subject_code not in self.data_persistence.data[self.name]:
-                self.data_persistence.data[self.name][subject_code] = OrderedDict(
-                    [
-                        ("Subject Name", subject_name if subject_name else "N/A"),
-                        ("Assignments", []),
-                        ("Total Mark", 0),
-                        ("Examinations", {"Exam Mark": 0, "Exam Weight": 100}),
-                    ]
-                )
-
-        return self.data_persistence.data[self.name][subject_code]
+            # Update persistence data
+            self.data_persistence.data[self.name] = {code: subj for code, subj in self.subjects.items()}
+            self.data_persistence.save_data(self.data_persistence.data)
+        return self.subjects[subject_code]
 
     def add_subject(self, subject_code: str, subject_name: str, sync_subject: bool = False):
         """
@@ -129,7 +114,7 @@ class Semester:
             st.error(f"Subject '{subject_code}' does not exist.")
             return
         del self.subjects[subject_code]
-        self.data_persistence.data[self.name] = {code: subj.to_dict() for code, subj in self.subjects.items()}
+        self.data_persistence.data[self.name] = {code: subj for code, subj in self.subjects.items()}
         self.data_persistence.save_data(self.data_persistence.data)
         st.success(f"Deleted subject '{subject_code}'.")
 
@@ -179,7 +164,7 @@ class Semester:
             )
             subject.assignments.append(assignment)
 
-        self.data_persistence.data[self.name] = {code: subj.to_dict() for code, subj in self.subjects.items()}
+        self.data_persistence.data[self.name] = {code: subj for code, subj in self.subjects.items()}
         self.data_persistence.save_data(self.data_persistence.data)
         if updated:
             st.info(f"Entry for '{subject_assessment}' updated in semester '{self.name}'.")
@@ -193,7 +178,7 @@ class Semester:
         if subject_code in self.subjects:
             subject = self.subjects[subject_code]
             subject.assignments = [a for a in subject.assignments if a.subject_assessment != subject_assessment]
-            self.data_persistence.data[self.name] = {code: subj.to_dict() for code, subj in self.subjects.items()}
+            self.data_persistence.data[self.name] = {code: subj for code, subj in self.subjects.items()}
             self.data_persistence.save_data(self.data_persistence.data)
             st.success(f"Deleted assessment '{subject_assessment}' from subject '{subject_code}'.")
 
