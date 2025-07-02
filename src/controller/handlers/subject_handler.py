@@ -54,26 +54,91 @@ class SubjectHandler:
         except Exception as e:
             return False, f"Failed to delete subject: {str(e)}"
 
-    def set_total_mark(self, subject: Subject, total_mark: float) -> Tuple[bool, str]:
-        """
-        Set the total mark for a subject.
+    # In your manage tab where total marks are set
+    def set_total_mark(self, subject_code: str, total_mark: float):
+        """Set total mark and automatically calculate exam mark if needed."""
+        subject = self.semester.subjects.get(subject_code)
+        if not subject:
+            return False, "Subject not found"
 
-        Args:
-            subject: Subject object
-            total_mark: Total mark to set
+        # Set the total mark
+        subject.total_mark = total_mark
 
-        Returns:
-            Tuple of (success, message)
-        """
-        if subject is None:
-            return False, "Subject not found."
+        # Check if exam should be calculated automatically
+        exam_keywords = ["exam", "final", "test", "final exam", "final test"]
+        existing_exam = None
 
-        try:
-            subject.total_mark = total_mark
+        # Look for existing exam in assignments
+        for assignment in subject.assignments:
+            if any(keyword in assignment.subject_assessment.lower() for keyword in exam_keywords):
+                existing_exam = assignment
+                break
+
+        # Check if exam already exists in examinations section
+        has_exam_in_examinations = (
+            hasattr(subject, "examinations")
+            and subject.examinations
+            and hasattr(subject.examinations, "exam_mark")
+            and subject.examinations.exam_mark is not None
+            and subject.examinations.exam_mark > 0
+        )
+
+        # Calculate what the exam mark should be (always calculate for reference)
+        assignment_total = 0.0
+        assignment_weight_total = 0.0
+
+        for assignment in subject.assignments:
+            # Skip exam assignments and ensure numeric values
+            is_exam = any(keyword in assignment.subject_assessment.lower() for keyword in exam_keywords)
+            if (
+                not is_exam
+                and assignment.weighted_mark is not None
+                and isinstance(assignment.weighted_mark, (int, float))
+                and assignment.mark_weight is not None
+                and isinstance(assignment.mark_weight, (int, float))
+            ):
+                assignment_total += float(assignment.weighted_mark)
+                assignment_weight_total += float(assignment.mark_weight)
+
+        exam_mark_needed = total_mark - assignment_total
+        exam_weight = 100.0 - assignment_weight_total
+
+        # Auto-create exam only if no exam exists anywhere
+        if not existing_exam and not has_exam_in_examinations and exam_weight > 0 and exam_mark_needed >= 0:
+            from model.domain.entities.examination import Examination
+
+            subject.examinations = Examination(
+                exam_mark=exam_mark_needed,
+                exam_weight=exam_weight,
+            )
+
             self.data_persistence.save_data(self.data_persistence.data)
-            return True, f"Total Mark for '{subject.subject_code}' set to {total_mark}."
-        except Exception as e:
-            return False, f"Failed to set total mark: {str(e)}"
+            return (
+                True,
+                f"Total mark set to {total_mark:.1f}. Exam mark automatically calculated as {exam_mark_needed:.1f}",
+            )
+
+        # If exam exists, just update total mark and show info message
+        elif has_exam_in_examinations:
+            current_exam_mark = subject.examinations.exam_mark
+            difference = exam_mark_needed - current_exam_mark
+
+            self.data_persistence.save_data(self.data_persistence.data)
+
+            if abs(difference) > 0.1:
+                return (
+                    True,
+                    f"Total mark set to {total_mark:.1f}. Note: Current exam mark ({current_exam_mark:.1f}) differs from calculated ({exam_mark_needed:.1f}) by {difference:.1f}. Check Analytics tab to update if needed.",
+                )
+            else:
+                return (
+                    True,
+                    f"Total mark set to {total_mark:.1f}. Exam mark matches calculation.",
+                )
+
+        # Save the total mark change
+        self.data_persistence.save_data(self.data_persistence.data)
+        return True, f"Total mark set to {total_mark:.1f}"
 
 
 # Backward compatibility functions
