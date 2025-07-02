@@ -102,7 +102,7 @@ class StreamlitView:
     def _render_main_content(self) -> None:
         """Render main application content."""
         # Create tabs for different sections
-        tab1, tab2, tab3 = st.tabs(["📊 Overview", "➕ Manage", "📈 Analytics"])
+        tab1, tab2, tab3 = st.tabs(["&#x1F4CA; Overview", "&#x2795; Manage", "&#x1F4C8; Analytics"])
 
         with tab1:
             self._render_overview_tab()
@@ -177,42 +177,42 @@ class StreamlitView:
 
         # Subject Management Section
         with st.container():
-            st.markdown("### 📚 Subject Management")
+            st.markdown("### &#x1F4DA; Subject Management")
             col1, col2 = st.columns(2, gap="medium")
 
             with col1:
-                with st.expander("➕ Add Subject", expanded=True):
+                with st.expander("&#x2795; Add Subject", expanded=True):
                     self._render_add_subject_form()
 
             with col2:
-                with st.expander("🗑️ Delete Subject", expanded=True):
+                with st.expander("&#x1F5D1;&#xFE0F; Delete Subject", expanded=True):
                     self._render_delete_subject_form()
 
         st.divider()  # Visual separator
 
         # Assignment Management Section
         with st.container():
-            st.markdown("### 📝 Assignment Management")
+            st.markdown("### &#x270E; Assignment Management")
             col1, col2, col3 = st.columns(3, gap="medium")
 
             with col1:
-                with st.expander("➕ Add Assignment", expanded=True):
+                with st.expander("&#x2795; Add Assignment", expanded=True):
                     self._render_add_assignment_form()
 
             with col2:
-                with st.expander("✏️ Modify Assignment", expanded=True):
+                with st.expander("&#x1F4DD; Modify or Delete Assignments", expanded=True):
                     self._render_modify_assignment_form()
 
             with col3:
-                with st.expander("🗑️ Delete Assignment", expanded=True):
+                with st.expander("&#x1F5D1;&#xFE0F; Delete Assignment", expanded=True):
                     self._render_delete_assignment_form()
 
         st.divider()
 
         # Settings Section
         with st.container():
-            st.markdown("### ⚙️ Settings")
-            with st.expander("🎯 Set Total Marks", expanded=True):
+            st.markdown("### &#x2699; Settings")
+            with st.expander("&#x1F3AF; Set Total Marks", expanded=True):
                 self._render_set_total_mark_form()
 
     def _render_analytics_tab(self) -> None:
