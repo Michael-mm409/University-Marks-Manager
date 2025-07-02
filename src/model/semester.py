@@ -9,8 +9,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import streamlit as st
 
-from model.data_persistence import DataPersistence
-from model.enums import DataKeys, GradeType
+from model import DataKeys, DataPersistence, GradeType
 from model.models import Assignment, Examination, Subject
 
 

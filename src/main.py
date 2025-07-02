@@ -3,9 +3,7 @@ from typing import List
 
 import streamlit as st
 
-from model.data_persistence import DataPersistence
-from model.enums import SemesterName
-from model.semester import Semester
+from model import DataPersistence, Semester, SemesterName
 from view.streamlit_views import render_main_page
 
 

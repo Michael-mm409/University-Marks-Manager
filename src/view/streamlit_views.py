@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import pandas as pd
 import streamlit as st
@@ -6,14 +6,18 @@ import streamlit as st
 from controller.entry_logic import add_assignment, delete_assignment
 from controller.subject_logic import add_subject, delete_subject, set_total_mark
 from controller.table_logic import get_all_subjects, get_summary
-from model.data_persistence import DataPersistence
-from model.semester import Semester
+from model import DataPersistence, Semester
+from model.enums import GradeType
+from model.models import Assignment, Subject
+
+# If you created the types file:
+# from model.types import SubjectDict, AssignmentDict
 
 if TYPE_CHECKING:
     from main import App
 
 
-def safe_float(val):
+def safe_float(val) -> Optional[float]:
     """
     Safely converts a value to a float, or returns None for 'S'/'U' (non-marked assignments).
 
@@ -23,7 +27,7 @@ def safe_float(val):
     Returns:
         float or None: The converted float value, or None if the value is 'S' or 'U'.
     """
-    if isinstance(val, str) and val.strip().upper() in {"S", "U"}:
+    if isinstance(val, str) and val.strip().upper() in {GradeType.SATISFACTORY.value, GradeType.UNSATISFACTORY.value}:
         return None
     try:
         return float(val)
@@ -31,7 +35,25 @@ def safe_float(val):
         return None
 
 
-def render_main_page(app: "App"):
+def safe_display_value(val) -> str:
+    """
+    Safely converts a value to a string for display, handling S/U grades properly.
+
+    Args:
+        val: The value to be converted for display
+
+    Returns:
+        str: The display string
+    """
+    if isinstance(val, str) and val.upper() in {GradeType.SATISFACTORY.value, GradeType.UNSATISFACTORY.value}:
+        return val.upper()
+    try:
+        return str(float(val))
+    except (ValueError, TypeError):
+        return ""
+
+
+def render_main_page(app: "App") -> None:
     """
     Render the main page of the University Marks Manager application using Streamlit.
     This function sets up the layout and user interface for managing university subjects,
@@ -145,14 +167,14 @@ def render_main_page(app: "App"):
                 # Replace the number_input with text_input to allow S/U
                 weighted_mark_input = st.text_input(
                     "Weighted Mark",
-                    value=str(selected_data["weighted_mark"]) if selected_data["weighted_mark"] is not None else "",
-                    placeholder="Enter number, 'S', or 'U'",
-                    help="Enter a numeric value for graded assignments, or 'S' for Satisfactory, 'U' for Unsatisfactory",
+                    value=safe_display_value(selected_data["weighted_mark"]),
+                    placeholder=f"Enter number, '{GradeType.SATISFACTORY.value}', or '{GradeType.UNSATISFACTORY.value}'",
+                    help=f"Enter a numeric value for graded assignments, or '{GradeType.SATISFACTORY.value}' for Satisfactory, '{GradeType.UNSATISFACTORY.value}' for Unsatisfactory",
                     key=f"add_weighted_mark_{subject_code}_{selected_idx}",
                 )
 
                 # Conditionally show mark weight input based on grade type
-                if weighted_mark_input.upper() in ["S", "U"]:
+                if weighted_mark_input.upper() in [GradeType.SATISFACTORY.value, GradeType.UNSATISFACTORY.value]:
                     st.info(f"Mark weight is not applicable for {weighted_mark_input.upper()} grades")
                     mark_weight = None
                 else:
@@ -164,14 +186,18 @@ def render_main_page(app: "App"):
                     )
 
                 if st.button("Add Assignment", key=f"add_assignment_btn_{subject_code}_{selected_idx}"):
-                    # Convert weighted_mark_input to appropriate type
-                    if weighted_mark_input.upper() in ["S", "U"]:
-                        weighted_mark = weighted_mark_input.upper()
+                    # Convert weighted_mark_input to appropriate type using enums
+                    if weighted_mark_input.upper() == GradeType.SATISFACTORY.value:
+                        weighted_mark = GradeType.SATISFACTORY.value
+                    elif weighted_mark_input.upper() == GradeType.UNSATISFACTORY.value:
+                        weighted_mark = GradeType.UNSATISFACTORY.value
                     else:
                         try:
                             weighted_mark = float(weighted_mark_input)
                         except ValueError:
-                            st.error("Please enter a valid number, 'S', or 'U' for weighted mark")
+                            st.error(
+                                f"Please enter a valid number, '{GradeType.SATISFACTORY.value}', or '{GradeType.UNSATISFACTORY.value}' for weighted mark"
+                            )
                             st.stop()
 
                     success, message = add_assignment(sem_obj, subject_code, assessment, weighted_mark, mark_weight)
@@ -212,7 +238,7 @@ def render_main_page(app: "App"):
     st.caption("Tip: Refresh the page after adding or deleting subjects/assignments to see updates.")
 
 
-def build_tables_per_subject(sem_obj: Semester, data_persistence: DataPersistence):
+def build_tables_per_subject(sem_obj: Semester, data_persistence: DataPersistence) -> None:
     """
     Builds and displays tables for each subject in a given semester object.
     This function retrieves all subjects associated with the given semester object,
@@ -246,24 +272,26 @@ def build_tables_per_subject(sem_obj: Semester, data_persistence: DataPersistenc
         - Uses the `pandas` library for creating and manipulating dataframes.
         - Relies on the `streamlit` library for UI rendering.
     """
-    subjects = get_all_subjects(sem_obj, data_persistence)
+    subjects: Dict[str, Subject] = get_all_subjects(sem_obj, data_persistence)
 
     # Now sort all subject codes (current + synced)
     for subject_code in sorted(subjects.keys()):
-        subject = subjects[subject_code]
+        subject: Subject = subjects[subject_code]
         st.subheader(
             f"{subject.subject_name} ({subject_code})"
             f"{' - Synced' if getattr(subject, 'sync_subject', False) else ''} "
             f"in {sem_obj.name} {sem_obj.year}"
         )
-        rows = []
-        for entry in subject.assignments:
+
+        rows: List[List[Union[str, float, None]]] = []
+        assignment: Assignment
+        for assignment in subject.assignments:
             rows.append(
                 [
-                    entry.subject_assessment,
-                    entry.unweighted_mark,
-                    entry.weighted_mark,
-                    entry.mark_weight,
+                    assignment.subject_assessment,
+                    assignment.unweighted_mark,
+                    assignment.weighted_mark,
+                    assignment.mark_weight,
                 ]
             )
         df = pd.DataFrame(
