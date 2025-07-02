@@ -9,8 +9,8 @@ from typing import Dict, Literal, Optional, Union
 
 import streamlit as st  # Use Streamlit for feedback
 
-from .data_persistence import DataPersistence
-from .models import Assignment, Examination, Subject
+from model.domain.entities import Assignment, Examination, Subject
+from model.repositories.data_persistence import DataPersistence
 
 
 class Semester:

@@ -1,19 +1,6 @@
 from enum import Enum
 
 
-class SemesterName(str, Enum):
-    AUTUMN = "Autumn"
-    SPRING = "Spring"
-    ANNUAL = "Annual"
-    SUMMER = "Summer"
-
-
-class GradeType(str, Enum):
-    NUMERIC = "numeric"
-    SATISFACTORY = "S"
-    UNSATISFACTORY = "U"
-
-
 class DataKeys(str, Enum):
     # Current keys
     SUBJECT_ASSESSMENT = "subject_assessment"
