@@ -102,15 +102,15 @@ class AnalyticsDisplay:
         """
         selected_subject: Optional[Any] = st.session_state.get("selected_subject")
         if not selected_subject:
-            st.info("📋 Select a subject from the sidebar to view detailed analytics")
+            st.info("&#x1F4CB; Select a subject from the sidebar to view detailed analytics")
             return
 
         # Get analytics data with corrected grade distribution
         # FIX: Use Optional type since get_subject_analytics can return None
         analytics_data: Optional[Dict[str, Any]] = self.analytics_controller.get_subject_analytics(selected_subject)
         if not analytics_data:
-            st.error("❌ Unable to load analytics data for the selected subject")
-            st.info("💡 Try refreshing the page or selecting a different subject")
+            st.error("&#x274C; Unable to load analytics data for the selected subject")
+            st.info("&#x1F4A1; Try refreshing the page or selecting a different subject")
             return
 
         # Main grade status overview
@@ -151,9 +151,11 @@ class AnalyticsDisplay:
         Example:
             >>> self._render_visual_analytics(analytics_data)
         """
-        st.subheader("📈 Visual Analytics")
+        st.subheader("&#x1F4C8; Visual Analytics")
 
-        tab1, tab2, tab3 = st.tabs(["📊 Grade Overview", "📋 Assignment Progress", "🎯 Performance Analysis"])
+        tab1, tab2, tab3 = st.tabs(
+            ["&#x1F4CA; Grade Overview", "&#x1F4CB; Assignment Progress", "&#x1F3AF; Performance Analysis"]
+        )
 
         with tab1:
             # Grade status charts and progress indicators
