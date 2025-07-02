@@ -16,6 +16,7 @@ class GradeType(str, Enum):
 
 class DataKeys(str, Enum):
     # Current keys
+    SUBJECT_CODE = "subject_code"
     SUBJECT_ASSESSMENT = "subject_assessment"
     UNWEIGHTED_MARK = "unweighted_mark"
     WEIGHTED_MARK = "weighted_mark"
