@@ -4,7 +4,7 @@ from .handlers import AnalyticsHandler, AssignmentHandler, SubjectHandler
 from .handlers.analytics_handler import get_all_subjects, get_summary
 
 # Backward compatibility imports
-from .handlers.assignment_handler import add_assignment, delete_assignment
+from .handlers.assignment_handler import add_assignment, delete_assignment, modify_assignment
 from .handlers.subject_handler import add_subject, delete_subject, set_total_mark
 
 __all__ = [
@@ -22,4 +22,5 @@ __all__ = [
     "set_total_mark",
     "get_all_subjects",
     "get_summary",
+    "modify_assignment",
 ]

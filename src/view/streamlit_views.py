@@ -158,36 +158,7 @@ class StreamlitView:
             if select_key not in st.session_state:
                 st.session_state[select_key] = 0  # Default to first row
 
-            selected_idx = (
-                st.radio(
-                    f"**Select an assignment for {subject_code}**",
-                    options=range(len(df)),
-                    format_func=lambda i: df.iloc[i]["Assessment"],
-                    key=select_key,
-                    index=st.session_state[select_key] if len(df) > 0 else None,
-                    horizontal=True,
-                    disabled=(len(df) == 0),
-                )
-                if len(df) > 0
-                else None
-            )
-
-            # Update session state if changed
-            if selected_idx is not None and st.session_state[select_key] != selected_idx:
-                st.session_state[select_key] = selected_idx
-
             st.dataframe(df.reset_index(drop=True), use_container_width=True, key=f"summary_editor_{subject_code}")
-
-            # --- Store the selected assignment in session state ---
-            if selected_idx is not None and len(df) > 0:
-                selected_assignment = df.iloc[selected_idx]
-                st.session_state[f"selected_assignment_{subject_code}"] = {
-                    "assessment": selected_assignment["Assessment"],
-                    "weighted_mark": safe_float(selected_assignment["Weighted Mark"]),
-                    "mark_weight": safe_float(selected_assignment["Mark Weight"]),
-                }
-            else:
-                st.session_state[f"selected_assignment_{subject_code}"] = None
 
             # Summary row (as a separate table or markdown)
             total_weighted_mark, total_weight, exam_mark, exam_weight, total_mark = get_summary(subject)
@@ -202,25 +173,47 @@ class StreamlitView:
             st.markdown("---")
 
     def _render_manage_tab(self) -> None:
-        """Render management tab with forms."""
-        col1, col2 = st.columns(2)
+        """Render management tab with organized container layout."""
 
-        with col1:
-            st.subheader("Add Subject")
-            self._render_add_subject_form()
+        # Subject Management Section
+        with st.container():
+            st.markdown("### 📚 Subject Management")
+            col1, col2 = st.columns(2, gap="medium")
 
-            st.subheader("Add Assignment")
-            self._render_add_assignment_form()
+            with col1:
+                with st.expander("➕ Add Subject", expanded=True):
+                    self._render_add_subject_form()
 
-        with col2:
-            st.subheader("Delete Subject")
-            self._render_delete_subject_form()
+            with col2:
+                with st.expander("🗑️ Delete Subject", expanded=True):
+                    self._render_delete_subject_form()
 
-            st.subheader("Delete Assignment")
-            self._render_delete_assignment_form()
+        st.divider()  # Visual separator
 
-            st.subheader("Set Total Marks")
-            self._render_set_total_mark_form()
+        # Assignment Management Section
+        with st.container():
+            st.markdown("### 📝 Assignment Management")
+            col1, col2, col3 = st.columns(3, gap="medium")
+
+            with col1:
+                with st.expander("➕ Add Assignment", expanded=True):
+                    self._render_add_assignment_form()
+
+            with col2:
+                with st.expander("✏️ Modify Assignment", expanded=True):
+                    self._render_modify_assignment_form()
+
+            with col3:
+                with st.expander("🗑️ Delete Assignment", expanded=True):
+                    self._render_delete_assignment_form()
+
+        st.divider()
+
+        # Settings Section
+        with st.container():
+            st.markdown("### ⚙️ Settings")
+            with st.expander("🎯 Set Total Marks", expanded=True):
+                self._render_set_total_mark_form()
 
     def _render_analytics_tab(self) -> None:
         """Render analytics tab with calculations."""
@@ -339,6 +332,108 @@ class StreamlitView:
                     st.rerun()
                 else:
                     st.warning(message)
+
+    def _render_modify_assignment_form(self) -> None:
+        """Render modify assignment form."""
+        subject_code = st.session_state.get("selected_subject")
+        if not subject_code:
+            st.info("Select a subject first")
+            return
+
+        if not self.controller.semester_obj:
+            st.error("Semester not initialized.")
+            return
+
+        subject = self.controller.semester_obj.subjects.get(subject_code)
+        if not subject or not subject.assignments:
+            st.info("No assignments to modify.")
+            return
+
+        assessments = [a.subject_assessment for a in subject.assignments]
+
+        with st.form(f"modify_assignment_form_{subject_code}"):
+            # Select assignment to modify
+            selected_assessment = st.selectbox("Select Assignment to Modify", assessments)
+
+            # Get current assignment data
+            current_assignment = None
+            for assignment in subject.assignments:
+                if assignment.subject_assessment == selected_assessment:
+                    current_assignment = assignment
+                    break
+
+            if current_assignment:
+                # Show current values and allow modification
+                st.markdown(f"**Modifying: {selected_assessment}**")
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    new_assessment_name = st.text_input(
+                        "New Assessment Name",
+                        value=current_assignment.subject_assessment,
+                        help="Change the assessment name",
+                    )
+
+                    # Handle S/U vs numeric grades
+                    current_mark = current_assignment.weighted_mark
+                    if isinstance(current_mark, str):
+                        default_mark = current_mark
+                    else:
+                        default_mark = str(current_mark)
+
+                    new_weighted_mark = st.text_input(
+                        "New Weighted Mark",
+                        value=default_mark,
+                        placeholder=f"Enter number, '{GradeType.SATISFACTORY.value}', or '{GradeType.UNSATISFACTORY.value}'",
+                        help=f"Enter a numeric value for graded assignments, or '{GradeType.SATISFACTORY.value}' for Satisfactory, '{GradeType.UNSATISFACTORY.value}' for Unsatisfactory",
+                    )
+
+                with col2:
+                    # Conditionally show mark weight input
+                    current_weight = current_assignment.mark_weight or 0.0
+                    new_mark_weight = None
+
+                    if new_weighted_mark.upper() not in [GradeType.SATISFACTORY.value, GradeType.UNSATISFACTORY.value]:
+                        new_mark_weight = st.number_input(
+                            "New Mark Weight",
+                            min_value=0.0,
+                            max_value=100.0,
+                            value=current_weight,
+                            help="Weight of this assignment",
+                        )
+                    else:
+                        st.info(f"Mark weight is not applicable for {new_weighted_mark.upper()} grades")
+
+                    # Show what's changing
+                    st.markdown("**Changes:**")
+                    if new_assessment_name != current_assignment.subject_assessment:
+                        st.write(f"• Name: {current_assignment.subject_assessment} → {new_assessment_name}")
+                    if str(new_weighted_mark) != str(current_assignment.weighted_mark):
+                        st.write(f"• Mark: {current_assignment.weighted_mark} → {new_weighted_mark}")
+                    if new_mark_weight != current_assignment.mark_weight:
+                        st.write(f"• Weight: {current_assignment.mark_weight} → {new_mark_weight}")
+
+                if st.form_submit_button("Modify Assignment", type="primary"):
+                    if not new_assessment_name or not new_weighted_mark:
+                        st.error("Assessment name and weighted mark are required")
+                        return
+
+                    from controller import modify_assignment
+
+                    success, message = modify_assignment(
+                        self.controller.semester_obj,
+                        subject_code,
+                        selected_assessment,
+                        new_assessment_name,
+                        new_weighted_mark,
+                        new_mark_weight,
+                    )
+                    if success:
+                        st.success(message)
+                        st.rerun()
+                    else:
+                        st.warning(message)
 
     def _render_exam_calculator(self, subject_code: str) -> None:
         """Simple exam mark calculator that calculates from total mark."""

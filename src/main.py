@@ -6,14 +6,14 @@ Entry point for the Streamlit-based university marks management system.
 import streamlit as st
 
 from controller.app_controller import AppController
-from view.streamlit_views import StreamlitView
+from view import StreamlitView
 
 
 def configure_page() -> None:
     """Configure Streamlit page settings."""
     st.set_page_config(
         page_title="University Marks Manager",
-        page_icon="📚",
+        page_icon="assets/app_icon.ico",
         layout="wide",
         initial_sidebar_state="expanded",
     )
