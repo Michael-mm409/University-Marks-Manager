@@ -184,19 +184,46 @@ class Semester:
 
     def calculate_exam_mark(self, subject_code: str) -> Optional[float]:
         """
-        Calculate the exam mark for a given subject based on its assignments and examinations.
+        Calculate the exam mark based on total mark and assignment marks, then save it.
+
+        Formula: exam_mark = total_mark - assignment_total
+
+        Args:
+            subject_code: The subject to calculate exam mark for
+
+        Returns:
+            Calculated exam mark, or None if calculation not possible
         """
         subject = self.subjects.get(subject_code)
-        if subject:
-            total_weighted = sum(
-                a.weighted_mark for a in subject.assignments if isinstance(a.weighted_mark, (float, int))
-            )
-            total_weight = sum(a.mark_weight for a in subject.assignments if a.mark_weight is not None)
-            if hasattr(subject, "examinations") and subject.examinations is not None:
-                exam_mark = getattr(subject.examinations, "exam_mark", None)
-                exam_weight = getattr(subject.examinations, "exam_weight", None)
-                if exam_mark is not None and exam_weight and exam_weight > 0:
-                    return round(exam_mark / exam_weight, 2)
-            if total_weighted is not None and total_weight:
-                return round(total_weighted / total_weight, 2)
-        return None
+        if not subject:
+            return None
+
+        # Get current assignment marks (only numeric grades)
+        assignment_total = sum(
+            a.weighted_mark for a in subject.assignments if isinstance(a.weighted_mark, (float, int))
+        )
+
+        # Simple calculation: exam mark = total mark - assignment total
+        calculated_exam_mark = subject.total_mark - assignment_total
+
+        # Ensure exam mark is within valid range
+        calculated_exam_mark = max(0.0, min(100.0, calculated_exam_mark))
+        calculated_exam_mark = round(calculated_exam_mark, 2)
+
+        # Get exam weight (remaining weight after assignments)
+        assignment_weight = sum(a.mark_weight for a in subject.assignments if a.mark_weight is not None)
+        exam_weight = 100.0 - assignment_weight
+
+        # Update the subject's examination data
+        if not subject.examinations:
+            subject.examinations = Examination()
+
+        subject.examinations.exam_mark = calculated_exam_mark
+        subject.examinations.exam_weight = exam_weight
+
+        # Save to JSON file
+        self.data_persistence.data[self.name] = {code: subj for code, subj in self.subjects.items()}
+        self.data_persistence.save_data(self.data_persistence.data)
+
+        st.success(f"Calculated and saved exam mark for {subject_code}: {calculated_exam_mark}%")
+        return calculated_exam_mark
