@@ -8,8 +8,11 @@ from typing import Any, Dict, List
 
 import streamlit as st
 
-from model.enums import DataKeys, GradeType
-from model.models import Assignment, Examination, Subject
+# Fix: Use relative import to avoid circular dependency
+from model.domain.entities import Assignment, Examination, Subject
+
+from ..enums.data_keys import DataKeys
+from ..enums.grade_types import GradeType
 
 
 class DataPersistence:

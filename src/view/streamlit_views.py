@@ -1,19 +1,14 @@
-from typing import TYPE_CHECKING
+from typing import Optional
 
 import pandas as pd
 import streamlit as st
 
-from controller.entry_logic import add_assignment, delete_assignment
-from controller.subject_logic import add_subject, delete_subject, set_total_mark
-from controller.table_logic import get_all_subjects, get_summary
-from model.data_persistence import DataPersistence
-from model.semester import Semester
-
-if TYPE_CHECKING:
-    from main import App
+from controller import add_assignment, add_subject, delete_assignment, delete_subject, get_all_subjects, get_summary
+from controller.app_controller import AppController
+from model.enums import GradeType
 
 
-def safe_float(val):
+def safe_float(val) -> Optional[float]:
     """
     Safely converts a value to a float, or returns None for 'S'/'U' (non-marked assignments).
 
@@ -23,7 +18,7 @@ def safe_float(val):
     Returns:
         float or None: The converted float value, or None if the value is 'S' or 'U'.
     """
-    if isinstance(val, str) and val.strip().upper() in {"S", "U"}:
+    if isinstance(val, str) and val.strip().upper() in {GradeType.SATISFACTORY.value, GradeType.UNSATISFACTORY.value}:
         return None
     try:
         return float(val)
@@ -31,275 +26,350 @@ def safe_float(val):
         return None
 
 
-def render_main_page(app: "App"):
+def safe_display_value(val) -> str:
     """
-    Render the main page of the University Marks Manager application using Streamlit.
-    This function sets up the layout and user interface for managing university subjects,
-    assignments, and marks. It provides functionality for adding, deleting, and updating
-    subjects and assignments, as well as calculating exam marks and displaying data in a
-    tabular format.
+    Safely converts a value to a string for display, handling S/U grades properly.
+
     Args:
-        app (App): The main application object containing the semester data, persistence
-                   layer, and current subject/semester context.
-    Streamlit Components:
-        - Page Configuration: Sets the page title, layout, and icon.
-        - Subject Management:
-            - Add New Subject: Allows users to add a new subject with a code, name, and
-              optional synchronization.
-            - Delete Subject: Enables users to delete the currently selected subject.
-            - Set Total Mark: Allows users to set the total mark for a selected subject.
-        - Assignment Management:
-            - Add Assignment: Provides functionality to add a new assignment to a subject.
-            - Delete Assignment: Enables users to delete an assignment from a subject.
-            - Calculate Exam Mark: Calculates and displays the exam mark for a subject.
-        - Display Table: Displays a table of subjects and their assessments for the
-          selected semester and year.
-    Notes:
-        - The function uses Streamlit's layout components (e.g., columns, expanders) to
-          organize the UI.
-        - Users are advised to refresh the page after adding or deleting subjects or
-          assignments to see the updates in the displayed table.
-    Dependencies:
-        - Streamlit (st): Used for building the user interface.
-        - Semester: Represents the semester object containing subjects and assignments.
-        - DataPersistence: Handles data persistence for subjects and assignments.
-        - Helper functions (e.g., add_subject, delete_subject, set_total_mark, add_assignment,
-          delete_assignment, build_tables_per_subject) are used for performing specific
-          operations.
+        val: The value to be converted for display
+
+    Returns:
+        str: The display string
     """
-    st.set_page_config(page_title="University Marks Manager", layout="wide", page_icon="assets/app_icon.ico")
-    st.title("University Marks Manager (Streamlit Edition)")
+    if isinstance(val, str) and val.upper() in {GradeType.SATISFACTORY.value, GradeType.UNSATISFACTORY.value}:
+        return val.upper()
+    try:
+        return str(float(val))
+    except (ValueError, TypeError):
+        return ""
 
-    sem_obj: Semester = app.sem_obj
-    data_persistence: DataPersistence = app.data_persistence
-    subject_code: str | None = app.subject_code
-    year: str = app.year
-    semester: str | None = app.semester
 
-    col1, col2, col3 = st.columns(3)
+class StreamlitView:
+    """
+    Main Streamlit view class following MVC pattern.
+    Handles all UI rendering and user interactions.
+    """
 
-    # --- Subject Name Input ---
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        with st.expander("Add New Subject"):
-            new_code = st.text_input("Subject Code", key="add_subject_code")
-            new_name = st.text_input("Subject Name", key="add_subject_name")
-            sync_subject = st.checkbox("Sync Subject", key="add_sync_subject")
-            if st.button("Add Subject"):
-                success, message = add_subject(sem_obj, new_code, new_name, sync_subject)
-                if success:
-                    st.success(message)
-                else:
-                    st.warning(message)
-    with col2:
-        with st.expander("Delete Subject"):
-            if st.button("Delete Subject", key="delete_subject_btn"):
-                success, message = delete_subject(sem_obj, subject_code)
-                if success:
-                    st.success(message)
-                else:
-                    st.warning(message)
+    def __init__(self, controller: AppController):
+        self.controller = controller
 
-    with col3:
-        subject = sem_obj.subjects.get(subject_code) if subject_code else None
-        if subject_code:
-            with st.expander(f"Set Total Mark for {subject_code}"):
-                total_mark = st.number_input(
-                    "Total Mark", min_value=0.0, value=subject.total_mark if subject else 0.0, key="set_total_mark"
+    def render(self) -> None:
+        """Render the main application interface."""
+        st.title("University Marks Manager")
+
+        # Render navigation
+        self._render_navigation()
+
+        # Check if ready to render main content
+        if not self.controller.is_ready():
+            st.info("Please select year and semester to continue.")
+            return
+
+        # Render main content
+        self._render_main_content()
+
+    def _render_navigation(self) -> None:
+        """Render navigation controls."""
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            selected_year = st.selectbox(
+                "Select Year",
+                options=self.controller.available_years,
+                index=self.controller.available_years.index(self.controller.current_year),
+                key="year_select",
+            )
+            self.controller.set_year(selected_year)
+
+        with col2:
+            if self.controller.year:
+                selected_semester = st.selectbox(
+                    "Select Semester", options=self.controller.available_semesters, index=0, key="semester_select"
                 )
-                if st.button("Set Total Mark", key="set_total_mark_btn"):
-                    if subject is not None:
-                        success, message = set_total_mark(subject, total_mark, data_persistence)
-                    else:
-                        st.warning("No subject selected. Please select a valid subject.")
-                    if success:
-                        st.success(message)
-                    else:
-                        st.warning(message)
+                success = self.controller.set_semester(selected_semester)
+                if not success:
+                    st.error("Failed to set semester. Please try again.")
 
-    # --- Assignment Management ---
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if subject_code:
-            with st.expander(f"Add Assignment to {subject_code}"):
-                select_key = f"select_row_{subject_code}"
-                selected_idx = st.session_state.get(select_key, 0)
-                subject = sem_obj.subjects.get(subject_code)
-                assignments = subject.assignments if subject else []
-                if assignments and 0 <= selected_idx < len(assignments):
-                    selected_assignment = assignments[selected_idx]
-                    selected_data = {
-                        "assessment": selected_assignment.subject_assessment,
-                        "weighted_mark": safe_float(selected_assignment.weighted_mark),
-                        "mark_weight": safe_float(selected_assignment.mark_weight),
-                    }
-                else:
-                    selected_data = {"assessment": "", "weighted_mark": 0.0, "mark_weight": 0.0}
-
-                assessment = st.text_input(
-                    "Assessment Name",
-                    value=selected_data["assessment"],
-                    key=f"add_assessment_{subject_code}_{selected_idx}",
+        with col3:
+            if self.controller.available_subjects:
+                selected_subject = st.selectbox(
+                    "Select Subject", options=self.controller.available_subjects, key="subject_select"
                 )
-                weighted_mark = st.number_input(
+                # Store selected subject in session state for components
+                st.session_state["selected_subject"] = selected_subject
+
+    def _render_main_content(self) -> None:
+        """Render main application content."""
+        # Create tabs for different sections
+        tab1, tab2, tab3 = st.tabs(["📊 Overview", "➕ Manage", "📈 Analytics"])
+
+        with tab1:
+            self._render_overview_tab()
+
+        with tab2:
+            self._render_manage_tab()
+
+        with tab3:
+            self._render_analytics_tab()
+
+    def _render_overview_tab(self) -> None:
+        """Render overview tab with subject tables."""
+        # Validate controller state
+        if not self.controller.semester_obj or not self.controller.data_persistence:
+            st.error("Controller not properly initialized.")
+            return
+
+        subjects = get_all_subjects(self.controller.semester_obj, self.controller.data_persistence)
+
+        # Now sort all subject codes (current + synced)
+        for subject_code in sorted(subjects.keys()):
+            subject = subjects[subject_code]
+            st.subheader(
+                f"{subject.subject_name} ({subject_code})"
+                f"{' - Synced' if getattr(subject, 'sync_subject', False) else ''} "
+                f"in {self.controller.semester_obj.name} {self.controller.semester_obj.year}"
+            )
+
+            rows = []
+            for entry in subject.assignments:
+                rows.append(
+                    [
+                        entry.subject_assessment,
+                        entry.unweighted_mark,
+                        entry.weighted_mark,
+                        entry.mark_weight,
+                    ]
+                )
+
+            df = pd.DataFrame(
+                rows,
+                columns=[
+                    "Assessment",
+                    "Unweighted Mark",
                     "Weighted Mark",
-                    min_value=0.0,
-                    value=selected_data["weighted_mark"],
-                    key=f"add_weighted_mark_{subject_code}_{selected_idx}",
-                )
-                mark_weight = st.number_input(
                     "Mark Weight",
-                    min_value=0.0,
-                    value=selected_data["mark_weight"],
-                    key=f"add_mark_weight_{subject_code}_{selected_idx}",
+                ],
+            ).astype(str)
+
+            # --- Add radio buttons for row selection ---
+            select_key = f"select_row_{subject_code}"
+            if select_key not in st.session_state:
+                st.session_state[select_key] = 0  # Default to first row
+
+            selected_idx = (
+                st.radio(
+                    f"**Select an assignment for {subject_code}**",
+                    options=range(len(df)),
+                    format_func=lambda i: df.iloc[i]["Assessment"],
+                    key=select_key,
+                    index=st.session_state[select_key] if len(df) > 0 else None,
+                    horizontal=True,
+                    disabled=(len(df) == 0),
                 )
-                if st.button("Add Assignment", key=f"add_assignment_btn_{subject_code}_{selected_idx}"):
-                    success, message = add_assignment(sem_obj, subject_code, assessment, weighted_mark, mark_weight)
-                    if success:
-                        st.success(message)
-                    else:
-                        st.warning(message)
-
-    with col2:
-        if subject_code:
-            assessments = [a.subject_assessment for a in subject.assignments] if subject else []
-            with st.expander(f"Delete Assignment from {subject_code}"):
-                del_assessment = (
-                    st.selectbox("Select Assessment to Delete", assessments, key="del_assessment")
-                    if assessments
-                    else None
-                )
-                if st.button("Delete Assignment", key="del_assignment_btn") and del_assessment:
-                    success, message = delete_assignment(sem_obj, subject_code, del_assessment)
-                    if success:
-                        st.success(message)
-                    else:
-                        st.warning(message)
-
-    with col3:
-        if subject_code:
-            with st.expander(f"Calculate Exam Mark for {subject_code}"):
-                if st.button("Calculate Exam Mark", key="calc_exam_mark_btn"):
-                    exam_mark = sem_obj.calculate_exam_mark(subject_code)
-                    if exam_mark is not None:
-                        st.info(f"Exam mark for {subject_code}: {exam_mark}")
-                    else:
-                        st.warning("Could not calculate exam mark.")
-
-    # --- Display Table ---
-    st.header(f"Subjects and Assessments for {semester} {year}")
-    build_tables_per_subject(sem_obj, data_persistence)
-    st.caption("Tip: Refresh the page after adding or deleting subjects/assignments to see updates.")
-
-
-def build_tables_per_subject(sem_obj: Semester, data_persistence: DataPersistence):
-    """
-    Builds and displays tables for each subject in a given semester object.
-    This function retrieves all subjects associated with the given semester object,
-    sorts them by their subject codes, and displays their assignment details in
-    tabular format using Streamlit. It also allows users to select specific assignments
-    via radio buttons and stores the selected assignment details in the Streamlit
-    session state.
-    Args:
-        sem_obj (Semester): The semester object containing information about the semester
-                          (e.g., name, year).
-        data_persistence (DataPersistence): The data persistence layer used to retrieve subject
-                                   and assignment data.
-    Functionality:
-        - Retrieves all subjects for the given semester.
-        - Displays assignment details for each subject in a table.
-        - Allows users to select an assignment using radio buttons.
-        - Stores the selected assignment details in Streamlit session state.
-        - Displays a summary of total weighted marks, total weight, exam marks, and
-          total marks for each subject.
-    Session State Keys:
-        - `select_row_<subject_code>`: Stores the index of the selected assignment row
-          for each subject.
-        - `selected_assignment_<subject_code>`: Stores details of the selected assignment
-          for each subject, including assessment name, weighted mark, and mark weight.
-    Notes:
-        - If no assignments are available for a subject, the radio buttons and table
-          are disabled.
-        - The summary row is displayed as a markdown section below each subject's table.
-    Dependencies:
-        - Requires the `get_all_subjects`, `safe_float`, and `get_summary` helper functions.
-        - Uses the `pandas` library for creating and manipulating dataframes.
-        - Relies on the `streamlit` library for UI rendering.
-    """
-    subjects = get_all_subjects(sem_obj, data_persistence)
-
-    # Now sort all subject codes (current + synced)
-    for subject_code in sorted(subjects.keys()):
-        subject = subjects[subject_code]
-        st.subheader(
-            f"{subject.subject_name} ({subject_code})"
-            f"{' - Synced' if getattr(subject, 'sync_subject', False) else ''} "
-            f"in {sem_obj.name} {sem_obj.year}"
-        )
-        rows = []
-        for entry in subject.assignments:
-            rows.append(
-                [
-                    entry.subject_assessment,
-                    entry.unweighted_mark,
-                    entry.weighted_mark,
-                    entry.mark_weight,
-                ]
+                if len(df) > 0
+                else None
             )
-        df = pd.DataFrame(
-            rows,
-            columns=[
-                "Assessment",
-                "Unweighted Mark",
+
+            # Update session state if changed
+            if selected_idx is not None and st.session_state[select_key] != selected_idx:
+                st.session_state[select_key] = selected_idx
+
+            st.dataframe(df.reset_index(drop=True), use_container_width=True, key=f"summary_editor_{subject_code}")
+
+            # --- Store the selected assignment in session state ---
+            if selected_idx is not None and len(df) > 0:
+                selected_assignment = df.iloc[selected_idx]
+                st.session_state[f"selected_assignment_{subject_code}"] = {
+                    "assessment": selected_assignment["Assessment"],
+                    "weighted_mark": safe_float(selected_assignment["Weighted Mark"]),
+                    "mark_weight": safe_float(selected_assignment["Mark Weight"]),
+                }
+            else:
+                st.session_state[f"selected_assignment_{subject_code}"] = None
+
+            # Summary row (as a separate table or markdown)
+            total_weighted_mark, total_weight, exam_mark, exam_weight, total_mark = get_summary(subject)
+            st.markdown(
+                f"**Summary:**  "
+                f"Total Weighted: `{total_weighted_mark:.2f}` &nbsp; | &nbsp; "
+                f"Total Weight: `{total_weight:.0f}%` &nbsp; | &nbsp; "
+                f"Exam Mark: `{exam_mark:.2f}` &nbsp; | &nbsp; "
+                f"Exam Weight: `{exam_weight:.0f}%` &nbsp; | &nbsp; "
+                f"Total Mark: `{total_mark:.0f}`"
+            )
+            st.markdown("---")
+
+    def _render_manage_tab(self) -> None:
+        """Render management tab with forms."""
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("Add Subject")
+            self._render_add_subject_form()
+
+            st.subheader("Add Assignment")
+            self._render_add_assignment_form()
+
+        with col2:
+            st.subheader("Delete Subject")
+            self._render_delete_subject_form()
+
+            st.subheader("Delete Assignment")
+            self._render_delete_assignment_form()
+
+    def _render_analytics_tab(self) -> None:
+        """Render analytics tab with calculations."""
+        selected_subject = st.session_state.get("selected_subject")
+        if selected_subject:
+            self._render_exam_calculator(selected_subject)
+            self._render_grade_summary(selected_subject)
+
+    def _render_add_subject_form(self) -> None:
+        """Render add subject form."""
+        if not self.controller.semester_obj:
+            st.error("Semester not initialized.")
+            return
+
+        with st.form("add_subject_form"):
+            subject_code = st.text_input("Subject Code")
+            subject_name = st.text_input("Subject Name")
+            sync_subject = st.checkbox("Sync Subject")
+
+            if st.form_submit_button("Add Subject"):
+                if subject_code and subject_name:
+                    success, message = add_subject(
+                        self.controller.semester_obj, subject_code, subject_name, sync_subject
+                    )
+                    if success:
+                        st.success(message)
+                        st.rerun()
+                    else:
+                        st.warning(message)
+                else:
+                    st.error("Please fill in all fields")
+
+    def _render_delete_subject_form(self) -> None:
+        """Render delete subject form."""
+        subjects = self.controller.available_subjects
+        if subjects:
+            with st.form("delete_subject_form"):
+                subject_to_delete = st.selectbox("Select Subject to Delete", subjects)
+
+                if st.form_submit_button("Delete Subject", type="secondary"):
+                    if self.controller.semester_obj:
+                        success, message = delete_subject(self.controller.semester_obj, subject_to_delete)
+                        if success:
+                            st.success(message)
+                            st.rerun()
+                        else:
+                            st.warning(message)
+
+    def _render_add_assignment_form(self) -> None:
+        """Render add assignment form."""
+        subject_code = st.session_state.get("selected_subject")
+        if not subject_code:
+            st.info("Select a subject first")
+            return
+
+        if not self.controller.semester_obj:
+            st.error("Semester not initialized.")
+            return
+
+        with st.form(f"add_assignment_form_{subject_code}"):
+            assessment = st.text_input("Assessment Name")
+
+            # Use text input to allow S/U grades
+            weighted_mark_input = st.text_input(
                 "Weighted Mark",
-                "Mark Weight",
-            ],
-        ).astype(str)
-
-        # --- Add radio buttons for row selection ---
-        select_key = f"select_row_{subject_code}"
-        if select_key not in st.session_state:
-            st.session_state[select_key] = 0  # Default to first row
-
-        selected_idx = (
-            st.radio(
-                f"**Select an assignment for {subject_code}**",
-                options=range(len(df)),
-                format_func=lambda i: df.iloc[i]["Assessment"],
-                key=select_key,
-                index=st.session_state[select_key] if len(df) > 0 else None,
-                horizontal=True,  # if len(df) <= 5 else False,
-                disabled=(len(df) == 0),
+                placeholder=f"Enter number, '{GradeType.SATISFACTORY.value}', or '{GradeType.UNSATISFACTORY.value}'",
+                help=f"Enter a numeric value for graded assignments, or '{GradeType.SATISFACTORY.value}' for Satisfactory, '{GradeType.UNSATISFACTORY.value}' for Unsatisfactory",
             )
-            if len(df) > 0
-            else None
-        )
 
-        # Update session state if changed
-        if selected_idx is not None and st.session_state[select_key] != selected_idx:
-            st.session_state[select_key] = selected_idx
+            # Conditionally show mark weight input
+            mark_weight = None
+            if weighted_mark_input.upper() not in [GradeType.SATISFACTORY.value, GradeType.UNSATISFACTORY.value]:
+                mark_weight = st.number_input("Mark Weight", min_value=0.0, max_value=100.0)
+            else:
+                st.info(f"Mark weight is not applicable for {weighted_mark_input.upper()} grades")
 
-        st.dataframe(df.reset_index(drop=True), use_container_width=True, key=f"summary_editor_{subject_code}")
+            if st.form_submit_button("Add Assignment"):
+                if not assessment or not weighted_mark_input:
+                    st.error("Assessment name and weighted mark are required")
+                    return
 
-        # --- Store the selected assignment in session state ---
-        if selected_idx is not None and len(df) > 0:
-            selected_assignment = df.iloc[selected_idx]
-            st.session_state[f"selected_assignment_{subject_code}"] = {
-                "assessment": selected_assignment["Assessment"],
-                "weighted_mark": safe_float(selected_assignment["Weighted Mark"]),
-                "mark_weight": safe_float(selected_assignment["Mark Weight"]),
-            }
-        else:
-            st.session_state[f"selected_assignment_{subject_code}"] = None
+                success, message = add_assignment(
+                    self.controller.semester_obj, subject_code, assessment, weighted_mark_input, mark_weight
+                )
+                if success:
+                    st.success(message)
+                    st.rerun()
+                else:
+                    st.warning(message)
 
-        # Summary row (as a separate table or markdown)
-        total_weighted_mark, total_weight, exam_mark, exam_weight, total_mark = get_summary(subject)
-        st.markdown(
-            f"**Summary:**  "
-            f"Total Weighted: `{total_weighted_mark:.2f}` &nbsp; | &nbsp; "
-            f"Total Weight: `{total_weight:.0f}%` &nbsp; | &nbsp; "
-            f"Exam Mark: `{exam_mark:.2f}` &nbsp; | &nbsp; "
-            f"Exam Weight: `{exam_weight:.0f}%` &nbsp; | &nbsp; "
-            f"Total Mark: `{total_mark:.0f}`"
-        )
-        st.markdown("---")
+    def _render_delete_assignment_form(self) -> None:
+        """Render delete assignment form."""
+        subject_code = st.session_state.get("selected_subject")
+        if not subject_code:
+            st.info("Select a subject first")
+            return
+
+        if not self.controller.semester_obj:
+            st.error("Semester not initialized.")
+            return
+
+        subject = self.controller.semester_obj.subjects.get(subject_code)
+        if not subject or not subject.assignments:
+            st.info("No assignments to delete.")
+            return
+
+        assessments = [a.subject_assessment for a in subject.assignments]
+
+        with st.form(f"delete_assignment_form_{subject_code}"):
+            del_assessment = st.selectbox("Select Assessment to Delete", assessments)
+
+            if st.form_submit_button("Delete Assignment", type="secondary"):
+                success, message = delete_assignment(self.controller.semester_obj, subject_code, del_assessment)
+                if success:
+                    st.success(message)
+                    st.rerun()
+                else:
+                    st.warning(message)
+
+    def _render_exam_calculator(self, subject_code: str) -> None:
+        """Render exam mark calculator."""
+        if not self.controller.semester_obj:
+            st.error("Semester not initialized.")
+            return
+
+        st.subheader(f"Exam Calculator for {subject_code}")
+
+        if st.button("Calculate Required Exam Mark"):
+            required_mark = self.controller.semester_obj.calculate_exam_mark(subject_code)
+            if required_mark is not None:
+                st.success(f"Required exam mark: {required_mark}%")
+            else:
+                st.warning("Cannot calculate exam mark. Check target total and exam weight.")
+
+    def _render_grade_summary(self, subject_code: str) -> None:
+        """Render grade summary for subject."""
+        if not self.controller.semester_obj:
+            return
+
+        subject = self.controller.semester_obj.subjects.get(subject_code)
+        if not subject:
+            return
+
+        st.subheader(f"Grade Summary for {subject_code}")
+
+        # Count different grade types
+        numeric_assignments = len([a for a in subject.assignments if a.grade_type == GradeType.NUMERIC])
+        satisfactory_assignments = len([a for a in subject.assignments if a.grade_type == GradeType.SATISFACTORY])
+        unsatisfactory_assignments = len([a for a in subject.assignments if a.grade_type == GradeType.UNSATISFACTORY])
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Numeric Assignments", numeric_assignments)
+        with col2:
+            st.metric("Satisfactory Assignments", satisfactory_assignments)
+        with col3:
+            st.metric("Unsatisfactory Assignments", unsatisfactory_assignments)
