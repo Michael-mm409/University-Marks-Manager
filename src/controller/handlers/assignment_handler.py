@@ -69,6 +69,85 @@ class AssignmentHandler:
         except Exception as e:
             return False, f"Failed to delete assignment: {str(e)}"
 
+    def modify_assignment(
+        self,
+        subject_code: str,
+        old_assessment: str,
+        new_assessment: str,
+        new_weighted_mark: Union[float, str],
+        new_mark_weight: Optional[float],
+    ) -> Tuple[bool, str]:
+        """
+        Modify an existing assignment.
+
+        Args:
+            subject_code: The subject code
+            old_assessment: Current assessment name
+            new_assessment: New assessment name
+            new_weighted_mark: New weighted mark (numeric or S/U)
+            new_mark_weight: New weight of the assignment
+
+        Returns:
+            Tuple of (success, message)
+        """
+        if not new_assessment:
+            return False, "Assessment name cannot be empty."
+
+        subject = self.semester.subjects.get(subject_code)
+        if not subject:
+            return False, "Subject not found."
+
+        # Find the assignment to modify
+        assignment_to_modify = None
+        for assignment in subject.assignments:
+            if assignment.subject_assessment == old_assessment:
+                assignment_to_modify = assignment
+                break
+
+        if not assignment_to_modify:
+            return False, f"Assignment '{old_assessment}' not found."
+
+        # Check if new name conflicts with existing assignments (excluding current one)
+        if new_assessment != old_assessment:
+            for assignment in subject.assignments:
+                if assignment.subject_assessment == new_assessment:
+                    return False, f"Assignment '{new_assessment}' already exists."
+
+        # Determine grade type and handle S/U grades
+        if isinstance(new_weighted_mark, str) and new_weighted_mark.upper() in ["S", "U"]:
+            from model.enums import GradeType
+
+            grade_type = GradeType.SATISFACTORY if new_weighted_mark.upper() == "S" else GradeType.UNSATISFACTORY
+            unweighted_mark = None
+            final_mark_weight = None
+        else:
+            try:
+                new_weighted_mark = float(new_weighted_mark)
+                from model.enums import GradeType
+
+                grade_type = GradeType.NUMERIC
+                unweighted_mark = (
+                    round(new_weighted_mark / new_mark_weight, 4) if new_mark_weight and new_mark_weight > 0 else 0
+                )
+                final_mark_weight = new_mark_weight
+            except (ValueError, TypeError):
+                return False, "Invalid weighted mark value."
+
+        # Update the assignment
+        assignment_to_modify.subject_assessment = new_assessment
+        assignment_to_modify.weighted_mark = new_weighted_mark
+        assignment_to_modify.unweighted_mark = unweighted_mark
+        assignment_to_modify.mark_weight = final_mark_weight
+        assignment_to_modify.grade_type = grade_type
+
+        # Save changes
+        self.semester.data_persistence.data[self.semester.name] = {
+            code: subj for code, subj in self.semester.subjects.items()
+        }
+        self.semester.data_persistence.save_data(self.semester.data_persistence.data)
+
+        return True, f"Modified assignment '{old_assessment}' → '{new_assessment}' in {subject_code}."
+
 
 # Backward compatibility functions
 def add_assignment(
@@ -87,3 +166,16 @@ def delete_assignment(sem_obj: Semester, subject_code: str, assessment: str) -> 
     """Backward compatibility wrapper."""
     handler = AssignmentHandler(sem_obj)
     return handler.delete_assignment(subject_code, assessment)
+
+
+def modify_assignment(
+    sem_obj: Semester,
+    subject_code: str,
+    old_assessment: str,
+    new_assessment: str,
+    new_weighted_mark: Union[float, str],
+    new_mark_weight: Optional[float],
+) -> Tuple[bool, str]:
+    """Backward compatibility wrapper."""
+    handler = AssignmentHandler(sem_obj)
+    return handler.modify_assignment(subject_code, old_assessment, new_assessment, new_weighted_mark, new_mark_weight)
