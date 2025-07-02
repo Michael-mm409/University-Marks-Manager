@@ -1,0 +1,7 @@
+# .streamlit/config.toml
+[server]
+fileWatcherType = "poll"
+runOnSave = true
+
+[global]
+suppressDeprecationWarnings = true

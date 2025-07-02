@@ -219,6 +219,9 @@ class StreamlitView:
             st.subheader("Delete Assignment")
             self._render_delete_assignment_form()
 
+            st.subheader("Set Total Marks")
+            self._render_set_total_mark_form()
+
     def _render_analytics_tab(self) -> None:
         """Render analytics tab with calculations."""
         selected_subject = st.session_state.get("selected_subject")
@@ -338,19 +341,46 @@ class StreamlitView:
                     st.warning(message)
 
     def _render_exam_calculator(self, subject_code: str) -> None:
-        """Render exam mark calculator."""
+        """Simple exam mark calculator that calculates from total mark."""
         if not self.controller.semester_obj:
             st.error("Semester not initialized.")
             return
 
         st.subheader(f"Exam Calculator for {subject_code}")
 
-        if st.button("Calculate Required Exam Mark"):
-            required_mark = self.controller.semester_obj.calculate_exam_mark(subject_code)
-            if required_mark is not None:
-                st.success(f"Required exam mark: {required_mark}%")
+        subject = self.controller.semester_obj.subjects.get(subject_code)
+        if not subject:
+            st.error("Subject not found.")
+            return
+
+        # Show current summary
+        assignment_total = sum(
+            a.weighted_mark for a in subject.assignments if isinstance(a.weighted_mark, (float, int))
+        )
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Mark", f"{subject.total_mark:.1f}")
+        with col2:
+            st.metric("Assignment Total", f"{assignment_total:.1f}")
+        with col3:
+            # Simple calculation for display
+            calculated_exam = subject.total_mark - assignment_total
+            st.metric("Calculated Exam", f"{calculated_exam:.1f}")
+
+        # Show the simple formula
+        st.info(
+            f"**Formula:** Exam Mark = Total Mark - Assignment Total = {subject.total_mark} - {assignment_total} = {calculated_exam:.1f}"
+        )
+
+        # Calculate and save button
+        if st.button("Calculate & Save Exam Mark", type="primary"):
+            calculated_mark = self.controller.semester_obj.calculate_exam_mark(subject_code)
+            if calculated_mark is not None:
+                st.success(f"Exam mark saved: {calculated_mark:.2f}")
+                st.rerun()
             else:
-                st.warning("Cannot calculate exam mark. Check target total and exam weight.")
+                st.error("Cannot calculate exam mark.")
 
     def _render_grade_summary(self, subject_code: str) -> None:
         """Render grade summary for subject."""
@@ -375,3 +405,41 @@ class StreamlitView:
             st.metric("Satisfactory Assignments", satisfactory_assignments)
         with col3:
             st.metric("Unsatisfactory Assignments", unsatisfactory_assignments)
+
+    def _render_set_total_mark_form(self) -> None:
+        """Render set total mark form."""
+        subject_code = st.session_state.get("selected_subject")
+        if not subject_code:
+            return
+
+        if not self.controller.semester_obj or not self.controller.data_persistence:
+            st.error("Controller not properly initialized.")
+            return
+
+        subject = self.controller.semester_obj.subjects.get(subject_code)
+        if not subject:
+            return
+
+        with st.form(f"set_total_mark_compact_{subject_code}"):
+            col1, col2 = st.columns([3, 1])
+
+            with col1:
+                new_total_mark = st.number_input(
+                    f"Total Mark for {subject_code}",
+                    min_value=0.0,
+                    max_value=100.0,
+                    value=float(subject.total_mark),
+                    step=0.01,
+                    help=f"Current: {subject.total_mark}",
+                )
+
+            with col2:
+                if st.form_submit_button("Update", type="secondary"):
+                    from controller import set_total_mark
+
+                    success, message = set_total_mark(subject, new_total_mark, self.controller.data_persistence)
+                    if success:
+                        st.success(message)
+                        st.rerun()
+                    else:
+                        st.error(message)
