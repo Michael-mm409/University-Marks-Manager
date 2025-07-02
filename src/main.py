@@ -4,6 +4,7 @@ from typing import List
 import streamlit as st
 
 from model.data_persistence import DataPersistence
+from model.enums import SemesterName
 from model.semester import Semester
 from view.streamlit_views import render_main_page
 
@@ -41,7 +42,9 @@ class App:
 
         # Data persistence for selected year
         self.data_persistence: DataPersistence = DataPersistence(self.year)
-        self.semester_names: List[str] = list(self.data_persistence.data.keys()) or ["Autumn", "Spring", "Annual"]
+        self.semester_names: List[str] = list(self.data_persistence.data.keys()) or [
+            semester.value for semester in SemesterName
+        ]
 
         with col2:
             # Semester selection

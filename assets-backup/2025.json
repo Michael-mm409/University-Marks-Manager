@@ -1,0 +1,262 @@
+{
+    "Autumn": {
+        "CSCI323": {
+            "subject_code": "CSCI323",
+            "subject_name": "Modern Artificial Intelligence",
+            "assignments": [
+                {
+                    "subject_assessment": "Quiz 1",
+                    "weighted_mark": 4.0,
+                    "unweighted_mark": 0.8,
+                    "mark_weight": 5.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Quiz 2",
+                    "weighted_mark": 3.0,
+                    "unweighted_mark": 0.6,
+                    "mark_weight": 5.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Assignment",
+                    "weighted_mark": 14.5005,
+                    "unweighted_mark": 0.9667,
+                    "mark_weight": 15.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Group Project - Presentation",
+                    "weighted_mark": 4.5,
+                    "unweighted_mark": 0.72,
+                    "mark_weight": 6.25,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Group Project - Report",
+                    "weighted_mark": 13.5,
+                    "unweighted_mark": 0.72,
+                    "mark_weight": 18.75,
+                    "grade_type": "numeric"
+                }
+            ],
+            "total_mark": 0.0,
+            "examinations": {
+                "exam_mark": 0,
+                "exam_weight": 50.0
+            },
+            "sync_subject": false
+        },
+        "CSIT375": {
+            "subject_code": "CSIT375",
+            "subject_name": "Artificial Intelligence for Cybersecurity",
+            "assignments": [
+                {
+                    "subject_assessment": "Lab Test 1",
+                    "weighted_mark": 3.5,
+                    "unweighted_mark": 0.7,
+                    "mark_weight": 5.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Lab Test 2",
+                    "weighted_mark": 5.5,
+                    "unweighted_mark": 0.55,
+                    "mark_weight": 10.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Assignment 1",
+                    "weighted_mark": 14.0,
+                    "unweighted_mark": 0.9333,
+                    "mark_weight": 15.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Assignment 2",
+                    "weighted_mark": 13.0,
+                    "unweighted_mark": 0.65,
+                    "mark_weight": 20.0,
+                    "grade_type": "numeric"
+                }
+            ],
+            "total_mark": 0.0,
+            "examinations": {
+                "exam_mark": 0,
+                "exam_weight": 50.0
+            },
+            "sync_subject": false
+        },
+        "CSCI316": {
+            "subject_code": "CSCI316",
+            "subject_name": "Big Data Mining Techniques and Implementation",
+            "assignments": [
+                {
+                    "subject_assessment": "Quiz 1",
+                    "weighted_mark": 4.5,
+                    "unweighted_mark": 0.9,
+                    "mark_weight": 5.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Quiz 2",
+                    "weighted_mark": 9.5,
+                    "unweighted_mark": 0.95,
+                    "mark_weight": 10.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Assignment 1",
+                    "weighted_mark": 11.34,
+                    "unweighted_mark": 0.756,
+                    "mark_weight": 15.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Group Project",
+                    "weighted_mark": 18.6,
+                    "unweighted_mark": 0.744,
+                    "mark_weight": 25.0,
+                    "grade_type": "numeric"
+                }
+            ],
+            "total_mark": 0.0,
+            "examinations": {
+                "exam_mark": 0.0,
+                "exam_weight": 100.0
+            },
+            "sync_subject": false
+        }
+    },
+    "Spring": {
+        "ISIT312": {
+            "subject_code": "ISIT312",
+            "subject_name": "Big Data Management",
+            "assignments": [
+                {
+                    "subject_assessment": "Assignment 1",
+                    "weighted_mark": 0.0,
+                    "unweighted_mark": 0.0,
+                    "mark_weight": 10.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Assignment 2",
+                    "weighted_mark": 0.0,
+                    "unweighted_mark": 0.0,
+                    "mark_weight": 20.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Assignment 3",
+                    "weighted_mark": 0.0,
+                    "unweighted_mark": 0.0,
+                    "mark_weight": 20.0,
+                    "grade_type": "numeric"
+                }
+            ],
+            "examinations": {
+                "exam_mark": 0.0,
+                "exam_weight": 100.0
+            },
+            "sync_subject": false,
+            "total_mark": 0.0
+        },
+        "CSCI369": {
+            "subject_code": "CSCI369",
+            "subject_name": "Ethical Hacking",
+            "assignments": [
+                {
+                    "subject_assessment": "Lab Assessment 1",
+                    "weighted_mark": 0.0,
+                    "unweighted_mark": 0.0,
+                    "mark_weight": 6.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Lab Assessment 2",
+                    "weighted_mark": 0.0,
+                    "unweighted_mark": 0.0,
+                    "mark_weight": 7.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Lab Assessment 3",
+                    "weighted_mark": 0.0,
+                    "unweighted_mark": 0.0,
+                    "mark_weight": 7.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Assignment",
+                    "weighted_mark": 0.0,
+                    "unweighted_mark": 0.0,
+                    "mark_weight": 30.0,
+                    "grade_type": "numeric"
+                }
+            ],
+            "examinations": {
+                "exam_mark": 0.0,
+                "exam_weight": 100.0
+            },
+            "sync_subject": false,
+            "total_mark": 0.0
+        }
+    },
+    "Annual": {
+        "CSIT321": {
+            "subject_code": "CSIT321",
+            "subject_name": "Capstone Project",
+            "assignments": [
+                {
+                    "subject_assessment": "Initial Project Description",
+                    "weighted_mark": "S",
+                    "unweighted_mark": null,
+                    "mark_weight": null,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Design Progress",
+                    "weighted_mark": 10.8,
+                    "unweighted_mark": 0.72,
+                    "mark_weight": 15.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Project Requirements and Interface Presentation",
+                    "weighted_mark": 0.0,
+                    "unweighted_mark": 0.0,
+                    "mark_weight": 10.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Prototype Presentation",
+                    "weighted_mark": 0.0,
+                    "unweighted_mark": 0.0,
+                    "mark_weight": 15.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Final Product & Documentation",
+                    "weighted_mark": 0.0,
+                    "unweighted_mark": 0.0,
+                    "mark_weight": 45.0,
+                    "grade_type": "numeric"
+                },
+                {
+                    "subject_assessment": "Marketing & Technical Presentation",
+                    "weighted_mark": 0.0,
+                    "unweighted_mark": 0.0,
+                    "mark_weight": 15.0,
+                    "grade_type": "numeric"
+                }
+            ],
+            "examinations": {
+                "exam_mark": 0.0,
+                "exam_weight": 100.0
+            },
+            "sync_subject": true,
+            "total_mark": 0.0
+        }
+    }
+}
