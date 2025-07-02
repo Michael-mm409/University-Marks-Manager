@@ -4,11 +4,11 @@ This module provides classes for data persistence in the University Marks Manage
 
 import json
 import os
-from dataclasses import asdict, is_dataclass
 from typing import Dict
 
 import streamlit as st  # <-- Use Streamlit for feedback
 
+from model.enums import DataKeys
 from model.models import Assignment, Examination, Subject
 
 
@@ -41,37 +41,56 @@ class DataPersistence:
                 for sem_name, subjects in raw_data.items():
                     data[sem_name] = {}
                     for subj_code, subj_dict in subjects.items():
-                        assignments = [
-                            Assignment(
-                                subject_assessment=assignment_record.get("subject_assessment")
-                                or assignment_record.get("Subject Assessment")
-                                or "",
-                                unweighted_mark=assignment_record.get(
-                                    "unweighted_mark", assignment_record.get("Unweighted Mark", 0.0)
+                        assignment_list = []
+                        assignment_records = subj_dict.get(
+                            DataKeys.ASSIGNMENTS.value, subj_dict.get(DataKeys.ASSIGNMENTS_LEGACY.value, [])
+                        )
+                        for assignment_record in assignment_records:
+                            assignment = Assignment(
+                                subject_assessment=assignment_record.get(
+                                    DataKeys.SUBJECT_ASSESSMENT.value,
+                                    assignment_record.get(DataKeys.SUBJECT_ASSESSMENT_LEGACY.value, ""),
                                 ),
                                 weighted_mark=assignment_record.get(
-                                    "weighted_mark", assignment_record.get("Weighted Mark", 0.0)
+                                    DataKeys.WEIGHTED_MARK.value,
+                                    assignment_record.get(DataKeys.WEIGHTED_MARK_LEGACY.value, 0.0),
+                                ),
+                                unweighted_mark=assignment_record.get(
+                                    DataKeys.UNWEIGHTED_MARK.value,
+                                    assignment_record.get(DataKeys.UNWEIGHTED_MARK_LEGACY.value, None),
                                 ),
                                 mark_weight=assignment_record.get(
-                                    "mark_weight", assignment_record.get("Mark Weight", 0.0)
+                                    DataKeys.MARK_WEIGHT.value,
+                                    assignment_record.get(DataKeys.MARK_WEIGHT_LEGACY.value, None),
                                 ),
+                                grade_type=assignment_record.get("grade_type", "numeric"),
                             )
-                            for assignment_record in subj_dict.get("assignments", subj_dict.get("Assignments", []))
-                        ]
-                        examinations_dict = subj_dict.get("examinations") or subj_dict.get("Examinations", {})
+                            assignment_list.append(assignment)
+
+                        # Load examinations
+                        examinations_dict = subj_dict.get(DataKeys.EXAMINATIONS) or subj_dict.get(
+                            DataKeys.EXAMINATIONS_LEGACY, {}
+                        )
                         examinations = Examination(
-                            exam_mark=examinations_dict.get("exam_mark", examinations_dict.get("Exam Mark", 0.0)),
+                            exam_mark=examinations_dict.get(
+                                DataKeys.EXAM_MARK, examinations_dict.get(DataKeys.EXAM_MARK_LEGACY, 0.0)
+                            ),
                             exam_weight=examinations_dict.get(
-                                "exam_weight", examinations_dict.get("Exam Weight", 100.0)
+                                DataKeys.EXAM_WEIGHT, examinations_dict.get(DataKeys.EXAM_WEIGHT_LEGACY, 100.0)
                             ),
                         )
                         data[sem_name][subj_code] = Subject(
                             subject_code=subj_code,
-                            subject_name=subj_dict.get("subject_name") or subj_dict.get("Subject Name") or "N/A",
-                            assignments=assignments,
-                            total_mark=subj_dict.get("total_mark", subj_dict.get("Total Mark", 0.0)),
+                            subject_name=subj_dict.get(DataKeys.SUBJECT_NAME.value)
+                            or subj_dict.get(DataKeys.SUBJECT_NAME_LEGACY, "N/A"),
+                            assignments=assignment_list,
+                            total_mark=subj_dict.get(
+                                DataKeys.TOTAL_MARK.value, subj_dict.get(DataKeys.TOTAL_MARK_LEGACY.value, 0.0)
+                            ),
                             examinations=examinations,
-                            sync_subject=subj_dict.get("sync_subject", subj_dict.get("Sync Subject", False)),
+                            sync_subject=subj_dict.get(
+                                DataKeys.SYNC_SUBJECT.value, subj_dict.get(DataKeys.SYNC_SUBJECT_LEGACY.value, False)
+                            ),
                         )
                 return data
         else:
@@ -88,9 +107,7 @@ class DataPersistence:
             for sem_name, subjects in semesters.items():
                 if isinstance(subjects, dict):
                     serializable_data[sem_name] = {
-                        subj_code: asdict(subject)
-                        if is_dataclass(subject) and not isinstance(subject, type)
-                        else subject
+                        subj_code: subject.model_dump()  # Changed from asdict() to model_dump()
                         for subj_code, subject in subjects.items()
                     }
                 else:

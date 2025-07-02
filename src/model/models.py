@@ -1,9 +1,11 @@
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Optional, Union
+
+from pydantic import BaseModel, Field, field_validator
+
+from model.enums import GradeType
 
 
-@dataclass
-class Assignment:
+class Assignment(BaseModel):
     """
     Represents an assignment with its associated marks and weight.
     Attributes:
@@ -16,8 +18,27 @@ class Assignment:
     subject_assessment: str
     weighted_mark: Union[float, str] = 0.0  # float for numeric, str for "S"/"U"
     unweighted_mark: Optional[float] = None
-    mark_weight: Optional[float] = None
-    grade_type: Literal["numeric", "S", "U"] = "numeric"
+    mark_weight: Optional[float] = Field(default=None, ge=0.0, le=100.0)  # 0 - 100%
+    grade_type: GradeType = GradeType.NUMERIC
+
+    @field_validator("weighted_mark")
+    @classmethod
+    def validate_mark_weight(cls, value: Union[float, str]) -> Union[float, str]:
+        """
+        Validates the weighted mark to ensure it is either a float or a string.
+        If the value is a string, it should be either "S" or "U".
+        Args:
+            value (Union[float, str]): The weighted mark to validate.
+        Returns:
+            Union[float, str]: The validated weighted mark.
+        Raises:
+            ValueError: If the value is not a float or not one of the allowed strings.
+        """
+        if isinstance(value, str) and value not in [GradeType.SATISFACTORY, GradeType.UNSATISFACTORY]:
+            raise ValueError(
+                f"Weighted mark must be '{GradeType.SATISFACTORY}', '{GradeType.UNSATISFACTORY}', or a numeric value."
+            )
+        return value
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -40,8 +61,7 @@ class Assignment:
         }
 
 
-@dataclass
-class Examination:
+class Examination(BaseModel):
     """
     Represents an examination with a mark and weight.
     Args:
@@ -49,8 +69,8 @@ class Examination:
         exam_weight (float): The weight of the examination in percentage. Defaults to 100.0.
     """
 
-    exam_mark: float = 0.0
-    exam_weight: float = 100.0
+    exam_mark: float = Field(default=0.0, ge=0.0, le=100.0)  # 0 - 100%
+    exam_weight: float = Field(default=100.0, ge=0.0, le=100.0)  # 0 - 100%
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -66,8 +86,7 @@ class Examination:
         }
 
 
-@dataclass
-class Subject:
+class Subject(BaseModel):
     """
     Subject class represents an academic subject with its associated details.
     Attributes:
@@ -81,10 +100,10 @@ class Subject:
 
     subject_code: str
     subject_name: str
-    assignments: List[Assignment] = field(default_factory=list)
-    examinations: Examination = field(default_factory=Examination)
+    assignments: List[Assignment] = Field(default_factory=list)
+    examinations: Examination = Field(default_factory=Examination)
     sync_subject: bool = False
-    total_mark: float = 0.0
+    total_mark: float = Field(default=0.0, ge=0.0, le=100.0)  # 0 - 100%
 
     def to_dict(self) -> Dict[str, Any]:
         """
