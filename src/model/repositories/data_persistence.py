@@ -17,7 +17,24 @@ from ..enums.grade_types import GradeType
 
 class DataPersistence:
     """
-    DataPersistence is a class responsible for managing the persistence of university marks data.
+    The `DataPersistence` class is responsible for managing the loading and saving of semester data
+    to and from JSON files. It provides methods to deserialize JSON data into structured Python objects
+    and serialize Python objects back into JSON format.
+
+    Args:
+        year (str): The academic year for which the data is being managed.
+        file_path (str): The file path to the JSON file where the data is stored.
+        data (Dict[str, Dict[str, Subject]]): A dictionary containing the loaded semester data.
+
+    Methods:
+        __init__(year: str):
+            Initializes the `DataPersistence` instance with the specified academic year.
+        _get_field_value(record: Dict[str, Any], current_key: DataKeys, legacy_key: DataKeys, default: Any = None) -> Any:
+            Helper method to retrieve a field value from a record, with a fallback to a legacy key if the current key is not found.
+        load_data() -> Dict[str, Dict[str, Subject]]:
+            Loads data from the JSON file specified by `file_path` and converts it into a structured dictionary of `Subject` objects.
+        save_data(semesters: Dict[str, Dict[str, Subject]]) -> None:
+            Saves the provided semester data to the JSON file specified by `file_path`.
     """
 
     def __init__(self, year: str):
@@ -28,13 +45,45 @@ class DataPersistence:
     def _get_field_value(
         self, record: Dict[str, Any], current_key: DataKeys, legacy_key: DataKeys, default: Any = None
     ) -> Any:
-        """Helper to get field value with fallback to legacy key."""
+        """
+        Retrieves the value of a specified field from a record dictionary, checking both
+        a current key and a legacy key, and returning a default value if neither key exists.
+        Args:
+            record (Dict[str, Any]): The dictionary containing the data record.
+            current_key (DataKeys): The primary key to look for in the record.
+            legacy_key (DataKeys): The fallback key to look for if the primary key is not found.
+            default (Any, optional): The value to return if neither key is found. Defaults to None.
+        Returns:
+            Any: The value associated with the current key or legacy key, or the default value
+            if neither key exists in the record.
+        """
+
         return record.get(current_key.value, record.get(legacy_key.value, default))
 
     def load_data(self) -> Dict[str, Dict[str, Subject]]:
         """
-        Load data from a JSON file and convert it into a structured dictionary of Subject objects.
+        Loads data from a JSON file and deserializes it into a nested dictionary structure.
+        The method reads the file specified by `self.file_path` and parses its contents
+        into a dictionary where the keys are semester names and the values are dictionaries
+        of subjects. Each subject contains its associated assignments, examinations, and
+        other metadata.
+
+        Returns:
+            Dict[str, Dict[str, Subject]]: A dictionary where:
+                - The outer keys are semester names (e.g., "Spring 2023").
+                - The inner keys are subject codes (e.g., "CSCI123").
+                - The values are `Subject` objects containing detailed information about
+                  the subject, including assignments, examinations, and marks.
+
+        Notes:
+            - If the file does not exist, an empty dictionary is returned.
+            - Legacy keys are supported for backward compatibility.
+            - Invalid `GradeType` values default to `GradeType.NUMERIC`.
+
+        Raises:
+            ValueError: If the JSON file contains invalid data that cannot be parsed.
         """
+
         if os.path.exists(self.file_path):
             with open(self.file_path, "r") as file:
                 raw_data: Dict[str, Dict[str, Any]] = json.load(file)
@@ -114,8 +163,24 @@ class DataPersistence:
 
     def save_data(self, semesters: Dict[str, Dict[str, Subject]]) -> None:
         """
-        Saves semester data to a JSON file at the specified file path.
+        Saves the provided semester data to a JSON file. This method serializes the semester data, ensuring that each subject's data is converted into a serializable format using the `model_dump` method. The serialized data is then written to a file specified by `self.file_path`.
+
+        Args:
+            semesters (Dict[str, Dict[str, Subject]]): A dictionary where the keys
+                are semester names and the values are dictionaries of subjects. Each
+                subject dictionary maps subject codes to `Subject` objects.
+
+        Raises:
+            IOError: If there is an issue creating directories or writing to the file.
+            json.JSONDecodeError: If there is an error during JSON serialization.
+
+        Notes:
+            - If a semester does not contain a dictionary of subjects, it will be
+            skipped, and a warning will be displayed using `st.warning`.
+            - Any errors encountered during the save process will be displayed using
+            `st.error`.
         """
+
         try:
             os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
             serializable_data: Dict[str, Dict[str, Any]] = {}

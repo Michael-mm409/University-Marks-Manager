@@ -6,11 +6,29 @@ from model import Assignment, Subject
 
 
 class AnalyticsService:
-    """Service for performing analytics calculations."""
+    """
+    AnalyticsService provides a collection of static methods to perform various analytical calculations related to assignments, exams, and grades.
+
+    Methods:
+        calculate_assignment_total(assignments: List[Assignment]) -> float: Calculate the total marks for a list of assignments, considering their weighted marks.
+        calculate_weight_total(assignments: List[Assignment]) -> float: Calculate the total weight of a list of assignments.
+        get_exam_mark(subject: Subject) -> Optional[float]: Retrieve the exam mark for a given subject, if available.
+        detect_marking_scale(marks: List[float]) -> Tuple[float, float]: Detect the marking scale based on the provided marks and return the maximum mark and the scale factor.
+        calculate_grade_distribution(marks: List[float], scale_factor: float = 1.0) -> Dict[str, int]: Calculate the grade distribution (HD, D, C, P, F) based on the provided marks and an optional scale factor.
+        calculate_exam_requirements(subject: Subject) -> Dict[str, float]: Calculate the exam mark requirements for a subject based on the total mark and assignment marks, and determine if the required exam mark is achievable.
+    """
 
     @staticmethod
     def calculate_assignment_total(assignments: List[Assignment]) -> float:
-        """Calculate total assignment marks."""
+        """
+        Calculates the total weighted marks for a list of assignments. This function iterates through a list of Assignment objects, checks if each assignment has a valid `weighted_mark`, and sums up the valid marks. If a `weighted_mark` is not valid (e.g., None, or cannot be converted to a float), it is ignored.
+
+        Args:
+            assignments (List[Assignment]): A list of Assignment objects, where each object may have a `weighted_mark` attribute.
+        Returns:
+            float: The total sum of valid weighted marks from the assignments.
+        """
+
         total = 0.0
         for assignment in assignments:
             if assignment.weighted_mark is not None:
@@ -22,7 +40,15 @@ class AnalyticsService:
 
     @staticmethod
     def calculate_weight_total(assignments: List[Assignment]) -> float:
-        """Calculate total assignment weights."""
+        """
+        Calculates the total weight of a list of assignments. This function iterates through a list of Assignment objects and sums up the `mark_weight` attribute of each assignment, provided it is not None and can be converted to a float. If a `mark_weight` is invalid (e.g., cannot be converted to a float), it is ignored.
+
+        Args:
+            assignments (List[Assignment]): A list of Assignment objects, each potentially containing a `mark_weight` attribute.
+        Returns:
+            float: The total weight of all valid `mark_weight` values in the assignments list.
+        """
+
         total = 0.0
         for assignment in assignments:
             if assignment.mark_weight is not None:
@@ -34,7 +60,14 @@ class AnalyticsService:
 
     @staticmethod
     def get_exam_mark(subject: Subject) -> Optional[float]:
-        """Get exam mark if available."""
+        """
+        Retrieves the exam mark for a given subject if it exists.
+        Args:
+            subject (Subject): The subject object containing examination details.
+        Returns:
+            Optional[float]: The exam mark if it exists, otherwise None.
+        """
+
         if hasattr(subject, "examinations") and subject.examinations:
             if hasattr(subject.examinations, "exam_mark"):
                 return subject.examinations.exam_mark
@@ -42,7 +75,20 @@ class AnalyticsService:
 
     @staticmethod
     def detect_marking_scale(marks: List[float]) -> Tuple[float, float]:
-        """Detect marking scale and return max_mark and scale_factor."""
+        """
+        Detects the marking scale based on the provided list of marks. This function determines the maximum mark in the list and returns a tuple containing the maximum mark and the corresponding scale factor. The scale
+        factor is calculated as follows:
+        - If the maximum mark is less than or equal to 20, the scale factor is `max_mark / 100`.
+        - Otherwise, the scale factor is `1.0`. If the input list of marks is empty, the function defaults to a maximum mark of 100 and a scale factor of 1.0.
+
+        Args:
+            marks (List[float]): A list of numerical marks.
+        Returns:
+            Tuple[float, float]: A tuple containing:
+                - The maximum mark (float).
+                - The scale factor (float).
+        """
+
         if not marks:
             return 100, 1.0
 
@@ -54,7 +100,22 @@ class AnalyticsService:
 
     @staticmethod
     def calculate_grade_distribution(marks: List[float], scale_factor: float = 1.0) -> Dict[str, int]:
-        """Calculate grade distribution based on marks and scale."""
+        """
+        Calculates the grade distribution for a list of marks based on predefined grade boundaries.
+
+        Args:
+            marks (List[float]): A list of numerical marks to be analyzed.
+            scale_factor (float, optional): A multiplier applied to the grade boundaries. Defaults to 1.0.
+
+        Returns:
+            Dict[str, int]: A dictionary containing the count of marks in each grade category:
+                - "HD": High Distinction (marks >= 85 * scale_factor)
+                - "D": Distinction (75 * scale_factor <= marks < 85 * scale_factor)
+                - "C": Credit (65 * scale_factor <= marks < 75 * scale_factor)
+                - "P": Pass (50 * scale_factor <= marks < 65 * scale_factor)
+                - "F": Fail (marks < 50 * scale_factor)
+        """
+
         return {
             "HD": len([m for m in marks if m >= (85 * scale_factor)]),
             "D": len([m for m in marks if (75 * scale_factor) <= m < (85 * scale_factor)]),
@@ -65,7 +126,21 @@ class AnalyticsService:
 
     @staticmethod
     def calculate_exam_requirements(subject: Subject) -> Dict[str, float]:
-        """Calculate exam mark requirements."""
+        """
+        Calculate the exam requirements for a given subject.
+        This function determines the marks required in the exam to achieve the
+        total mark for the subject, based on the marks obtained in assignments.
+        Args:
+            subject (Subject): The subject object containing details about
+                assignments and the total mark required.
+        Returns:
+            Dict[str, float]: A dictionary containing:
+                - "total_mark" (float): The total mark required for the subject.
+                - "assignment_total" (float): The total marks obtained from assignments.
+                - "required_exam" (float): The marks required in the exam to achieve the total mark.
+                - "achievable" (bool): Whether the required exam mark is achievable (<= 100).
+        """
+
         if subject.total_mark is None:
             return {}
 
