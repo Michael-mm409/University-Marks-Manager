@@ -1,14 +1,15 @@
-from typing import Optional
+from typing import List, Optional, Union
 
 import pandas as pd
 import streamlit as st
 
 from controller import add_assignment, add_subject, delete_assignment, delete_subject, get_all_subjects, get_summary
 from controller.app_controller import AppController
+from model import Subject  # Add missing imports
 from model.enums import GradeType
 
 
-def safe_float(val) -> Optional[float]:
+def safe_float(val) -> Optional[float]:  # Add missing return type
     """
     Safely converts a value to a float, or returns None for 'S'/'U' (non-marked assignments).
 
@@ -123,21 +124,22 @@ class StreamlitView:
 
         # Now sort all subject codes (current + synced)
         for subject_code in sorted(subjects.keys()):
-            subject = subjects[subject_code]
+            subject: Subject = subjects[subject_code]
             st.subheader(
                 f"{subject.subject_name} ({subject_code})"
                 f"{' - Synced' if getattr(subject, 'sync_subject', False) else ''} "
                 f"in {self.controller.semester_obj.name} {self.controller.semester_obj.year}"
             )
 
-            rows = []
-            for entry in subject.assignments:
+            # Fix: Correct indentation and type annotation
+            rows: List[List[Union[str, float, None]]] = []
+            for assignment in subject.assignments:  # Fix: Proper indentation and variable declaration
                 rows.append(
                     [
-                        entry.subject_assessment,
-                        entry.unweighted_mark,
-                        entry.weighted_mark,
-                        entry.mark_weight,
+                        assignment.subject_assessment,
+                        assignment.unweighted_mark,
+                        assignment.weighted_mark,
+                        assignment.mark_weight,
                     ]
                 )
 
