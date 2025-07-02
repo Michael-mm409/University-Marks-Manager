@@ -108,32 +108,45 @@ The application follows the MVC (Model-View-Controller) architectural pattern an
 ```
 University-Marks-Manager/
 ├── .streamlit/                  # Streamlit configuration
-│   └── config.toml             # App configuration
+│   └── config.toml             # App settings (file watcher, server config)
 ├── src/                        # Source code
 │   ├── controller/             # Business logic layer
-│   │   ├── handlers/           # Specific operation handlers
-│   │   │   ├── analytics_handler.py
-│   │   │   ├── assignment_handler.py
-│   │   │   └── subject_handler.py
-│   │   ├── __init__.py
-│   │   └── app_controller.py   # Main controller
+│   │   ├── handlers/           # Domain-specific operations
+│   │   │   ├── analytics_handler.py    # Grade calculations & analytics
+│   │   │   ├── assignment_handler.py   # Assignment CRUD operations
+│   │   │   └── subject_handler.py      # Subject management
+│   │   ├── __init__.py         # Controller exports
+│   │   └── app_controller.py   # Main application controller
 │   ├── model/                  # Data layer
-│   │   ├── domain/             # Domain models
-│   │   │   ├── assignment.py
-│   │   │   ├── semester.py
-│   │   │   └── subject.py
-│   │   ├── repositories/       # Data persistence
-│   │   │   └── data_persistence.py
-│   │   ├── enums.py           # Enumerations
-│   │   └── __init__.py
+│   │   ├── domain/             # Core business entities
+│   │   │   ├── assignment.py   # Assignment entity & methods
+│   │   │   ├── semester.py     # Semester entity & logic
+│   │   │   └── subject.py      # Subject entity & operations
+│   │   ├── repositories/       # Data persistence layer
+│   │   │   └── data_persistence.py     # JSON file I/O operations
+│   │   ├── enums/              # Application constants
+│   │   │   ├── __init__.py     # Enum exports
+│   │   │   ├── data_keys.py    # JSON structure keys
+│   │   │   ├── grade_types.py  # Grade type definitions (NUMERIC, S/U)
+│   │   │   └── semester_names.py       # Standard semester names
+│   │   ├── types/              # Type definitions
+│   │   │   └── json_types.py   # Custom type aliases
+│   │   └── __init__.py         # Model exports
 │   ├── view/                   # Presentation layer
-│   │   ├── streamlit_views.py  # Main UI components
-│   │   └── __init__.py
+│   │   ├── streamlit_views.py  # UI components & layouts
+│   │   └── __init__.py         # View exports
 │   └── main.py                 # Application entry point
 ├── data/                       # JSON data storage
-├── assets/                     # Static assets
-├── requirements.txt            # Python dependencies
-└── README.md                  # This file
+│   ├── 2023.json              # Academic year data files
+│   └── 2024.json              # (auto-generated)
+├── assets/                     # Static resources
+│   └── app_icon.ico           # Application icon
+├── tests/                      # Unit & integration tests (optional)
+├── docs/                       # Additional documentation (optional)
+├── .gitignore                 # Git ignore patterns
+├── requirements.txt           # Python dependencies
+├── LICENSE                    # Project license
+└── README.md                  # This documentation
 ```
 
 ---
