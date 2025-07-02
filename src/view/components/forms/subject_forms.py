@@ -1,5 +1,21 @@
-# src/view/components/forms/subject_forms.py
-"""Subject management form components."""
+"""
+Subject management form components.
+
+This module defines the `SubjectForms` class, which provides Streamlit-based UI forms
+to support adding and deleting subjects within a semester context.
+
+Forms include:
+    - Add Subject Form
+    - Delete Subject Form
+
+These forms interact with controller functions (`add_subject`, `delete_subject`) and
+provide feedback based on user actions.
+
+Dependencies:
+    - streamlit
+    - controller (add_subject, delete_subject)
+    - AppController
+"""
 
 import streamlit as st
 
@@ -8,13 +24,38 @@ from controller.app_controller import AppController
 
 
 class SubjectForms:
-    """Handles subject-related form components."""
+    """
+    Handles Streamlit form rendering for managing subjects.
+
+    Args:
+        controller (AppController): The application controller used to access semester
+            state and subject management logic.
+    """
 
     def __init__(self, controller: AppController):
+        """
+        Initialize the SubjectForms component.
+
+        Args:
+            controller (AppController): Controller instance for accessing app state.
+        """
         self.controller = controller
 
     def render_add_form(self) -> None:
-        """Render add subject form."""
+        """
+        Render the form to add a new subject.
+
+        Displays input fields for:
+            - Subject code
+            - Subject name
+            - Sync subject checkbox (optional flag for external sync)
+
+        On submission:
+            - Validates the input
+            - Calls `add_subject()` from the controller
+            - Displays feedback messages (success, warning, error)
+            - Triggers rerun if successful
+        """
         if not self.controller.semester_obj:
             st.error("Semester not initialized.")
             return
@@ -38,7 +79,16 @@ class SubjectForms:
                     st.error("Please fill in all fields")
 
     def render_delete_form(self) -> None:
-        """Render delete subject form."""
+        """
+        Render the form to delete an existing subject.
+
+        Displays a dropdown of available subjects and allows the user to delete a selected one.
+
+        On submission:
+            - Calls `delete_subject()` from the controller
+            - Displays success or warning message
+            - Triggers rerun if successful
+        """
         subjects = self.controller.available_subjects
         if not subjects:
             st.info("No subjects to delete.")

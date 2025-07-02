@@ -1,3 +1,23 @@
+"""
+View layer initializer.
+
+This module aggregates and exposes core components used in the application's
+Streamlit-based user interface (UI), including display components, form handlers,
+navigation controls, and utility functions.
+
+Re-exported components:
+    - StreamlitView
+    - NavigationBar
+    - OverviewDisplay
+    - AnalyticsDisplay
+    - SummaryDisplay
+    - SubjectForms
+    - AssignmentForms
+    - SettingsForms
+    - safe_float
+    - safe_display_value
+"""
+
 from .components.displays.analytics_display import AnalyticsDisplay
 from .components.displays.overview_display import OverviewDisplay
 from .components.displays.summary_display import SummaryDisplay
