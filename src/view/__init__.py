@@ -18,7 +18,7 @@ Re-exported components:
     - safe_display_value
 """
 
-from .components.displays.analytics_display import AnalyticsDisplay
+from .components.displays.analytics.analytics_display import AnalyticsDisplay
 from .components.displays.overview_display import OverviewDisplay
 from .components.displays.summary_display import SummaryDisplay
 from .components.forms.assignment_forms import AssignmentForms
