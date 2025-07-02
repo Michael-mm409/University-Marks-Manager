@@ -1,116 +1,296 @@
-# Student Marks Management System
+# University Marks Manager
 
 ## Overview
-The **Student Marks Management System** is a Python-based application designed to manage and persist student marks and assessments across multiple semesters (Autumn, Spring, Annual). It provides functionality to input, edit, sync, and calculate marks for various subjects and assessments, ensuring data consistency and easy accessibility.
+The **University Marks Manager** is a modern Python-based web application designed to manage and track student marks and assessments across multiple academic years and semesters. Built with Streamlit, it provides an intuitive web interface for managing university coursework, calculating grades, and analyzing academic performance.
 
-The application features a graphical user interface (GUI) built with `tkinter`, allowing users to interact with the system intuitively. Data is stored persistently in JSON format, enabling seamless loading and saving of records.
+The application follows the MVC (Model-View-Controller) architectural pattern and features real-time data persistence, grade calculations, and comprehensive assignment management capabilities.
 
 ---
 
 ## Features
-- **Semester Management**: Separate data handling for Autumn, Spring, and Annual semesters.
-- **Data Persistence**: Save and load semester data to/from JSON files.
-- **Synchronization**: Sync selected data from the "Annual" semester to Autumn and Spring without overwriting existing data.
-- **GUI Integration**: User-friendly interface for managing subject codes, assessments, and marks.
-- **Dynamic Calculations**: Automatically calculate Final Exam Marks based on Total Marks and assessment data.
-- **Directory Handling**: Customizable file directory for data storage.
+
+### 📚 Academic Management
+- **Multi-Year Support**: Manage marks across different academic years
+- **Semester Organization**: Separate data handling for different semesters within each year
+- **Subject Management**: Add, modify, and delete university subjects
+- **Assignment Tracking**: Complete CRUD operations for assignments and assessments
+
+### 📊 Grade Management
+- **Flexible Grading**: Support for both numeric grades and Satisfactory/Unsatisfactory (S/U) marking
+- **Weighted Calculations**: Automatic calculation of weighted marks based on assignment weights
+- **Exam Calculator**: Calculate required exam marks or derive exam performance from total marks
+- **Total Mark Setting**: Set and modify total marks for subjects
+
+### 💾 Data & Analytics
+- **JSON Persistence**: Automatic saving and loading of all academic data
+- **Real-time Updates**: Instant data synchronization across the application
+- **Grade Analytics**: Performance summaries and grade distribution analysis
+- **Data Validation**: Input validation and error handling
+
+### 🎨 User Interface
+- **Modern Web UI**: Clean, responsive Streamlit interface
+- **Tabbed Navigation**: Organized sections for Overview, Management, and Analytics
+- **Interactive Tables**: Dynamic data display with selection capabilities
+- **Form Validation**: User-friendly error messages and input validation
 
 ---
 
 ## Installation
 
+### Prerequisites
+- Python 3.9 or higher
+- pip package manager
+
+### Setup Steps
+
 1. **Clone the Repository**:
    ```bash
    git clone <repository_url>
-   cd student-marks-management
+   cd University-Marks-Manager
    ```
 
-2. **Install Requirements**:
-   Ensure you have Python 3.9 or above installed. Install any necessary packages using:
+2. **Create Virtual Environment** (Recommended):
+   ```bash
+   python -m venv venv
+   
+   # Windows
+   venv\Scripts\activate
+   
+   # macOS/Linux
+   source venv/bin/activate
+   ```
+
+3. **Install Dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-   *(Optional)*: If `requirements.txt` is unavailable, ensure `tkinter` is installed on your system.
-
-3. **Run the Application**:
+4. **Run the Application**:
    ```bash
-   python main.py
+   streamlit run src/main.py
    ```
+
+5. **Access the Application**:
+   Open your web browser and navigate to `http://localhost:8501`
 
 ---
 
-## Usage
+## Usage Guide
 
-1. **Adding Semester Data**:
-   - Enter subject codes and corresponding assessments.
-   - Input unweighted marks, weighted marks, and weight percentages for each assessment.
+### Getting Started
+1. **Select Academic Year**: Choose your current academic year from the dropdown
+2. **Choose Semester**: Select the semester you want to manage
+3. **Add Subjects**: Use the Management tab to add your university subjects
 
-2. **Syncing Data**:
-   - Use the `sync_semesters` feature to copy missing subjects/assessments from "Annual" into Autumn and Spring.
+### Managing Assignments
+1. **Add Assignments**: 
+   - Enter assessment name, weighted mark, and weight percentage
+   - Supports both numeric grades and S/U marking
+2. **Modify Assignments**: Edit existing assignment details
+3. **Delete Assignments**: Remove assignments when needed
 
-3. **Save & Load**:
-   - Save the data to the specified directory for future access.
-   - Load data from existing files to continue editing.
+### Grade Calculations
+1. **Set Total Marks**: Define the total mark for each subject
+2. **Calculate Exam Marks**: Use the Analytics tab to:
+   - Calculate required exam marks for target grades
+   - Derive actual exam performance from total marks
+3. **View Summaries**: Check grade summaries and performance analytics
 
-4. **Edit Settings**:
-   - Customize file storage paths by modifying the `file_directory` parameter in the `DataPersistence` class.
+### Data Management
+- All data is automatically saved to JSON files in the `data/` directory
+- Data persists between sessions
+- Export capabilities for backup purposes
 
 ---
 
 ## Project Structure
 
 ```
-student-marks-management/
-├── data/                        # JSON data directory
-├── main.py                      # Entry point for the application
-├── data_persistence.py          # Data handling and persistence logic
-├── semester.py                  # Semester-specific data management
-├── README.md                    # Project documentation
-└── requirements.txt             # Dependencies (if applicable)
+University-Marks-Manager/
+├── .streamlit/                  # Streamlit configuration
+│   └── config.toml             # App configuration
+├── src/                        # Source code
+│   ├── controller/             # Business logic layer
+│   │   ├── handlers/           # Specific operation handlers
+│   │   │   ├── analytics_handler.py
+│   │   │   ├── assignment_handler.py
+│   │   │   └── subject_handler.py
+│   │   ├── __init__.py
+│   │   └── app_controller.py   # Main controller
+│   ├── model/                  # Data layer
+│   │   ├── domain/             # Domain models
+│   │   │   ├── assignment.py
+│   │   │   ├── semester.py
+│   │   │   └── subject.py
+│   │   ├── repositories/       # Data persistence
+│   │   │   └── data_persistence.py
+│   │   ├── enums.py           # Enumerations
+│   │   └── __init__.py
+│   ├── view/                   # Presentation layer
+│   │   ├── streamlit_views.py  # Main UI components
+│   │   └── __init__.py
+│   └── main.py                 # Application entry point
+├── data/                       # JSON data storage
+├── assets/                     # Static assets
+├── requirements.txt            # Python dependencies
+└── README.md                  # This file
 ```
 
 ---
 
-## Example JSON Format
+## Data Format
+
+The application stores data in JSON format with the following structure:
 
 ```json
 {
-    "Autumn": {
-        "CSIT321": {
-            "Assignments": [
-                {
-                    "Subject Assessment": "Project Requirements and Interface Presentation",
-                    "Unweighted Mark": 1.0,
-                    "Weighted Mark": 10.0,
-                    "Mark Weight": 10.0
-                }
-            ]
+  "2024": {
+    "Autumn 2024": {
+      "CSCI101": {
+        "subject_name": "Introduction to Programming",
+        "total_mark": 75.0,
+        "assignments": [
+          {
+            "subject_assessment": "Assignment 1",
+            "unweighted_mark": 18.0,
+            "weighted_mark": 18.0,
+            "mark_weight": 20.0,
+            "grade_type": "NUMERIC"
+          }
+        ],
+        "examinations": {
+          "exam_mark": 45.0,
+          "exam_weight": 60.0
         }
-    },
-    "Spring": {},
-    "Annual": {}
+      }
+    }
+  }
 }
 ```
 
 ---
 
-## Contribution
+## Configuration
 
-1. Fork the repository.
-2. Create a new feature branch:
+### Streamlit Configuration
+Create `.streamlit/config.toml` for custom settings:
+
+```toml
+[server]
+fileWatcherType = "poll"
+runOnSave = true
+
+[global]
+suppressDeprecationWarnings = true
+```
+
+### Data Storage
+- Data files are stored in the `data/` directory
+- Each academic year has its own JSON file
+- Automatic backup on data modifications
+
+---
+
+## Development
+
+### Architecture
+The application follows the MVC pattern:
+- **Model**: Data structures and business entities
+- **View**: Streamlit UI components
+- **Controller**: Business logic and data flow management
+
+### Adding Features
+1. **New Models**: Add to `src/model/domain/`
+2. **Business Logic**: Extend controllers in `src/controller/handlers/`
+3. **UI Components**: Add views to `src/view/streamlit_views.py`
+
+### Testing
+```bash
+# Run unit tests (when available)
+python -m pytest tests/
+
+# Run with coverage
+python -m pytest --cov=src tests/
+```
+
+---
+
+## Contributing
+
+1. **Fork the Repository**
+2. **Create Feature Branch**:
    ```bash
-   git checkout -b feature/your-feature
+   git checkout -b feature/your-feature-name
    ```
-3. Commit your changes and push them:
+3. **Make Changes**: Follow the existing code structure and patterns
+4. **Test Changes**: Ensure all functionality works correctly
+5. **Commit Changes**:
    ```bash
-   git commit -m "Add your message here"
-   git push origin feature/your-feature
+   git commit -m "Add: description of your changes"
    ```
-4. Open a pull request for review.
+6. **Push and Create PR**:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+### Code Style
+- Follow PEP 8 guidelines
+- Use type hints where appropriate
+- Document functions and classes
+- Maintain separation of concerns (MVC pattern)
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**Streamlit Won't Start**:
+```bash
+# Check if port is available
+netstat -an | findstr :8501
+
+# Use different port
+streamlit run src/main.py --server.port 8502
+```
+
+**File Watching Errors**:
+```bash
+# Run with polling file watcher
+streamlit run src/main.py --server.fileWatcherType=poll
+```
+
+**Data Not Saving**:
+- Check write permissions in the `data/` directory
+- Verify JSON file format validity
+- Check console for error messages
 
 ---
 
 ## License
 
-This project is licensed under the MIT License. See [`LICENSE`](LICENSE) for details.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+## Support
+
+For issues, questions, or contributions:
+- Open an issue on the repository
+- Check existing documentation
+- Review the troubleshooting section
+
+---
+
+## Changelog
+
+### Version 2.0.0
+- Complete rewrite using Streamlit
+- MVC architecture implementation
+- Enhanced grade calculation features
+- Modern web-based interface
+- Improved data persistence
+
+### Version 1.0.0
+- Initial tkinter-based implementation
+- Basic mark management functionality
