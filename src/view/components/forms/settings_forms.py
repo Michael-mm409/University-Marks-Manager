@@ -1,5 +1,32 @@
 # src/view/components/forms/settings_forms.py
-"""Settings and configuration form components."""
+"""Settings and configuration form components.
+
+This module provides form components for managing application settings, configuration
+options, and administrative functions in the University Marks Manager. It implements
+specialized forms for subject settings, semester-wide configuration, and data
+management operations.
+
+The SettingsForms class encapsulates all settings-related user interfaces with
+proper validation, error handling, and user feedback mechanisms. It follows the
+single responsibility principle by focusing specifically on configuration and
+administrative form operations.
+
+Classes:
+    SettingsForms: Main settings form handler with configuration interfaces
+
+Dependencies:
+    - streamlit: UI framework for form rendering and user interaction
+    - controller.set_total_mark: Business logic for total mark updates
+    - controller.app_controller.AppController: Main application controller
+
+Example:
+    >>> from view.components.forms.settings_forms import SettingsForms
+    >>> from controller.app_controller import AppController
+    >>>
+    >>> controller = AppController()
+    >>> settings_forms = SettingsForms(controller)
+    >>> settings_forms.render_total_mark_form()
+"""
 
 import streamlit as st
 
@@ -8,13 +35,96 @@ from controller.app_controller import AppController
 
 
 class SettingsForms:
-    """Handles settings-related form components."""
+    """Handles settings-related form components for the University Marks Manager.
 
-    def __init__(self, controller: AppController):
+    This class provides a collection of form interfaces for managing application
+    settings, subject configuration, and administrative functions. It implements
+    a consistent form architecture with validation, error handling, and user
+    feedback across all configuration operations.
+
+    The class follows the dependency injection pattern, receiving the application
+    controller to coordinate with business logic and data persistence layers.
+    All forms implement proper validation and provide clear user feedback for
+    both success and error scenarios.
+
+    Attributes:
+        controller: Main application controller for data access and business logic
+
+    Form Categories:
+        Subject Settings: Individual subject configuration and mark management
+        Semester Settings: Semester-wide configuration and information display
+        Data Management: Export, import, and backup functionality
+
+    Design Principles:
+        - Single Responsibility: Focused on settings and configuration forms
+        - Dependency Injection: Controller provided for business logic access
+        - Validation First: Input validation before processing
+        - User Feedback: Clear success and error messaging
+        - Error Handling: Graceful degradation with informative messages
+
+    Example:
+        >>> controller = AppController()
+        >>> settings = SettingsForms(controller)
+        >>> settings.render_total_mark_form()  # Subject mark configuration
+        >>> settings.render_semester_settings_form()  # Semester information
+        >>> settings.render_data_management_form()  # Data operations
+    """
+
+    def __init__(self, controller: AppController) -> None:
+        """Initialize SettingsForms with application controller dependency.
+
+        Sets up the settings form handler with access to the main application
+        controller for business logic coordination and data operations.
+
+        Args:
+            controller: Main application controller providing data access,
+                       business logic coordination, and persistence operations
+
+        Example:
+            >>> from controller.app_controller import AppController
+            >>> controller = AppController()
+            >>> settings_forms = SettingsForms(controller)
+        """
         self.controller = controller
 
     def render_total_mark_form(self) -> None:
-        """Render set total mark form."""
+        """Render total mark configuration form for the selected subject.
+
+        Provides a compact form interface for updating a subject's total mark
+        target. The form includes validation for mark ranges (0-100), displays
+        the current total mark value, and provides immediate feedback for
+        successful updates or validation errors.
+
+        Form Features:
+            - Number input with range validation (0.0-100.0)
+            - Current value display for reference
+            - Real-time validation and error feedback
+            - Automatic UI refresh after successful updates
+            - Graceful error handling for missing data
+
+        Validation Rules:
+            - Subject must be selected in session state
+            - Controller must be properly initialized
+            - Subject must exist in current semester
+            - Mark must be between 0.0 and 100.0
+
+        User Interface:
+            - Two-column layout: input field and submit button
+            - Help text showing current total mark value
+            - Success/error messages with appropriate styling
+            - Form rerun after successful submission
+
+        Error Handling:
+            - Info message if no subject is selected
+            - Error message if controller is not initialized
+            - Warning if selected subject is not found
+            - Error feedback for business logic validation failures
+
+        Example:
+            >>> settings_forms.render_total_mark_form()
+            >>> # Displays form for currently selected subject
+            >>> # User can update total mark with validation
+        """
         subject_code = st.session_state.get("selected_subject")
         if not subject_code:
             st.info("Select a subject first")
@@ -52,7 +162,42 @@ class SettingsForms:
                         st.error(message)
 
     def render_semester_settings_form(self) -> None:
-        """Render semester-wide settings form."""
+        """Render semester-wide settings and information display.
+
+        Provides a read-only information panel showing current semester details
+        and statistics. This form serves as an information dashboard for
+        semester-wide configuration and provides context for other settings.
+
+        Display Components:
+            - Current academic year information
+            - Semester name and session details
+            - Total subject count metric
+            - Two-column layout for organized information display
+
+        Information Categories:
+            Academic Session:
+                - Current year display
+                - Semester name (Session 1, Session 2, etc.)
+
+            Statistics:
+                - Total number of subjects in semester
+                - Future: Additional semester-wide metrics
+
+        Error Handling:
+            - Error message if semester object is not initialized
+            - Graceful degradation with informative feedback
+
+        Future Enhancements:
+            - Semester name editing capability
+            - Academic year modification
+            - Additional semester-wide statistics
+            - Configuration export/import for semester settings
+
+        Example:
+            >>> settings_forms.render_semester_settings_form()
+            >>> # Displays current semester information
+            >>> # Shows year, name, and subject count
+        """
         if not self.controller.semester_obj:
             st.error("Semester not initialized.")
             return
@@ -70,7 +215,52 @@ class SettingsForms:
             st.metric("Total Subjects", total_subjects)
 
     def render_data_management_form(self) -> None:
-        """Render data export/import form."""
+        """Render data export, import, and backup management form.
+
+        Provides administrative functions for data management operations including
+        export, import, and backup functionality. Currently displays placeholder
+        interfaces with informational messages about future implementation.
+
+        Planned Features:
+            Data Export:
+                - Export semester data to JSON format
+                - Export individual subject data
+                - Custom export filters and options
+                - Multiple export formats (JSON, CSV, Excel)
+
+            Data Backup:
+                - Automatic backup creation before major operations
+                - Manual backup triggering
+                - Backup restoration functionality
+                - Backup file management and cleanup
+
+            Data Import:
+                - Import data from external sources
+                - Validation and conflict resolution
+                - Batch import operations
+                - Import format validation
+
+        Current Implementation:
+            - Two-column layout with export and backup buttons
+            - Placeholder functionality with user notifications
+            - Secondary button styling for future operations
+            - Information messages about development status
+
+        Error Handling:
+            - Error message if semester is not initialized
+            - Future: Comprehensive validation for import/export operations
+            - Future: Error recovery for failed backup operations
+
+        Security Considerations:
+            - Future: User confirmation for destructive operations
+            - Future: Data validation before import operations
+            - Future: Backup integrity verification
+
+        Example:
+            >>> settings_forms.render_data_management_form()
+            >>> # Displays data management interface
+            >>> # Shows placeholder export/backup buttons
+        """
         if not self.controller.semester_obj:
             st.error("Semester not initialized.")
             return

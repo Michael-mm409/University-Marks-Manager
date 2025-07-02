@@ -1,5 +1,22 @@
-# src/view/components/forms/assignment_forms.py
-"""Assignment management form components."""
+"""
+Assignment management form components.
+
+This module defines the `AssignmentForms` class, which renders forms in the Streamlit UI
+to support the addition, modification, and deletion of assignments tied to a subject
+within a semester. The forms validate user input, call controller methods, and provide
+feedback messages based on operation success or failure.
+
+Forms include:
+    - Add Assignment Form
+    - Modify Assignment Form
+    - Delete Assignment Form
+
+Dependencies:
+    - streamlit
+    - controller (add_assignment, modify_assignment, delete_assignment)
+    - AppController
+    - GradeType (enum representing SATISFACTORY/UNSATISFACTORY grades)
+"""
 
 import streamlit as st
 
@@ -9,13 +26,37 @@ from model.enums import GradeType
 
 
 class AssignmentForms:
-    """Handles assignment-related form components."""
+    """
+    Handles Streamlit form rendering for managing assignments.
+
+    Attributes:
+        controller (AppController): Instance of the application controller used
+            to access the current semester and perform assignment operations.
+    """
 
     def __init__(self, controller: AppController):
+        """
+        Initialize the AssignmentForms component with an AppController.
+
+        Args:
+            controller (AppController): Controller instance for accessing app state.
+        """
+
         self.controller = controller
 
     def render_add_form(self) -> None:
-        """Render add assignment form."""
+        """
+        Render the form for adding a new assignment to the selected subject.
+
+        Displays input fields for:
+            - Assessment name
+            - Weighted mark (numeric or S/U)
+            - Mark weight (if applicable)
+
+        On submission, validates the input and calls `add_assignment()` from the controller.
+        Displays success, error, or warning messages based on operation outcome.
+        """
+
         subject_code = st.session_state.get("selected_subject")
         if not subject_code:
             st.info("Select a subject first")
@@ -55,7 +96,17 @@ class AssignmentForms:
                     st.warning(message)
 
     def render_modify_form(self) -> None:
-        """Render modify assignment form."""
+        """
+        Render the form for modifying an existing assignment.
+
+        Allows the user to:
+            - Select an assignment
+            - Change its name, mark, or weight
+
+        Handles both numeric and non-numeric (S/U) grading.
+        On form submission, it calls `modify_assignment()` and displays feedback.
+        """
+
         subject_code = st.session_state.get("selected_subject")
         if not subject_code:
             st.info("Select a subject first")
@@ -155,7 +206,13 @@ class AssignmentForms:
                         st.warning(message)
 
     def render_delete_form(self) -> None:
-        """Render delete assignment form."""
+        """
+        Render the form for deleting an existing assignment.
+
+        Prompts the user to select an assignment from the current subject and delete it.
+
+        On confirmation, it calls `delete_assignment()` and shows a success or warning message.
+        """
         subject_code = st.session_state.get("selected_subject")
         if not subject_code:
             st.info("Select a subject first")
