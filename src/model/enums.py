@@ -27,6 +27,7 @@ class DataKeys(str, Enum):
     EXAMINATIONS = "examinations"
     EXAM_MARK = "exam_mark"
     EXAM_WEIGHT = "exam_weight"
+    GRADE_TYPE = "grade_type"
 
     # Legacy keys (for backward compatibility)
     SUBJECT_ASSESSMENT_LEGACY = "Subject Assessment"
@@ -40,3 +41,4 @@ class DataKeys(str, Enum):
     EXAMINATIONS_LEGACY = "Examinations"
     EXAM_MARK_LEGACY = "Exam Mark"
     EXAM_WEIGHT_LEGACY = "Exam Weight"
+    GRADE_TYPE_LEGACY = "Grade Type"
