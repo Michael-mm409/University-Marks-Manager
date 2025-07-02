@@ -141,39 +141,19 @@ def render_main_page(app: "App"):
                     value=selected_data["assessment"],
                     key=f"add_assessment_{subject_code}_{selected_idx}",
                 )
-
-                # Replace the number_input with text_input to allow S/U
-                weighted_mark_input = st.text_input(
+                weighted_mark = st.number_input(
                     "Weighted Mark",
-                    value=str(selected_data["weighted_mark"]) if selected_data["weighted_mark"] is not None else "",
-                    placeholder="Enter number, 'S', or 'U'",
-                    help="Enter a numeric value for graded assignments, or 'S' for Satisfactory, 'U' for Unsatisfactory",
+                    min_value=0.0,
+                    value=selected_data["weighted_mark"],
                     key=f"add_weighted_mark_{subject_code}_{selected_idx}",
                 )
-
-                # Conditionally show mark weight input based on grade type
-                if weighted_mark_input.upper() in ["S", "U"]:
-                    st.info(f"Mark weight is not applicable for {weighted_mark_input.upper()} grades")
-                    mark_weight = None
-                else:
-                    mark_weight = st.number_input(
-                        "Mark Weight",
-                        min_value=0.0,
-                        value=selected_data["mark_weight"] if selected_data["mark_weight"] is not None else 0.0,
-                        key=f"add_mark_weight_{subject_code}_{selected_idx}",
-                    )
-
+                mark_weight = st.number_input(
+                    "Mark Weight",
+                    min_value=0.0,
+                    value=selected_data["mark_weight"],
+                    key=f"add_mark_weight_{subject_code}_{selected_idx}",
+                )
                 if st.button("Add Assignment", key=f"add_assignment_btn_{subject_code}_{selected_idx}"):
-                    # Convert weighted_mark_input to appropriate type
-                    if weighted_mark_input.upper() in ["S", "U"]:
-                        weighted_mark = weighted_mark_input.upper()
-                    else:
-                        try:
-                            weighted_mark = float(weighted_mark_input)
-                        except ValueError:
-                            st.error("Please enter a valid number, 'S', or 'U' for weighted mark")
-                            st.stop()
-
                     success, message = add_assignment(sem_obj, subject_code, assessment, weighted_mark, mark_weight)
                     if success:
                         st.success(message)
