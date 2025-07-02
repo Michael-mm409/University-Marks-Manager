@@ -23,7 +23,7 @@ Architecture:
     - Modular design with separation of concerns
 """
 
-from .analytics_display import AnalyticsDisplay  # Performance analysis and charts
+from .analytics.analytics_display import AnalyticsDisplay  # Performance analysis and charts
 from .overview_display import OverviewDisplay  # Subject listing and navigation
 from .summary_display import SummaryDisplay
 
