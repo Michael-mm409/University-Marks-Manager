@@ -16,7 +16,7 @@ class Examination(BaseModel):
 
     def to_dict(self) -> Dict[str, Any]:
         """
-        Converts the instance attributes to a dictionary representation.
+        Converts the instance Args to a dictionary representation.
         Returns:
             Dict[str, Any]: A dictionary containing the exam mark and exam weight
             with their corresponding values.

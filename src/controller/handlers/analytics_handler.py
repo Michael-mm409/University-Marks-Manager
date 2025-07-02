@@ -6,7 +6,31 @@ from model.repositories.data_persistence import DataPersistence
 
 
 class AnalyticsHandler:
-    """Handles analytics and data aggregation operations."""
+    """
+    AnalyticsHandler is responsible for managing analytics and data aggregation operations
+    related to subjects within a semester. It provides methods to retrieve all subjects,
+    including synchronized subjects from other semesters, and calculate summary statistics
+    for a given subject.
+
+    Args:
+        semester (Semester): The current semester for which analytics are being handled.
+        data_persistence (DataPersistence): The persistence layer for accessing and storing data.
+
+    Methods:
+        get_all_subjects() -> Dict[str, Subject]:
+            Retrieve all subjects for the current semester, including synchronized subjects
+            from other semesters.
+        get_subject_summary(subject: Subject) -> Tuple[float, float, float, float, float]:
+            Calculate and return summary statistics for a given subject, including total
+            weighted mark, total weight, exam mark, exam weight, and total mark.
+        _is_subject_synced(subj) -> bool:
+            Check if a subject is marked for synchronization. This is used to determine
+            whether a subject from another semester should be included in the current semester's
+            analytics.
+        _convert_to_subject(subj_code: str, subj) -> Subject:
+            Convert a dictionary or object representation of a subject into a Subject instance.
+            This is used to standardize subject data for analytics purposes.
+    """
 
     def __init__(self, semester: Semester, data_persistence: DataPersistence):
         self.semester = semester

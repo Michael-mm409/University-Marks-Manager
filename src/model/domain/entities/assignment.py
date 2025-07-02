@@ -8,7 +8,7 @@ from ...enums.grade_types import GradeType
 class Assignment(BaseModel):
     """
     Represents an assignment with its associated marks and weight.
-    Attributes:
+    Args:
         subject_assessment (str): The name or identifier of the subject assessment.
         unweighted_mark (float): The raw mark obtained for the assignment.
         weighted_mark (float): The mark adjusted by the weight of the assignment.
@@ -42,7 +42,7 @@ class Assignment(BaseModel):
 
     def to_dict(self) -> Dict[str, Any]:
         """
-        Converts the instance attributes to a dictionary representation.
+        Converts the instance Args to a dictionary representation.
         Returns:
             Dict[str, Any]: A dictionary containing the following key-value pairs:
                 - "subject_assessment": The subject assessment details.

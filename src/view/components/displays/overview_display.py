@@ -29,7 +29,7 @@ class OverviewDisplay:
 
     def _render_subject_table(self, subject_code: str, subject: Subject) -> None:
         """Render individual subject table."""
-        # Add null check before accessing semester_obj attributes
+        # Add null check before accessing semester_obj Args
         if not self.controller.semester_obj:
             st.error("Semester not initialized.")
             return

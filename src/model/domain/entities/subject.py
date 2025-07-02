@@ -9,7 +9,7 @@ from .examination import Examination
 class Subject(BaseModel):
     """
     Subject class represents an academic subject with its associated details.
-    Attributes:
+    Args:
         subject_code (str): The unique code identifying the subject.
         subject_name (str): The name of the subject.
         assignments (List[Assignment]): A list of assignments associated with the subject.

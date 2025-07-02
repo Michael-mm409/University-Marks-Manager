@@ -5,7 +5,20 @@ from model.enums import GradeType
 
 
 class AssignmentHandler:
-    """Handles assignment-related operations."""
+    """
+    AssignmentHandler is responsible for managing assignments within a semester.
+    It provides functionality to add, delete, and modify assignments for specific subjects.
+
+    Methods:
+        __init__(semester: Semester):
+            Initializes the AssignmentHandler with a given semester.
+        add_assignment(subject_code: str, assessment: str, weighted_mark: Union[float, str], mark_weight: Optional[float]) -> Tuple[bool, str]:
+            Adds an assignment to a subject within the semester.
+        delete_assignment(subject_code: str, assessment: str) -> Tuple[bool, str]:
+            Deletes an assignment from a subject within the semester.
+        modify_assignment(subject_code: str, old_assessment: str, new_assessment: str, new_weighted_mark: Union[float, str], new_mark_weight: Optional[float]) -> Tuple[bool, str]:
+            Modifies an existing assignment for a subject within the semester.
+    """
 
     def __init__(self, semester: Semester):
         self.semester = semester

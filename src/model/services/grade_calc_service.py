@@ -2,6 +2,7 @@
 
 from typing import List, Tuple
 
+from model.domain.entities.assignment import Assignment
 from model.domain.entities.subject import Subject
 
 
@@ -10,55 +11,99 @@ class GradeCalculationService:
 
     @staticmethod
     def calculate_grade_status(subject: Subject) -> Tuple[float, str, bool]:
-        """Calculate grade value from available data.
+        """Calculate grade status with zero-mark handling.
+
+        Args:
+            subject: Subject entity containing assignments and total mark
 
         Returns:
             Tuple of (grade_value, grade_source, has_total_mark)
         """
-        has_total_mark = subject.total_mark is not None and subject.total_mark >= 0
+        # Check if total mark is set and greater than 0
+        if subject.total_mark is not None and subject.total_mark > 0:
+            # Use total mark for final grade calculation
+            grade_value: float = subject.total_mark
+            grade_source: str = "final grade"
+            has_total_mark: bool = True
+            return grade_value, grade_source, has_total_mark
 
-        if has_total_mark:
-            return subject.total_mark, "Total Mark", True
-        else:
-            # Calculate from assignments
-            assignment_marks = []
-            for assignment in subject.assignments:
-                if assignment.weighted_mark is not None:
-                    try:
-                        assignment_marks.append(float(assignment.weighted_mark))
-                    except (TypeError, ValueError):
-                        continue
+        # If total mark is 0 or None, check assignment performance
+        assignment_total: float = GradeCalculationService._calculate_assignment_total(subject.assignments)
 
-            if assignment_marks:
-                return GradeCalculationService._calculate_assignment_grade(assignment_marks)
-            else:
-                return 0, "No data", False
+        if assignment_total > 0:
+            # Calculate assignment-based percentage
+            weight_total: float = GradeCalculationService._calculate_weight_total(subject.assignments)
+            if weight_total > 0:
+                grade_value: float = (assignment_total / weight_total) * 100
+                grade_source: str = "assignments"
+                has_total_mark: bool = False
+                return grade_value, grade_source, has_total_mark
 
-    @staticmethod
-    def _calculate_assignment_grade(assignment_marks: List[float]) -> Tuple[float, str, bool]:
-        """Calculate grade based on assignment performance."""
-        max_mark = max(assignment_marks)
-
-        if max_mark <= 20:  # Smaller scale detected
-            assignment_percentages = [(mark / max_mark) * 100 for mark in assignment_marks]
-            grade_value = sum(assignment_percentages) / len(assignment_percentages)
-            grade_source = f"Assignment Average (scaled from /{max_mark:.0f})"
-        else:
-            grade_value = sum(assignment_marks) / len(assignment_marks)
-            grade_source = "Assignment Average"
-
-        return grade_value, grade_source, False
+        # No marks available at all
+        return 0.0, "no marks available", False
 
     @staticmethod
-    def get_grade_level(mark: float) -> Tuple[str, str]:
-        """Get grade level and emoji for a mark."""
-        if mark >= 85:
+    def _calculate_assignment_total(assignments: List[Assignment]) -> float:
+        """Calculate total marks from assignments.
+
+        Args:
+            assignments: List of assignment entities
+
+        Returns:
+            Total weighted marks from all assignments
+        """
+        total: float = 0.0
+        for assignment in assignments:
+            if assignment.weighted_mark is not None:
+                try:
+                    weighted_mark: float = float(assignment.weighted_mark)
+                    total += weighted_mark
+                except (TypeError, ValueError):
+                    continue
+        return total
+
+    @staticmethod
+    def _calculate_weight_total(assignments: List[Assignment]) -> float:
+        """Calculate total weight from assignments.
+
+        Args:
+            assignments: List of assignment entities
+
+        Returns:
+            Total weight/maximum marks from all assignments
+        """
+        total_weight: float = 0.0
+        for assignment in assignments:
+            # FIX: Use mark_weight instead of weight
+            if assignment.mark_weight is not None:
+                try:
+                    mark_weight: float = float(assignment.mark_weight)
+                    total_weight += mark_weight
+                except (TypeError, ValueError):
+                    continue
+        return total_weight
+
+    @staticmethod
+    def get_grade_level(grade_value: float) -> Tuple[str, str]:
+        """Get grade level and emoji, handling zero values.
+
+        Args:
+            grade_value: Percentage grade value (0-100)
+
+        Returns:
+            Tuple of (grade_level, emoji)
+        """
+        # FIX: Don't assign a grade if no marks are available
+        if grade_value <= 0:
+            return "Not Set", "📋"
+
+        if grade_value >= 85:
             return "High Distinction", "🎉"
-        elif mark >= 75:
+        elif grade_value >= 75:
             return "Distinction", "🌟"
-        elif mark >= 65:
+        elif grade_value >= 65:
             return "Credit", "✅"
-        elif mark >= 50:
+        elif grade_value >= 50:
             return "Pass", "📈"
         else:
-            return "Fail", "❌"
+            return "Fail", "⚠️"

@@ -30,9 +30,6 @@ class Semester:
     """
 
     def __init__(self, name: str, year: str, data_persistence: DataPersistence):
-        """
-        Initializes a Semester instance.
-        """
         self.name = name
         self.year = year
         self.data_persistence = data_persistence
@@ -65,8 +62,18 @@ class Semester:
 
     def get_subject_data(self, subject_code: str, subject_name: Optional[str] = None) -> Subject:
         """
-        Retrieves or initializes subject data for a given subject code within the semester.
-        """
+        If the subject code does not exist in the current semester's subjects, a new `Subject`
+        instance is created and added to the semester. The new subject is initialized with
+        the provided subject code, an optional subject name (defaulting to "N/A" if not provided),
+        an empty list of assignments, a total mark of 0, a default `Examination` instance, and
+        `sync_subject` set to False. The updated data is then saved using the persistence layer.
+
+        Args:
+            subject_code (str): The unique code identifying the subject.
+            subject_name (Optional[str]): The name of the subject. Defaults to None.
+
+        Returns:
+            Subject: The `Subject` instance corresponding to the given subject code."""
         if subject_code not in self.subjects:
             self.subjects[subject_code] = Subject(
                 subject_code=subject_code,
@@ -83,9 +90,24 @@ class Semester:
 
     def add_subject(self, subject_code: str, subject_name: str, sync_subject: bool = False):
         """
-        Adds a new subject to the semester.
-        Uses Streamlit for feedback instead of QMessageBox.
+        This method allows adding a new subject to the semester by providing its
+        code, name, and an optional flag to indicate if the subject should be
+        synchronized. It provides feedback using Streamlit messages.
+        Args:
+            subject_code (str): The unique code of the subject to be added.
+            subject_name (str): The name of the subject to be added.
+            sync_subject (bool, optional): A flag indicating whether the subject
+                should be synchronized. Defaults to False.
+        Returns:
+            None
+        Raises:
+            None
+        Feedback:
+            - Displays an error message if the subject code already exists.
+            - Displays an error message if the subject code or name is empty.
+            - Displays a success message upon successful addition of the subject.
         """
+
         if subject_code in self.subjects:
             st.error(f"Subject '{subject_code}' already exists.")
             return
@@ -108,8 +130,22 @@ class Semester:
 
     def delete_subject(self, subject_code: str):
         """
-        Deletes a subject from the semester.
+        Deletes a subject from the semester based on the provided subject code.
+        Args:
+            subject_code (str): The code of the subject to be deleted.
+
+        Behavior:
+            - Checks if the subject code exists in the `subjects` dictionary.
+            - If the subject code does not exist, displays an error message using `st.error`.
+            - If the subject code exists, removes the subject from the `subjects` dictionary.
+            - Updates the data persistence layer with the modified subjects data.
+            - Saves the updated data to persistent storage.
+            - Displays a success message using `st.success` upon successful deletion.
+
+        Raises:
+            None
         """
+
         if subject_code not in self.subjects:
             st.error(f"Subject '{subject_code}' does not exist.")
             return
@@ -129,7 +165,26 @@ class Semester:
     ) -> None:
         """
         Adds or updates an entry for a subject assessment in the semester.
-        Uses Streamlit for feedback.
+
+        Args:
+            subject_code (str): The code of the subject to which the assessment belongs.
+            subject_assessment (str): The name or identifier of the assessment.
+            weighted_mark (Union[float, str]): The weighted mark for the assessment, or a grade type ("S" or "U").
+            unweighted_mark (Optional[float]): The unweighted mark for the assessment (calculated if not provided).
+            mark_weight (Optional[float]): The weight of the assessment in the subject's overall grade.
+            grade_type (Literal["numeric", "S", "U"]): The type of grade, either numeric or pass/fail ("S" or "U").
+
+        Returns:
+            None
+
+        Behavior:
+            - If the subject does not exist in the semester, an error message is displayed.
+            - If the grade type is "S" or "U", the unweighted mark and mark weight are set to None, and the weighted mark is set to the grade type.
+            - If the grade type is numeric, the weighted mark and mark weight must be provided, and the unweighted mark is calculated.
+            - If an assessment with the same name already exists, its details are updated.
+            - If no such assessment exists, a new one is added to the subject.
+            - The updated data is saved to persistent storage.
+            - Displays a success or info message depending on whether the entry was added or updated.
         """
         if subject_code not in self.subjects:
             st.error(f"Subject '{subject_code}' does not exist in {self.name}.")
@@ -173,7 +228,21 @@ class Semester:
 
     def delete_entry(self, subject_code: str, subject_assessment: str):
         """
-        Deletes an assignment entry from a subject.
+        Deletes an assessment entry from a specific subject in the semester.
+
+        Args:
+            subject_code (str): The code of the subject from which the assessment will be deleted.
+            subject_assessment (str): The name or identifier of the assessment to be deleted.
+
+        Behavior:
+            - If the specified subject exists in the semester, it removes the assessment
+              matching the given `subject_assessment` from the subject's assignments.
+            - Updates the data persistence layer with the modified subject data.
+            - Saves the updated data to persistent storage.
+            - Displays a success message indicating the assessment has been deleted.
+
+        Raises:
+            KeyError: If the `subject_code` does not exist in the semester's subjects.
         """
         if subject_code in self.subjects:
             subject = self.subjects[subject_code]

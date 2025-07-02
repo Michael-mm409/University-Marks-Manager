@@ -5,7 +5,26 @@ from model.repositories.data_persistence import DataPersistence
 
 
 class SubjectHandler:
-    """Handles subject-related operations."""
+    """
+    SubjectHandler is responsible for managing subjects within a semester, including adding, deleting,
+    and setting total marks for subjects. It interacts with the Semester and DataPersistence classes
+    to perform these operations.
+
+    Args:
+        semester (Semester): The semester object containing subjects and their details.
+        data_persistence (DataPersistence): The persistence layer for saving and retrieving data.
+
+    Methods:
+        __init__(semester: Semester, data_persistence: DataPersistence):
+            Initializes the SubjectHandler with a semester and data persistence instance.
+        add_subject(code: str, name: str, sync_subject: bool = False) -> Tuple[bool, str]:
+            Adds a new subject to the semester. Returns a tuple indicating success and a message.
+        delete_subject(code: str) -> Tuple[bool, str]:
+            Deletes a subject from the semester. Returns a tuple indicating success and a message.
+        set_total_mark(subject_code: str, total_mark: float) -> Tuple[bool, str]:
+            Sets the total mark for a subject and calculates the exam mark if necessary.
+            Returns a tuple indicating success and a message.
+    """
 
     def __init__(self, semester: Semester, data_persistence: DataPersistence):
         self.semester = semester
