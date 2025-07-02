@@ -86,7 +86,7 @@ class ExamManagementDisplay:
         Example:
             >>> display.render(analytics_data)
         """
-        st.subheader("📝 Exam Management")
+        st.subheader("&#x1F4DD; Exam Management")
 
         exam_analytics: Dict[str, Any] = analytics_data["exam_analytics"]
         subject_code: str = analytics_data["subject_code"]
@@ -123,16 +123,16 @@ class ExamManagementDisplay:
             >>> self._render_existing_exam(exam_analytics, "CSCI251")
         """
         exam_mark: float = exam_analytics["exam_mark"]
-        st.success(f"✅ **Exam recorded:** {exam_mark:.1f}")
+        st.success(f"&#x2705; **Exam recorded:** {exam_mark:.1f}")
 
         # Check for updates needed
         if exam_analytics.get("needs_update", False):
             calculated: float = exam_analytics["calculated_exam"]
-            st.warning(f"⚠️ **Update Available:** Calculated exam mark is {calculated:.1f}")
+            st.warning(f"&#x26A0; **Update Available:** Calculated exam mark is {calculated:.1f}")
 
             if st.button("🔄 Auto-Update to Calculated Mark", key=f"auto_update_{subject_code}"):
                 if self.exam_controller.auto_calculate_exam(subject_code):
-                    st.success("✅ Auto-updated exam mark")
+                    st.success("&#x2705; Auto-updated exam mark")
                     st.rerun()
                 else:
                     st.error("Error updating exam")
@@ -167,18 +167,18 @@ class ExamManagementDisplay:
         Example:
             >>> self._render_add_exam_form(exam_analytics, "CSCI251")
         """
-        st.info("📝 **No exam recorded.** Add your exam mark below:")
+        st.info("&#x1F4DD; **No exam recorded.** Add your exam mark below:")
 
         # Auto-calculate option
         if "requirements" in exam_analytics:
             requirements: Dict[str, Any] = exam_analytics["requirements"]
             suggested_exam: float = requirements["required_exam"]
 
-            st.info(f"💡 **Suggested exam mark:** {suggested_exam:.1f}")
+            st.info(f"&#x1F4A1; **Suggested exam mark:** {suggested_exam:.1f}")
 
-            if st.button("🎯 Auto-Calculate & Save Exam", key=f"auto_calc_{subject_code}"):
+            if st.button("&#x1F3AF; Auto-Calculate & Save Exam", key=f"auto_calc_{subject_code}"):
                 if self.exam_controller.auto_calculate_exam(subject_code):
-                    st.success("✅ Auto-calculated exam saved!")
+                    st.success("&#x2705; Auto-calculated exam saved!")
                     st.rerun()
                 else:
                     st.error("Error saving exam")
@@ -260,9 +260,9 @@ class ExamManagementDisplay:
                     help="Enter the exam weight percentage",
                 )
 
-            if st.form_submit_button(f"🎯 {action} Exam Manually", type="primary"):
+            if st.form_submit_button(f"&#x1F3AF; {action} Exam Manually", type="primary"):
                 if self.exam_controller.update_exam_manually(subject_code, exam_mark, exam_weight):
-                    st.success(f"✅ Exam {action.lower()}ed manually!")
+                    st.success(f"&#x2705; Exam {action.lower()}ed manually!")
                     st.rerun()
                 else:
                     st.error(f"Error {action.lower()}ing exam")
@@ -303,7 +303,7 @@ class ExamManagementDisplay:
         Example:
             >>> self._render_exam_calculator(exam_analytics)
         """
-        with st.expander("🧮 Exam Calculator"):
+        with st.expander("&#x1F9EE; Exam Calculator"):
             st.markdown("**Quick calculation to help you plan:**")
 
             requirements: Dict[str, Any] = exam_analytics["requirements"]
@@ -319,7 +319,7 @@ class ExamManagementDisplay:
                 assignment_total = float(assignment_total) if assignment_total is not None else 0.0
                 required_exam = float(required_exam) if required_exam is not None else 0.0
             except (TypeError, ValueError):
-                st.error("⚠️ Unable to calculate exam requirements due to invalid data.")
+                st.error("&#x26A0; Unable to calculate exam requirements due to invalid data.")
                 return
 
             col1, col2, col3 = st.columns(3)
@@ -366,16 +366,16 @@ class ExamManagementDisplay:
             >>> self._render_exam_advice(65.5)  # Shows "study well" advice
         """
         if required_exam <= 0:
-            st.success("🎉 You've already achieved your target with assignments!")
+            st.success("&#x1F389; You've already achieved your target with assignments!")
         elif required_exam <= 50:
-            st.success(f"✅ You need {required_exam:.1f} marks on the exam - very achievable!")
+            st.success(f"&#x2705; You need {required_exam:.1f} marks on the exam - very achievable!")
         elif required_exam <= 70:
-            st.info(f"📚 You need {required_exam:.1f} marks on the exam - study well!")
+            st.info(f"&#x1F4DA; You need {required_exam:.1f} marks on the exam - study well!")
         elif required_exam <= 85:
-            st.warning(f"⚠️ You need {required_exam:.1f} marks on the exam - challenging but possible!")
+            st.warning(f"&#x26A0; You need {required_exam:.1f} marks on the exam - challenging but possible!")
         elif required_exam <= 100:
-            st.error(f"🔥 You need {required_exam:.1f} marks on the exam - this will be very challenging!")
+            st.error(f"&#x1F525; You need {required_exam:.1f} marks on the exam - this will be very challenging!")
         else:
             st.error(
-                f"❌ You need {required_exam:.1f} marks on the exam - this exceeds 100% and may not be achievable."
+                f"&#x274C; You need {required_exam:.1f} marks on the exam - this exceeds 100% and may not be achievable."
             )
