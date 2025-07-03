@@ -300,5 +300,13 @@ class StreamlitView:
         # Settings Section
         with st.container():
             st.markdown("### &#x2699; Settings")
-            with st.expander("&#x1F3AF; Set Total Marks", expanded=True):
-                self.settings_forms.render_total_mark_form()
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                with st.expander("&#x1F3AF; Set Total Marks", expanded=True):
+                    self.settings_forms.render_total_mark_form()
+            
+            with col2:
+                with st.expander("&#x1F4C5; Manage Semesters", expanded=True):
+                    self.settings_forms.render_semester_management_form()

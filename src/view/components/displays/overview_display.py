@@ -1,7 +1,6 @@
 """Overview tab display components."""
 
 from typing import List, Union
-
 import pandas as pd
 import streamlit as st
 
@@ -48,7 +47,7 @@ class OverviewDisplay:
                     assignment.subject_assessment,
                     assignment.unweighted_mark,
                     assignment.weighted_mark,
-                    assignment.mark_weight,
+                    f"{assignment.mark_weight}%" if assignment.mark_weight is not None else "N/A",
                 ]
             )
 
