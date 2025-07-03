@@ -71,8 +71,11 @@ class AssignmentForms:
 
             weighted_mark_input = st.text_input(
                 "Weighted Mark",
-                placeholder=f"Enter number, '{GradeType.SATISFACTORY.value}', or '{GradeType.UNSATISFACTORY.value}'",
-                help=f"Enter a numeric value for graded assignments, or '{GradeType.SATISFACTORY.value}' for Satisfactory, '{GradeType.UNSATISFACTORY.value}' for Unsatisfactory",
+                placeholder=f"Enter number, '{GradeType.SATISFACTORY.value}', "
+                            f"or '{GradeType.UNSATISFACTORY.value}'",
+                help=f"Enter a numeric value for graded assignments, or "
+                     f"'{GradeType.SATISFACTORY.value}' for Satisfactory, "
+                     f"'{GradeType.UNSATISFACTORY.value}' for Unsatisfactory",
             )
 
             mark_weight = None
@@ -123,21 +126,31 @@ class AssignmentForms:
 
         assessments = [a.subject_assessment for a in subject.assignments]
 
-        with st.form(f"modify_assignment_form_{subject_code}"):
-            # Select assignment to modify
-            selected_assessment = st.selectbox("Select Assignment to Modify", assessments)
+        # Select assignment to modify OUTSIDE the form so it updates dynamically
+        selected_assessment = st.selectbox(
+            "Select Assignment to Modify",
+            assessments,
+            key=f"modify_select_{subject_code}"
+        )
 
-            # Get current assignment data
-            current_assignment = None
-            for assignment in subject.assignments:
-                if assignment.subject_assessment == selected_assessment:
-                    current_assignment = assignment
-                    break
+        # Get current assignment data
+        current_assignment = None
+        for assignment in subject.assignments:
+            if assignment.subject_assessment == selected_assessment:
+                current_assignment = assignment
+                break
 
-            if current_assignment:
-                # Show current values and allow modification
-                st.markdown(f"**Modifying: {selected_assessment}**")
+        if current_assignment:
+            # Show current values clearly
+            st.markdown(f"**Currently Modifying: {selected_assessment}**")
+            
+            # Display current values in an info box
+            with st.expander("Current Assignment Details", expanded=True):
+                st.write(f"**Name:** {current_assignment.subject_assessment}")
+                st.write(f"**Mark:** {current_assignment.weighted_mark}")
+                st.write(f"**Weight:** {current_assignment.mark_weight}")
 
+            with st.form(f"modify_assignment_form_{subject_code}_{selected_assessment}"):
                 col1, col2 = st.columns(2)
 
                 with col1:
@@ -157,8 +170,11 @@ class AssignmentForms:
                     new_weighted_mark = st.text_input(
                         "New Weighted Mark",
                         value=default_mark,
-                        placeholder=f"Enter number, '{GradeType.SATISFACTORY.value}', or '{GradeType.UNSATISFACTORY.value}'",
-                        help=f"Enter a numeric value for graded assignments, or '{GradeType.SATISFACTORY.value}' for Satisfactory, '{GradeType.UNSATISFACTORY.value}' for Unsatisfactory",
+                        placeholder=f"Enter number, '{GradeType.SATISFACTORY.value}', "
+                                    f"or '{GradeType.UNSATISFACTORY.value}'",
+                        help=f"Enter a numeric value for graded assignments, or "
+                             f"'{GradeType.SATISFACTORY.value}' for Satisfactory, "
+                             f"'{GradeType.UNSATISFACTORY.value}' for Unsatisfactory",
                     )
 
                 with col2:
@@ -178,13 +194,20 @@ class AssignmentForms:
                         st.info(f"Mark weight is not applicable for {new_weighted_mark.upper()} grades")
 
                     # Show what's changing
-                    st.markdown("**Changes:**")
+                    st.markdown("**Changes Preview:**")
+                    changes_made = False
                     if new_assessment_name != current_assignment.subject_assessment:
                         st.write(f"• Name: {current_assignment.subject_assessment} → {new_assessment_name}")
+                        changes_made = True
                     if str(new_weighted_mark) != str(current_assignment.weighted_mark):
                         st.write(f"• Mark: {current_assignment.weighted_mark} → {new_weighted_mark}")
+                        changes_made = True
                     if new_mark_weight != current_assignment.mark_weight:
                         st.write(f"• Weight: {current_assignment.mark_weight} → {new_mark_weight}")
+                        changes_made = True
+                    
+                    if not changes_made:
+                        st.write("No changes detected")
 
                 if st.form_submit_button("Modify Assignment", type="primary"):
                     if not new_assessment_name or not new_weighted_mark:
@@ -194,7 +217,7 @@ class AssignmentForms:
                     success, message = modify_assignment(
                         self.controller.semester_obj,
                         subject_code,
-                        selected_assessment,
+                        selected_assessment,  # Use the original assessment name as the identifier
                         new_assessment_name,
                         new_weighted_mark,
                         new_mark_weight,
@@ -204,6 +227,8 @@ class AssignmentForms:
                         st.rerun()
                     else:
                         st.warning(message)
+        else:
+            st.error("Could not find the selected assignment. Please try again.")
 
     def render_delete_form(self) -> None:
         """
