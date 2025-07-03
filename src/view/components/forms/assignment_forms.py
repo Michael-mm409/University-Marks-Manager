@@ -71,11 +71,10 @@ class AssignmentForms:
 
             weighted_mark_input = st.text_input(
                 "Weighted Mark",
-                placeholder=f"Enter number, '{GradeType.SATISFACTORY.value}', "
-                            f"or '{GradeType.UNSATISFACTORY.value}'",
+                placeholder=f"Enter number, '{GradeType.SATISFACTORY.value}', or '{GradeType.UNSATISFACTORY.value}'",
                 help=f"Enter a numeric value for graded assignments, or "
-                     f"'{GradeType.SATISFACTORY.value}' for Satisfactory, "
-                     f"'{GradeType.UNSATISFACTORY.value}' for Unsatisfactory",
+                f"'{GradeType.SATISFACTORY.value}' for Satisfactory, "
+                f"'{GradeType.UNSATISFACTORY.value}' for Unsatisfactory",
             )
 
             mark_weight = None
@@ -128,9 +127,7 @@ class AssignmentForms:
 
         # Select assignment to modify OUTSIDE the form so it updates dynamically
         selected_assessment = st.selectbox(
-            "Select Assignment to Modify",
-            assessments,
-            key=f"modify_select_{subject_code}"
+            "Select Assignment to Modify", assessments, key=f"modify_select_{subject_code}"
         )
 
         # Get current assignment data
@@ -143,12 +140,14 @@ class AssignmentForms:
         if current_assignment:
             # Show current values clearly
             st.markdown(f"**Currently Modifying: {selected_assessment}**")
-            
-            # Display current values in an info box
-            with st.expander("Current Assignment Details", expanded=True):
-                st.write(f"**Name:** {current_assignment.subject_assessment}")
-                st.write(f"**Mark:** {current_assignment.weighted_mark}")
-                st.write(f"**Weight:** {current_assignment.mark_weight}")
+
+            # Compact info box for current assignment
+            st.info(
+                f"**Currently Modifying:** `{selected_assessment}`  \n"
+                f"**Name:** `{current_assignment.subject_assessment}` &nbsp; | &nbsp; "
+                f"**Mark:** `{current_assignment.weighted_mark}` &nbsp; | &nbsp; "
+                f"**Weight:** `{current_assignment.mark_weight}`"
+            )
 
             with st.form(f"modify_assignment_form_{subject_code}_{selected_assessment}"):
                 col1, col2 = st.columns(2)
@@ -171,10 +170,10 @@ class AssignmentForms:
                         "New Weighted Mark",
                         value=default_mark,
                         placeholder=f"Enter number, '{GradeType.SATISFACTORY.value}', "
-                                    f"or '{GradeType.UNSATISFACTORY.value}'",
+                        f"or '{GradeType.UNSATISFACTORY.value}'",
                         help=f"Enter a numeric value for graded assignments, or "
-                             f"'{GradeType.SATISFACTORY.value}' for Satisfactory, "
-                             f"'{GradeType.UNSATISFACTORY.value}' for Unsatisfactory",
+                        f"'{GradeType.SATISFACTORY.value}' for Satisfactory, "
+                        f"'{GradeType.UNSATISFACTORY.value}' for Unsatisfactory",
                     )
 
                 with col2:
@@ -205,7 +204,7 @@ class AssignmentForms:
                     if new_mark_weight != current_assignment.mark_weight:
                         st.write(f"• Weight: {current_assignment.mark_weight} → {new_mark_weight}")
                         changes_made = True
-                    
+
                     if not changes_made:
                         st.write("No changes detected")
 

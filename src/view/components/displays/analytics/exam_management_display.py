@@ -303,40 +303,40 @@ class ExamManagementDisplay:
         Example:
             >>> self._render_exam_calculator(exam_analytics)
         """
-        with st.expander("&#x1F9EE; Exam Calculator"):
-            st.markdown("**Quick calculation to help you plan:**")
+        # with st.expander("&#x1F9EE; Exam Calculator"):
+        st.markdown("**Quick calculation to help you plan:**")
 
-            requirements: Dict[str, Any] = exam_analytics["requirements"]
+        requirements: Dict[str, Any] = exam_analytics["requirements"]
 
-            # Safely extract values with defaults
-            total_mark: Optional[float] = requirements.get("total_mark", 0.0)
-            assignment_total: Optional[float] = requirements.get("assignment_total", 0.0)
-            required_exam: Optional[float] = requirements.get("required_exam", 0.0)
+        # Safely extract values with defaults
+        total_mark: Optional[float] = requirements.get("total_mark", 0.0)
+        assignment_total: Optional[float] = requirements.get("assignment_total", 0.0)
+        required_exam: Optional[float] = requirements.get("required_exam", 0.0)
 
-            # Ensure all values are valid numbers
-            try:
-                total_mark = float(total_mark) if total_mark is not None else 0.0
-                assignment_total = float(assignment_total) if assignment_total is not None else 0.0
-                required_exam = float(required_exam) if required_exam is not None else 0.0
-            except (TypeError, ValueError):
-                st.error("&#x26A0; Unable to calculate exam requirements due to invalid data.")
-                return
+        # Ensure all values are valid numbers
+        try:
+            total_mark = float(total_mark) if total_mark is not None else 0.0
+            assignment_total = float(assignment_total) if assignment_total is not None else 0.0
+            required_exam = float(required_exam) if required_exam is not None else 0.0
+        except (TypeError, ValueError):
+            st.error("&#x26A0; Unable to calculate exam requirements due to invalid data.")
+            return
 
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Total Mark", f"{total_mark:.1f}")
-            with col2:
-                st.metric("Assignment Total", f"{assignment_total:.1f}")
-            with col3:
-                st.metric("Required Exam", f"{required_exam:.1f}")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Mark", f"{total_mark:.1f}")
+        with col2:
+            st.metric("Assignment Total", f"{assignment_total:.1f}")
+        with col3:
+            st.metric("Required Exam", f"{required_exam:.1f}")
 
-            # Show calculation formula
-            st.info(
-                f"**Formula:** {total_mark:.1f} (Total) - {assignment_total:.1f} (Assignments) = {required_exam:.1f} (Exam)"
-            )
+        # Show calculation formula
+        st.info(
+            f"**Formula:** {total_mark:.1f} (Total) - {assignment_total:.1f} (Assignments) = {required_exam:.1f} (Exam)"
+        )
 
-            # Simple advice
-            self._render_exam_advice(required_exam)
+        # Simple advice
+        self._render_exam_advice(required_exam)
 
     def _render_exam_advice(self, required_exam: float) -> None:
         """Render personalized exam advice based on required performance.

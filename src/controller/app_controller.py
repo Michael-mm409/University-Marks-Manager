@@ -115,10 +115,10 @@ class AppController:
         """
 
         if not self._data_persistence:
-            return [SemesterName.AUTUMN, SemesterName.SPRING, SemesterName.SUMMER]
+            return [semester.value for semester in SemesterName]
 
         existing_semesters = list(self._data_persistence.data.keys())
-        return existing_semesters or [SemesterName.AUTUMN, SemesterName.SPRING, SemesterName.SUMMER]
+        return existing_semesters or [semester.value for semester in SemesterName]
 
     @property
     def semester(self) -> Optional[str]:

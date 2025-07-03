@@ -220,93 +220,48 @@ class StreamlitView:
             self.analytics_display.render()
 
     def _render_manage_tab(self) -> None:
-        """Render management tab with organized CRUD operations and settings.
+        """Render management tab with organized CRUD operations and settings."""
 
-        Provides a comprehensive management interface organized into logical
-        sections for different types of administrative operations. The layout
-        uses expandable sections and column layouts to organize functionality
-        while maintaining clean visual presentation.
+        # Subject Management Section in Expander
+        # with st.expander("📚 Subject Management", expanded=True):
+        col1, col2 = st.columns(2, gap="medium")
 
-        Section Organization:
-            Subject Management Section:
-                ├── Add Subject: Form for creating new subjects
-                └── Delete Subject: Interface for removing subjects
+        with col1:
+            with st.expander("#### ➕ **Add Subject**", expanded=True):
+                self.subject_forms.render_add_form()
 
-            Assignment Management Section:
-                ├── Add Assignment: Form for creating new assignments
-                ├── Modify Assignment: Interface for editing existing assignments
-                └── Delete Assignment: Interface for removing assignments
-
-            Settings Section:
-                └── Set Total Marks: Configuration for subject target marks
-
-        Layout Features:
-            - Sectioned Organization: Logical grouping of related operations
-            - Expandable Containers: Collapsible sections for organized presentation
-            - Column Layouts: Efficient use of horizontal space
-            - Visual Separators: Clear divisions between functional areas
-            - Icon Integration: Visual indicators for different operation types
-
-        User Experience:
-            - Intuitive Organization: Related operations grouped together
-            - Expandable Interface: Users can focus on specific tasks
-            - Efficient Layout: Multiple operations accessible without scrolling
-            - Clear Visual Hierarchy: Sections and operations clearly delineated
-
-        Form Integration:
-            - Component-Based Forms: Each operation uses specialized form components
-            - Consistent Validation: Standardized error handling across all forms
-            - User Feedback: Success and error messaging for all operations
-            - State Management: Form state coordinated through controller
-
-        Example:
-            >>> view._render_manage_tab()
-            >>> # Displays organized management interface with sections and forms
-        """
-        # Subject Management Section
-        with st.container():
-            st.markdown("### &#x1F4DA; Subject Management")
-            col1, col2 = st.columns(2, gap="medium")
-
-            with col1:
-                with st.expander("&#x2795; Add Subject", expanded=True):
-                    self.subject_forms.render_add_form()
-
-            with col2:
-                with st.expander("&#x1F5D1; Delete Subject", expanded=True):
-                    self.subject_forms.render_delete_form()
+        with col2:
+            with st.expander("#### 🗑️ **Delete Subject**", expanded=True):
+                self.subject_forms.render_delete_form()
 
         st.divider()
 
-        # Assignment Management Section
-        with st.container():
-            st.markdown("###  &#x1F4DD; Assignment Management")
-            col1, col2, col3 = st.columns(3, gap="medium")
+        # Assignment Management Section (NO outer expander)
+        st.markdown("### 📝 Assignment Management")
+        col1, col2, col3 = st.columns(3, gap="medium")
 
-            with col1:
-                with st.expander("&#x2795; Add Assignment", expanded=True):
-                    self.assignment_forms.render_add_form()
+        with col1:
+            with st.expander("➕ **Add Assignment**", expanded=False):
+                self.assignment_forms.render_add_form()
 
-            with col2:
-                with st.expander("&#x270F; Modify Assignment", expanded=True):
-                    self.assignment_forms.render_modify_form()
+        with col2:
+            with st.expander("✏️ **Modify Assignment**", expanded=False):
+                self.assignment_forms.render_modify_form()
 
-            with col3:
-                with st.expander("&#x1F5D1; Delete Assignment", expanded=True):
-                    self.assignment_forms.render_delete_form()
+        with col3:
+            with st.expander("🗑️ Delete Assignment", expanded=False):
+                self.assignment_forms.render_delete_form()
 
         st.divider()
 
-        # Settings Section
-        with st.container():
-            st.markdown("### &#x2699; Settings")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                with st.expander("&#x1F3AF; Set Total Marks", expanded=True):
-                    self.settings_forms.render_total_mark_form()
-            
-            with col2:
-                with st.expander("&#x1F4C5; Manage Semesters", expanded=True):
-                    self.settings_forms.render_semester_management_form()
+        # Settings Section (not in expander)
+        st.markdown("### ⚙️ Settings")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("#### 🎯 Set Total Marks")
+            self.settings_forms.render_total_mark_form()
+
+        with col2:
+            st.markdown("#### 📅 Manage Semesters")
+            self.settings_forms.render_semester_management_form()
