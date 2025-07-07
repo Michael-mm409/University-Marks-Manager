@@ -22,21 +22,21 @@ class GradeStatusDisplay:
         grade_status: Dict[str, Any] = analytics_data["grade_status"]
 
         # Display metrics
-        col1, col2, col3, col4 = st.columns(4)
+        total_mark_column, exam_mark_column, assignment_total_column, grade_level_column = st.columns(4)
 
-        with col1:
+        with total_mark_column:
             total_mark: Optional[float] = basic_metrics["total_mark"]
             st.metric("Total Mark", f"{total_mark:.1f}" if total_mark is not None else "Not set")
 
-        with col2:
+        with exam_mark_column:
             exam_mark: Optional[float] = basic_metrics["exam_mark"]
             st.metric("Exam Mark", f"{exam_mark:.1f}" if exam_mark is not None else "Not set")
 
-        with col3:
+        with assignment_total_column:
             assignment_total: float = basic_metrics["assignment_total"]
             st.metric("Assignment Total", f"{assignment_total:.1f}")
 
-        with col4:
+        with grade_level_column:
             grade_level: str = grade_status["grade_level"]
             emoji: str = grade_status["emoji"]
             st.metric("Grade", grade_level, delta=emoji)
@@ -83,28 +83,28 @@ class GradeStatusDisplay:
         st.dataframe(df, use_container_width=True, hide_index=True)
 
         # Summary metrics
-        col1, col2, col3 = st.columns(3)
-        with col1:
+        assignment_total_column, weight_total_column, remaining_weight_column = st.columns(3)
+        with assignment_total_column:
             assignment_total: float = basic_metrics["assignment_total"]
             st.metric("Assignment Total", f"{assignment_total:.1f}")
-        with col2:
+        with weight_total_column:
             weight_total: float = basic_metrics["weight_total"]
             st.metric("Weight Total", f"{weight_total:.1f}%")
-        with col3:
+        with remaining_weight_column:
             remaining_weight: float = basic_metrics["remaining_weight"]
             st.metric("Remaining Weight", f"{remaining_weight:.1f}%")
 
     def render_grade_charts(self, analytics_data: Dict[str, Any]) -> None:
         """Render grade overview charts."""
-        col1, col2 = st.columns(2)
+        current_grade_status_column, mark_distribution_column = st.columns(2)
 
         grade_status: Dict[str, Any] = analytics_data["grade_status"]
         basic_metrics: Dict[str, Any] = analytics_data["basic_metrics"]
 
-        with col1:
+        with current_grade_status_column:
             self._render_current_grade_status(grade_status)
 
-        with col2:
+        with mark_distribution_column:
             self._render_mark_distribution(basic_metrics)
 
     def _render_current_grade_status(self, grade_status: Dict[str, Any]) -> None:
@@ -244,10 +244,10 @@ class GradeStatusDisplay:
                     st.progress(exam_percent / 100, text=f"Exam Contribution: {exam_percent:.1f}%")
 
                 # Show totals for verification
-                col1, col2 = st.columns(2)
-                with col1:
+                total_marks_column, coverage_column = st.columns(2)
+                with total_marks_column:
                     st.metric("Total Marks", f"{total_marks:.1f}")
-                with col2:
+                with coverage_column:
                     coverage: float = assignment_percent + exam_percent
                     st.metric("Coverage", f"{coverage:.0f}%")
 

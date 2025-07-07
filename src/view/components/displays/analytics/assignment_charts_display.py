@@ -338,7 +338,7 @@ class AssignmentChartsDisplay:
         col_ref1, col_ref2, col_ref3, col_ref4 = st.columns(4)
 
         # Show that grades are calculated per assignment
-        st.info("📊 **Grades calculated individually for each assignment based on its maximum mark**")
+        st.info("&#x1F4CA; **Grades calculated individually for each assignment based on its maximum mark**")
 
         references: List[Tuple[Any, str, str, int]] = [
             (col_ref1, "&#x1F7E2;", "HD", 85),
