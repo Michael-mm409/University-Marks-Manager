@@ -54,15 +54,15 @@ class NavigationBar:
 
         Each selector updates the application state via the controller or Streamlit session state.
         """
-        col1, col2, col3 = st.columns(3)
+        year_column, semester_column, subject_column = st.columns(3)
 
-        with col1:
+        with year_column:
             self._render_year_selector()
 
-        with col2:
+        with semester_column:
             self._render_semester_selector()
 
-        with col3:
+        with subject_column:
             self._render_subject_selector()
 
     def _render_year_selector(self) -> None:

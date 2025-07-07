@@ -143,7 +143,7 @@ class SummaryDisplay:
             st.info("💡 Please load or create a semester to view summary statistics.")
             return
 
-        st.subheader("📊 Semester Overview")
+        st.subheader("&#x1F4CA  ; Semester Overview")
 
         subjects: Dict[str, Subject] = self.controller.semester_obj.subjects
         if not subjects:
@@ -166,19 +166,19 @@ class SummaryDisplay:
             lowest_mark = min(s.total_mark for s in marked_subjects)
 
         # Display summary metrics in responsive columns
-        col1, col2, col3, col4 = st.columns(4)
+        total_subjects_column, average_mark_column, highest_mark_column, lowest_mark_column = st.columns(4)
 
-        with col1:
+        with total_subjects_column:
             completion_rate: float = (subjects_with_marks / total_subjects) * 100 if total_subjects > 0 else 0
             st.metric("Total Subjects", total_subjects, delta=f"{completion_rate:.0f}% marked")
 
-        with col2:
+        with average_mark_column:
             st.metric("Average Mark", f"{average_mark:.1f}")
 
-        with col3:
+        with highest_mark_column:
             st.metric("Highest Mark", f"{highest_mark:.1f}")
 
-        with col4:
+        with lowest_mark_column:
             st.metric("Lowest Mark", f"{lowest_mark:.1f}")
 
         # Grade distribution analysis
@@ -212,7 +212,7 @@ class SummaryDisplay:
         Example:
             >>> self._render_grade_distribution(subjects_dict, 5)
         """
-        st.markdown("#### 📈 Grade Distribution")
+        st.markdown("#### &#1F4C8; Grade Distribution")
 
         # Initialize grade counters with descriptive labels
         grade_counts: Dict[str, int] = {"HD (85+)": 0, "D (75-84)": 0, "C (65-74)": 0, "P (50-64)": 0, "F (<50)": 0}
@@ -235,9 +235,9 @@ class SummaryDisplay:
                 grade_counts["F (<50)"] += 1
 
         # Create responsive two-column layout
-        col1, col2 = st.columns([2, 1])
+        grade_visualization_column, statistics_column = st.columns([2, 1])
 
-        with col1:
+        with grade_visualization_column:
             # Filter out zero values for cleaner chart visualization
             filtered_grades: Dict[str, int] = {k: v for k, v in grade_counts.items() if v > 0}
 
@@ -246,7 +246,7 @@ class SummaryDisplay:
             else:
                 st.info("📊 No grade data available for visualization")
 
-        with col2:
+        with statistics_column:
             st.markdown("**Grade Breakdown:**")
             # Display statistics for all grades (including zeros for completeness)
             for grade, count in grade_counts.items():
@@ -298,17 +298,17 @@ class SummaryDisplay:
         total_weighted_mark, total_weight, exam_mark, exam_weight, total_mark = summary_data
 
         # Display key metrics in responsive 3-column layout
-        col1, col2, col3 = st.columns(3)
+        assignments_total_column, assignment_weight_column, remaining_weight_column = st.columns(3)
 
-        with col1:
+        with assignments_total_column:
             st.metric("Assignments Total", f"{total_weighted_mark:.1f}", help="Sum of all assignment marks received")
 
-        with col2:
+        with assignment_weight_column:
             st.metric(
                 "Assignment Weight", f"{total_weight:.0f}%", help="Percentage of final grade from completed assignments"
             )
 
-        with col3:
+        with remaining_weight_column:
             remaining_weight: float = 100.0 - total_weight
             st.metric(
                 "Remaining Weight",

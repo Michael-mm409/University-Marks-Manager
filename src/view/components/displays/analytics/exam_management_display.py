@@ -218,7 +218,7 @@ class ExamManagementDisplay:
             >>> self._render_exam_form(exam_analytics, "CSCI251", "Add")
         """
         with st.form(f"exam_form_{subject_code}_{action.lower()}"):
-            col1, col2 = st.columns(2)
+            exam_mark_column, exam_weight_column = st.columns(2)
 
             # Set default values, ensuring they are floats
             suggested_exam: float = 0.0
@@ -240,7 +240,7 @@ class ExamManagementDisplay:
                 except (TypeError, ValueError):
                     suggested_exam = 0.0
 
-            with col1:
+            with exam_mark_column:
                 exam_mark: float = st.number_input(
                     "Exam Mark",
                     min_value=0.0,
@@ -250,7 +250,7 @@ class ExamManagementDisplay:
                     help="Enter your exam mark (0-100)",
                 )
 
-            with col2:
+            with exam_weight_column:
                 exam_weight: float = st.number_input(
                     "Exam Weight (%)",
                     min_value=0.0,
@@ -322,12 +322,12 @@ class ExamManagementDisplay:
             st.error("&#x26A0; Unable to calculate exam requirements due to invalid data.")
             return
 
-        col1, col2, col3 = st.columns(3)
-        with col1:
+        total_mark_column, assignment_total_column, needed_exam_column = st.columns(3)
+        with total_mark_column:
             st.metric("Total Mark", f"{total_mark:.1f}")
-        with col2:
+        with assignment_total_column:
             st.metric("Assignment Total", f"{assignment_total:.1f}")
-        with col3:
+        with needed_exam_column:
             st.metric("Required Exam", f"{required_exam:.1f}")
 
         # Show calculation formula
@@ -377,5 +377,8 @@ class ExamManagementDisplay:
             st.error(f"&#x1F525; You need {required_exam:.1f} marks on the exam - this will be very challenging!")
         else:
             st.error(
-                f"&#x274C; You need {required_exam:.1f} marks on the exam - this exceeds 100% and may not be achievable."
+                (
+                    f"&#x274C; You need {required_exam:.1f} marks on the exam - "
+                    "this exceeds 100% and may not be achievable."
+                )
             )

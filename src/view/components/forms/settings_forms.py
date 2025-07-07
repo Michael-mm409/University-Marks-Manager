@@ -207,13 +207,13 @@ class SettingsForms:
 
         st.markdown("#### Semester Settings")
 
-        col1, col2 = st.columns(2)
+        current_year_column, subject_count_column = st.columns(2)
 
-        with col1:
+        with current_year_column:
             st.info(f"**Current Year:** {self.controller.semester_obj.year}")
             st.info(f"**Current Semester:** {self.controller.semester_obj.name}")
 
-        with col2:
+        with subject_count_column:
             total_subjects = len(self.controller.semester_obj.subjects)
             st.metric("Total Subjects", total_subjects)
 
@@ -317,7 +317,7 @@ class SettingsForms:
             return
 
         st.markdown("#### Semester Management")
-        
+
         current_year = self.controller.year
         if not current_year:
             st.error("No year selected.")
@@ -325,20 +325,16 @@ class SettingsForms:
 
         # Display current semesters
         st.write(f"**Managing semesters for {current_year}:**")
-        
+
         existing_semesters = list(self.controller.data_persistence.data.keys())
-        
+
         if existing_semesters:
             # Display existing semesters in a nice format
             cols = st.columns(len(existing_semesters) if len(existing_semesters) <= 4 else 4)
             for i, semester in enumerate(existing_semesters):
                 with cols[i % 4]:
                     subject_count = len(self.controller.data_persistence.data.get(semester, {}))
-                    st.metric(
-                        label=semester,
-                        value=f"{subject_count} subjects",
-                        delta=None
-                    )
+                    st.metric(label=semester, value=f"{subject_count} subjects", delta=None)
         else:
             st.info("No semesters found for this year.")
 
@@ -346,11 +342,11 @@ class SettingsForms:
 
         # Add semester section
         col1, col2 = st.columns(2)
-        
+
         with col1:
             st.markdown("**Add Standard Semester:**")
             standard_semesters = ["Autumn", "Spring", "Summer", "Annual"]
-            
+
             for semester in standard_semesters:
                 if semester not in existing_semesters:
                     if st.button(f"Add {semester}", key=f"add_{semester}"):
@@ -361,11 +357,9 @@ class SettingsForms:
             st.markdown("**Add Custom Semester:**")
             with st.form("add_custom_semester_form"):
                 custom_semester = st.text_input(
-                    "Semester Name",
-                    placeholder="e.g., Winter, Session 3, etc.",
-                    help="Enter a custom semester name"
+                    "Semester Name", placeholder="e.g., Winter, Session 3, etc.", help="Enter a custom semester name"
                 )
-                
+
                 if st.form_submit_button("Add Custom Semester"):
                     if custom_semester:
                         if custom_semester in existing_semesters:
@@ -382,19 +376,19 @@ class SettingsForms:
             st.divider()
             st.markdown("**Remove Semester:**")
             st.warning("⚠️ Removing a semester will permanently delete all its data!")
-            
+
             with st.form("remove_semester_form"):
                 semester_to_remove = st.selectbox(
                     "Select Semester to Remove",
                     options=existing_semesters,
-                    help="Choose a semester to remove (this cannot be undone)"
+                    help="Choose a semester to remove (this cannot be undone)",
                 )
-                
+
                 confirm_removal = st.checkbox(
                     f"I understand that removing '{semester_to_remove}' will permanently delete all its data",
-                    help="Check this box to confirm you want to remove the semester"
+                    help="Check this box to confirm you want to remove the semester",
                 )
-                
+
                 if st.form_submit_button("Remove Semester", type="secondary"):
                     if confirm_removal:
                         self._remove_semester(semester_to_remove)
@@ -405,57 +399,57 @@ class SettingsForms:
 
     def _add_semester(self, semester_name: str) -> None:
         """Add a new semester to the current year.
-        
+
         Args:
             semester_name: Name of the semester to add
         """
         if not self.controller.data_persistence:
             st.error("Data persistence not available.")
             return
-            
+
         try:
             # Add empty semester data (explicitly typed as Dict[str, Subject])
             empty_semester: Dict[str, Subject] = {}
             self.controller.data_persistence.data[semester_name] = empty_semester
-            
+
             # Save the updated data
             self.controller.data_persistence.save_data(self.controller.data_persistence.data)
-            
+
             st.success(f"Successfully added semester '{semester_name}'")
-            
+
             # Update available semesters in controller by refreshing data persistence
             current_year = self.controller.year
             if current_year:
                 self.controller.set_year(current_year)  # This will refresh the data
-                
+
         except Exception as e:
             st.error(f"Failed to add semester: {str(e)}")
 
     def _remove_semester(self, semester_name: str) -> None:
         """Remove a semester from the current year.
-        
+
         Args:
             semester_name: Name of the semester to remove
         """
         if not self.controller.data_persistence:
             st.error("Data persistence not available.")
             return
-            
+
         try:
             if semester_name in self.controller.data_persistence.data:
                 # Remove the semester data
                 del self.controller.data_persistence.data[semester_name]
-                
+
                 # Save the updated data
                 self.controller.data_persistence.save_data(self.controller.data_persistence.data)
-                
+
                 # Update available semesters in controller by refreshing data persistence
                 current_year = self.controller.year
                 if current_year:
                     self.controller.set_year(current_year)  # This will refresh the data
-                    
+
             else:
                 st.error(f"Semester '{semester_name}' not found.")
-                
+
         except Exception as e:
             st.error(f"Failed to remove semester: {str(e)}")
