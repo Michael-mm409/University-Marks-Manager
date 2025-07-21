@@ -36,23 +36,45 @@ class AnalyticsHandler:
         self.semester = semester
         self.data_persistence = data_persistence
 
-    def get_all_subjects(self) -> Dict[str, Subject]:
-        """Retrieve all subjects for the semester, including synchronized subjects."""
-        subjects = dict(self.semester.subjects)
+    def get_all_subjects_flat(self):
+        """
+        Retrieve all subjects for the semester, including synchronized subjects, as flat dicts (no custom objects).
+        Returns a list of dicts (one per subject), suitable for DuckDB/analytics use.
+        """
+        import duckdb
+        import pandas as pd
 
-        # Add synchronized subjects from other semesters
+        all_subjects = []
         for sem_name, sem_data in self.data_persistence.data.items():
-            if sem_name == self.semester.name:
-                continue
-
             for subj_code, subj in sem_data.items():
-                is_synced = self._is_subject_synced(subj)
+                if isinstance(subj, dict):
+                    subj_dict = dict(subj)
+                else:
+                    subj_dict = subj.__dict__.copy()
+                subj_dict['semester'] = sem_name
+                subj_dict['subject_code'] = subj_code
+                # Remove or flatten nested custom objects for DuckDB compatibility
+                subj_dict.pop('assignments', None)
+                subj_dict.pop('examinations', None)
+                all_subjects.append(subj_dict)
 
-                if is_synced and subj_code not in subjects:
-                    subject = self._convert_to_subject(subj_code, subj)
-                    subjects[subj_code] = subject
+        df = pd.DataFrame(all_subjects)
+        con = duckdb.connect(database=':memory:')
+        con.register('subjects', df)
 
-        return subjects
+        query = f"""
+            SELECT * FROM subjects
+            WHERE semester = '{self.semester.name}'
+            UNION
+            SELECT * FROM subjects
+            WHERE semester != '{self.semester.name}'
+                AND sync_subject = TRUE
+                AND subject_code NOT IN (
+                    SELECT subject_code FROM subjects WHERE semester = '{self.semester.name}'
+                )
+        """
+        combined_df = con.execute(query).df()
+        return combined_df.to_dict(orient='records')
 
     @staticmethod
     def get_subject_summary(subject: Subject) -> Tuple[float, float, float, float, float]:
@@ -103,6 +125,19 @@ class AnalyticsHandler:
             )
         else:
             return subj
+
+    def get_all_subjects(self) -> Dict[str, Subject]:
+        """Retrieve all subjects for the semester, including synchronized subjects (returns Subject objects)."""
+        subjects = dict(self.semester.subjects)
+        for sem_name, sem_data in self.data_persistence.data.items():
+            if sem_name == self.semester.name:
+                continue
+            for subj_code, subj in sem_data.items():
+                is_synced = self._is_subject_synced(subj)
+                if is_synced and subj_code not in subjects:
+                    subject = self._convert_to_subject(subj_code, subj)
+                    subjects[subj_code] = subject
+        return subjects
 
 
 # Backward compatibility functions

@@ -89,7 +89,7 @@ class AssignmentChartsDisplay:
         assignment_analytics: Dict[str, Any] = analytics_data["assignment_analytics"]
 
         if not assignment_analytics["has_data"]:
-            st.info("&#x1F4DD; No assignments to display. Add assignments in the Manage tab.")
+            st.info("📝 No assignments to display. Add assignments in the Manage tab.")
             return
 
         # Create charts using the processed data
@@ -208,7 +208,7 @@ class AssignmentChartsDisplay:
         Example:
             >>> self._render_performance_chart(assignment_df, analytics)
         """
-        st.markdown("#### &#x1F4CA; Assignment Performance")
+        st.markdown("#### 📊 Assignment Performance")
 
         # Calculate optimal settings
         chart_height: int = self._get_chart_height(df)
@@ -338,13 +338,13 @@ class AssignmentChartsDisplay:
         col_ref1, col_ref2, col_ref3, col_ref4 = st.columns(4)
 
         # Show that grades are calculated per assignment
-        st.info("&#x1F4CA; **Grades calculated individually for each assignment based on its maximum mark**")
+        st.info("📊 **Grades calculated individually for each assignment based on its maximum mark**")
 
         references: List[Tuple[Any, str, str, int]] = [
-            (col_ref1, "&#x1F7E2;", "HD", 85),
-            (col_ref2, "&#x1F535;", "D", 75),
-            (col_ref3, "&#x1F7E0;", "C", 65),
-            (col_ref4, "&#x1F534;", "P", 50),
+            (col_ref1, "🟢", "HD", 85),
+            (col_ref2, "🔵", "D", 75),
+            (col_ref3, "🟡", "C", 65),
+            (col_ref4, "🔴", "P", 50),
         ]
 
         for col, emoji, grade, threshold in references:
@@ -389,7 +389,7 @@ class AssignmentChartsDisplay:
             avg_percentage: float = (metrics["average"] / max_mark) * 100
             with col_pct:
                 st.metric("Average %", f"{avg_percentage:.1f}%")
-            st.info(f"&#x1F4CA; **Scale:** ~{max_mark:.0f} marks")
+            st.info(f"📊 **Scale:** ~{max_mark:.0f} marks")
 
         # Compact grade distribution
         st.markdown("**Grade Distribution:**")
@@ -430,7 +430,7 @@ class AssignmentChartsDisplay:
         Example:
             >>> self._render_weight_distribution(assignment_analytics, basic_metrics)
         """
-        st.markdown("#### &#x2696; Weight Distribution")
+        st.markdown("#### ⚖️ Weight Distribution")
 
         assignment_data: List[Dict[str, Any]] = assignment_analytics["assignment_data"]
 
@@ -454,8 +454,8 @@ class AssignmentChartsDisplay:
         # Validation with color-coded feedback
         remaining: float = basic_metrics["remaining_weight"]
         if remaining < 0:
-            st.error("&#x26A0; Weight exceeds 100%!")
+            st.error("⚠️ Weight exceeds 100%!")
         elif remaining > 50:
-            st.warning(f"&#x26A0; {remaining:.1f}% remaining")
+            st.warning(f"⚠️ {remaining:.1f}% remaining")
         else:
-            st.success("&#x2705; Good distribution")
+            st.success("✅ Good distribution")

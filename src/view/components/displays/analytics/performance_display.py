@@ -140,7 +140,7 @@ class PerformanceDisplay:
         Example:
             >>> self._render_progress_targets(performance_data)
         """
-        st.markdown("#### &#x1F3AF; Progress to Grade Targets")
+        st.markdown("#### 🎯 Progress to Grade Targets")
 
         if performance_analytics["has_total_mark"]:
             progress_data: Dict[str, Dict[str, Any]] = performance_analytics["progress_to_targets"]
@@ -153,15 +153,15 @@ class PerformanceDisplay:
                 # Display achievement status with appropriate styling
                 if target_info["achieved"]:
                     st.success(f"{emoji} **{target_name}** - Achieved!")
-                    st.progress(1.0, text=f"&#x2705; {progress:.1f}%")
+                    st.progress(1.0, text=f"✅ {progress:.1f}%")
                 elif status == "Almost there":
                     st.info(f"{emoji} **{target_name}** - {status}!")
-                    st.progress(progress / 100, text=f"&#x1F4C8; {progress:.1f}%")
+                    st.progress(progress / 100, text=f"📈 {progress:.1f}%")
                 else:
                     st.warning(f"{emoji} **{target_name}** - {status}")
-                    st.progress(progress / 100, text=f"&#x1F4CA; {progress:.1f}%")
+                    st.progress(progress / 100, text=f"📉 {progress:.1f}%")
         else:
-            st.info("&#x1F4CB; Set a total mark to see progress analysis")
+            st.info("📈 Set a total mark to see progress analysis")
 
     def _render_trend_analysis(
         self, performance_analytics: Dict[str, Any], assignment_analytics: Dict[str, Any]
@@ -195,12 +195,12 @@ class PerformanceDisplay:
         Example:
             >>> self._render_trend_analysis(performance_data, assignment_data)
         """
-        st.markdown("#### &#x1F4C8; Performance Trends")
+        st.markdown("#### 📈 Performance Trends")
 
         trend_data: Dict[str, Any] = performance_analytics["trend_analysis"]
 
         if not trend_data["has_trend"]:
-            st.info("&#x1F4DD; Add more assignments to see performance trends")
+            st.info("📄 Add more assignments to see performance trends")
             return
 
         if assignment_analytics["has_data"]:
@@ -228,11 +228,11 @@ class PerformanceDisplay:
         direction: str = trend_data["trend_direction"]
 
         if direction == "improving":
-            st.success(f"&#x1F4C8; **Improving trend!** +{trend_change:.1f} points")
+            st.success(f"📈 **Improving trend!** +{trend_change:.1f} points")
         elif direction == "declining":
-            st.warning(f"&#x1F4C9; **Declining trend.** -{abs(trend_change):.1f} points")
+            st.warning(f"📉 **Declining trend.** -{abs(trend_change):.1f} points")
         else:
-            st.info(f"&#x1F4CA; **Stable performance** (±{abs(trend_change):.1f} points)")
+            st.info(f"📊 **Stable performance** (±{abs(trend_change):.1f} points)")
 
     def _render_performance_statistics(self, assignment_analytics: Dict[str, Any]) -> None:
         """Render comprehensive performance statistics and metrics.
@@ -258,7 +258,7 @@ class PerformanceDisplay:
             >>> self._render_performance_statistics(assignment_data)
         """
         st.divider()
-        st.markdown("#### &#x1F4CA; Performance Statistics")
+        st.markdown("#### 📊 Performance Statistics")
 
         metrics: Dict[str, float] = assignment_analytics["performance_metrics"]
         grade_dist: Dict[str, int] = assignment_analytics["grade_distribution"]
@@ -331,8 +331,8 @@ class PerformanceDisplay:
             scale_factor: float = assignment_analytics["scale_factor"]
             avg_percentage: float = (metrics["average"] / max_mark) * 100
 
-            st.info(f"&#x1F4CA; **Scale Detection:** Marks appear to be out of ~{max_mark:.0f}")
-            st.success(f"&#x1F4CA; **Average Performance:** {avg_percentage:.1f}% on detected scale")
+            st.info(f"📊 **Scale Detection:** Marks appear to be out of ~{max_mark:.0f}")
+            st.success(f"📊 **Average Performance:** {avg_percentage:.1f}% on detected scale")
 
             # Scale-aware grade feedback
             hd_count: int = assignment_analytics["grade_distribution"]["HD"]
@@ -340,32 +340,32 @@ class PerformanceDisplay:
             f_count: int = assignment_analytics["grade_distribution"]["F"]
 
             if hd_count > 0:
-                st.success(f"&#x1F31F; {hd_count} assignment(s) at HD level ({85 * scale_factor:.1f}+")
+                st.success(f"🌟 {hd_count} assignment(s) at HD level ({85 * scale_factor:.1f}+")
             if d_count > 0:
-                st.info(f"&#x1F4C8; {d_count} assignment(s) at Distinction level")
+                st.info(f"📈 {d_count} assignment(s) at Distinction level")
             if f_count > 0:
-                st.warning(f"&#x26A0; {f_count} assignment(s) below pass level")
+                st.warning(f"⚠️ {f_count} assignment(s) below pass level")
         else:
             # Standard 100-point scale analysis
             avg_mark: float = metrics["average"]
-            st.info(f"&#x1F4CA; **Average Performance:** {avg_mark:.1f} points (assuming 100-point scale)")
+            st.info(f"📊 **Average Performance:** {avg_mark:.1f} points (assuming 100-point scale)")
 
             hd_count: int = assignment_analytics["grade_distribution"]["HD"]
             d_count: int = assignment_analytics["grade_distribution"]["D"]
             f_count: int = assignment_analytics["grade_distribution"]["F"]
 
             if f_count > 0:
-                st.warning(f"&#x26A0; {f_count} assignment(s) below 50 (pass mark)")
+                st.warning(f"⚠️ {f_count} assignment(s) below 50 (pass mark)")
             elif hd_count > 0:
-                st.success(f"&#x1F31F; {hd_count} assignment(s) at HD level (85+)")
+                st.success(f"🌟 {hd_count} assignment(s) at HD level (85+)")
             elif d_count > 0:
-                st.info(f"&#x1F4C8; {d_count} assignment(s) at Distinction level (75-84)")
+                st.info(f"📈 {d_count} assignment(s) at Distinction level (75-84)")
 
         # Performance consistency analysis
         consistency: float = metrics.get("consistency", 0)
         if consistency > 90:
-            st.success("&#x1F3AF; **Very consistent** performance")
+            st.success("🎯 **Very consistent** performance")
         elif consistency > 75:
-            st.info("&#x1F4CA; **Reasonably consistent** performance")
+            st.info("📊 **Reasonably consistent** performance")
         else:
-            st.warning("&#x1F4C8; **Variable** performance - aim for consistency")
+            st.warning("📉 **Variable** performance - aim for consistency")

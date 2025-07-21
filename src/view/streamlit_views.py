@@ -206,7 +206,7 @@ class StreamlitView:
             >>> view._render_main_content()
             >>> # Displays three-tab interface with organized content areas
         """
-        tab1, tab2, tab3 = st.tabs(["&#x1F4CA; Overview", "&#x2795; Manage", "&#x1F4C8; Analytics"])
+        tab1, tab2, tab3 = st.tabs(["📊 Overview", "➕ Manage", "📈 Analytics"])
 
         with tab1:
             # Use the overview display component
@@ -223,46 +223,46 @@ class StreamlitView:
         """Render management tab with organized CRUD operations and settings."""
 
         # Subject Management Section in Expander
-        st.markdown("### &#128218; Subject Management")
+        st.markdown("### 📚 Subject Management")
 
         add_subject_column, modify_subject_column = st.columns(2, gap="medium")
 
         with add_subject_column:
-            with st.expander("&#x2795; **Add Subject**", expanded=True):
+            with st.expander("➕ **Add Subject**", expanded=True):
                 self.subject_forms.render_add_form()
 
         with modify_subject_column:
-            with st.expander("&#x1F5D1;&#xFE0F; **Delete Subject**", expanded=True):
+            with st.expander("🗑️ **Delete Subject**", expanded=True):
                 self.subject_forms.render_delete_form()
 
         st.divider()
 
         # Assignment Management Section (NO outer expander)
-        st.markdown("### &#x1F4DD; Assignment Management")
+        st.markdown("### 📝 Assignment Management")
         add_assignment_column, modify_assignment_column, delete_assignment_column = st.columns(3, gap="medium")
 
         with add_assignment_column:
-            with st.expander("&#x2795; **Add Assignment**", expanded=False):
+            with st.expander("➕ **Add Assignment**", expanded=False):
                 self.assignment_forms.render_add_form()
 
         with modify_assignment_column:
-            with st.expander("&#x270F;&#xFE0F; **Modify Assignment**", expanded=False):
+            with st.expander("✏️ **Modify Assignment**", expanded=False):
                 self.assignment_forms.render_modify_form()
 
         with delete_assignment_column:
-            with st.expander("&#x1F5D1;&#xFE0F; **Delete Assignment**", expanded=False):
+            with st.expander("🗑️ **Delete Assignment**", expanded=False):
                 self.assignment_forms.render_delete_form()
 
         st.divider()
 
         # Settings Section (not in expander)
-        st.markdown("### &#x2699; Settings")
+        st.markdown("### ⚙️ Settings")
         add_assignment_column, modify_assignment_column = st.columns(2)
 
         with add_assignment_column:
-            with st.expander("&#x1F4C8; Manage Total Marks", expanded=False):
+            with st.expander("📈 Manage Total Marks", expanded=False):
                 self.settings_forms.render_total_mark_form()
 
         with modify_assignment_column:
-            with st.expander("&#x1F4C5; Manage Semesters", expanded=False):
+            with st.expander("📅 Manage Semesters", expanded=False):
                 self.settings_forms.render_semester_management_form()
