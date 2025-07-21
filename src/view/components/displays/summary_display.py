@@ -143,7 +143,7 @@ class SummaryDisplay:
             st.info("💡 Please load or create a semester to view summary statistics.")
             return
 
-        st.subheader("&#x1F4CA  ; Semester Overview")
+        st.subheader("📊 Semester Overview")
 
         subjects: Dict[str, Subject] = self.controller.semester_obj.subjects
         if not subjects:
@@ -212,7 +212,7 @@ class SummaryDisplay:
         Example:
             >>> self._render_grade_distribution(subjects_dict, 5)
         """
-        st.markdown("#### &#1F4C8; Grade Distribution")
+        st.markdown("#### 📊 Grade Distribution")
 
         # Initialize grade counters with descriptive labels
         grade_counts: Dict[str, int] = {"HD (85+)": 0, "D (75-84)": 0, "C (65-74)": 0, "P (50-64)": 0, "F (<50)": 0}

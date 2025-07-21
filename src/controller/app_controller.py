@@ -38,6 +38,14 @@ class AppController:
         get_state_summary() -> str:
             Returns a string summarizing the current state of the controller for debugging purposes."""
 
+    __slots__ = (
+        "_data_persistence_factory",
+        "_year",
+        "_semester",
+        "_data_persistence",
+        "_sem_obj",
+    )
+
     def __init__(self, data_persistence_factory=None):
         self._data_persistence_factory = data_persistence_factory or DataPersistence
         self._year: Optional[str] = None

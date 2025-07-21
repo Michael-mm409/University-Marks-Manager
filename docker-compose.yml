@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  marks-manager:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    environment:
+      - STREAMLIT_SERVER_ENABLECORS=false
+      - STREAMLIT_SERVER_ENABLEXSRFPROTECTION=false
+    command: streamlit run src/main.py
