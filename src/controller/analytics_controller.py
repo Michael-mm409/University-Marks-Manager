@@ -2,10 +2,7 @@
 
 from typing import Any, Dict, Optional
 
-from model.domain.entities.subject import Subject
-from model.services.analytic_service import AnalyticsService
-from model.services.grade_calc_service import GradeCalculationService
-from model.services.performance_metrics_service import PerformanceMetricsService
+from model import AnalyticsService, GradeCalculationService, PerformanceMetricsService, Subject
 
 
 class AnalyticsController:

@@ -2,7 +2,7 @@ from typing import List
 
 import streamlit as st
 
-from controller.app_controller import AppController
+from controller import AppController
 
 
 class SemesterSetupComponent:

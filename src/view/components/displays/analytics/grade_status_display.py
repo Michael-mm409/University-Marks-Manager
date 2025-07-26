@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional, Tuple
 import pandas as pd
 import streamlit as st
 
-from controller.app_controller import AppController
+from controller import AppController
 
 
 class GradeStatusDisplay:

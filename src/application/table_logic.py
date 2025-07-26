@@ -1,6 +1,6 @@
-from model.data_persistence import DataPersistence
-from model.models import Assignment, Examination, Subject
-from model.semester import Semester
+import pandas as pd
+
+from model import Assignment, DataPersistence, Examination, Semester, Subject
 
 
 def get_all_subjects(sem_obj: Semester, data_persistence: DataPersistence) -> dict:
@@ -29,30 +29,40 @@ def get_all_subjects(sem_obj: Semester, data_persistence: DataPersistence) -> di
           current semester's subjects.
     """
     subjects = dict(sem_obj.subjects)
-    for sem_name, sem_data in data_persistence.data.items():
-        if sem_name == sem_obj.name:
-            continue
+    # Collect all subjects from other semesters except the current one
+    other_semesters = {k: v for k, v in data_persistence.data.items() if k != sem_obj.name}
+    # Flatten all subjects from other semesters into a DataFrame for vectorized filtering
+    records = []
+    for sem_name, sem_data in other_semesters.items():
         for subj_code, subj in sem_data.items():
-            is_synced = False
             if isinstance(subj, dict):
-                is_synced = subj.get("sync_subject", False)
+                sync = subj.get("sync_subject", False)
             elif hasattr(subj, "sync_subject"):
-                is_synced = subj.sync_subject
-            if is_synced and subj_code not in subjects:
-                if isinstance(subj, dict):
-                    assignments = [Assignment(**a) for a in subj["assignments"]] if "assignments" in subj else []
-                    examinations = Examination(**subj.get("examinations", {})) if "examinations" in subj else None
-                    subject = Subject(
-                        subject_code=subj_code,
-                        subject_name=subj.get("subject_name", "N/A"),
-                        assignments=assignments,
-                        total_mark=subj.get("total_mark", 0.0),
-                        examinations=examinations or Examination(exam_mark=0, exam_weight=100),
-                        sync_subject=True,
-                    )
-                else:
-                    subject = subj
-                subjects[subj_code] = subject
+                sync = subj.sync_subject
+            else:
+                sync = False
+            records.append({"subj_code": subj_code, "subj": subj, "is_synced": sync})
+    df = pd.DataFrame(records)
+    # Filter for synced subjects not already in current semester
+    if not df.empty:
+        df = df[df["is_synced"] & (~df["subj_code"].isin(subjects.keys()))]
+        for _, row in df.iterrows():
+            subj_code = row["subj_code"]
+            subj = row["subj"]
+            if isinstance(subj, dict):
+                assignments = [Assignment(**a) for a in subj["assignments"]] if "assignments" in subj else []
+                examinations = Examination(**subj.get("examinations", {})) if "examinations" in subj else None
+                subject = Subject(
+                    subject_code=subj_code,
+                    subject_name=subj.get("subject_name", "N/A"),
+                    assignments=assignments,
+                    total_mark=subj.get("total_mark", 0.0),
+                    examinations=examinations or Examination(exam_mark=0, exam_weight=100),
+                    sync_subject=True,
+                )
+            else:
+                subject = subj
+            subjects[subj_code] = subject
     return subjects
 
 
@@ -78,12 +88,9 @@ def get_summary(subject: Subject) -> tuple:
             - exam_weight (float): The weight of the examination (100 if no examination exists).
             - total_mark (float): The total mark for the subject.
     """
-    total_weighted_mark = sum(
-        entry.weighted_mark for entry in subject.assignments if isinstance(entry.weighted_mark, (int, float))
-    )
-    total_weight = sum(
-        entry.mark_weight for entry in subject.assignments if isinstance(entry.mark_weight, (int, float))
-    )
+    df = pd.DataFrame([a.__dict__ for a in subject.assignments if isinstance(a.weighted_mark, (int, float))])
+    total_weighted_mark = df["weighted_mark"].dropna().astype(float).sum() if not df.empty else 0
+    total_weight = df["mark_weight"].dropna().astype(float).sum() if not df.empty else 0
     exam_mark = subject.examinations.exam_mark if subject.examinations else 0
     exam_weight = subject.examinations.exam_weight if subject.examinations else 100
     total_mark = subject.total_mark

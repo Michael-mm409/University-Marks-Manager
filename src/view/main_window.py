@@ -20,7 +20,6 @@ from controller.table_logic import update_table
 from model import DataPersistence, Semester
 
 from .ui import SemesterSelectionDialog
-from .ui_main_window import MainWindowUI
 
 __slots__ = (
     "storage_handler",
@@ -46,7 +45,7 @@ __slots__ = (
 )
 
 
-class Application(QMainWindow, MainWindowUI):
+class Application(QMainWindow):
     """
     This class represents the main window of the University Marks Manager application. It provides
     a graphical user interface (GUI) for managing university marks, including subjects, assessments,

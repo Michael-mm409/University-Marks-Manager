@@ -1,5 +1,4 @@
-from model.enums import GradeType
-from model.semester import Semester
+from model import GradeType, Semester
 
 
 def add_assignment(sem_obj, subject_code, assessment, weighted_mark, mark_weight):

@@ -28,8 +28,7 @@ from typing import Dict, Tuple
 
 import streamlit as st
 
-from controller import get_summary
-from controller.app_controller import AppController
+from controller import AppController, get_summary
 from model import Subject
 
 

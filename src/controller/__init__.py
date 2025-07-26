@@ -49,6 +49,8 @@ from .handlers.assignment_handler import add_assignment, delete_assignment, modi
 
 """Functions for CRUD operations on assignments."""
 
+from .analytics_controller import AnalyticsController  # noqa: E402
+from .exam_controller import ExamController  # noqa: E402
 from .handlers.subject_handler import add_subject, delete_subject, set_total_mark  # noqa: E402
 
 """Functions for managing subjects and setting total marks."""
@@ -57,10 +59,14 @@ from .handlers.subject_handler import add_subject, delete_subject, set_total_mar
 __all__ = [
     # Main controller
     "AppController",
+    # Analytics controller
+    "AnalyticsController",
     # Handlers
     "AssignmentHandler",
     "SubjectHandler",
     "AnalyticsHandler",
+    # Exam controller
+    "ExamController",
     # Backward compatibility functions
     "add_assignment",
     "delete_assignment",

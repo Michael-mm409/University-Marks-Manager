@@ -1,11 +1,11 @@
 """Overview tab display components."""
 
 from typing import List, Union
+
 import pandas as pd
 import streamlit as st
 
-from controller import get_all_subjects, get_summary
-from controller.app_controller import AppController
+from controller import AppController, get_all_subjects, get_summary
 from model import Subject
 
 

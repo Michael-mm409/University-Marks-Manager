@@ -26,8 +26,7 @@ from typing import Any, Dict, Optional
 
 import streamlit as st
 
-from controller.app_controller import AppController
-from controller.exam_controller import ExamController
+from controller import AppController, ExamController
 
 
 class ExamManagementDisplay:
