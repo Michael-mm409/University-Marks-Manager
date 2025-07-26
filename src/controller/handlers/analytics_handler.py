@@ -1,8 +1,6 @@
 from typing import Dict, Tuple
 
-from model.domain import Semester
-from model.domain.entities import Assignment, Examination, Subject
-from model.repositories.data_persistence import DataPersistence
+from model import Assignment, DataPersistence, Examination, Semester, Subject
 
 
 class AnalyticsHandler:
@@ -51,16 +49,16 @@ class AnalyticsHandler:
                     subj_dict = dict(subj)
                 else:
                     subj_dict = subj.__dict__.copy()
-                subj_dict['semester'] = sem_name
-                subj_dict['subject_code'] = subj_code
+                subj_dict["semester"] = sem_name
+                subj_dict["subject_code"] = subj_code
                 # Remove or flatten nested custom objects for DuckDB compatibility
-                subj_dict.pop('assignments', None)
-                subj_dict.pop('examinations', None)
+                subj_dict.pop("assignments", None)
+                subj_dict.pop("examinations", None)
                 all_subjects.append(subj_dict)
 
         df = pd.DataFrame(all_subjects)
-        con = duckdb.connect(database=':memory:')
-        con.register('subjects', df)
+        con = duckdb.connect(database=":memory:")
+        con.register("subjects", df)
 
         query = f"""
             SELECT * FROM subjects
@@ -74,7 +72,7 @@ class AnalyticsHandler:
                 )
         """
         combined_df = con.execute(query).df()
-        return combined_df.to_dict(orient='records')
+        return combined_df.to_dict(orient="records")
 
     @staticmethod
     def get_subject_summary(subject: Subject) -> Tuple[float, float, float, float, float]:

@@ -1,7 +1,6 @@
 from typing import Optional, Tuple, Union
 
-from model.domain import Semester
-from model.enums import GradeType
+from model import GradeType, Semester
 
 
 class AssignmentHandler:

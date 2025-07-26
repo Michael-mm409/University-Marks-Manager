@@ -20,9 +20,8 @@ Dependencies:
 
 import streamlit as st
 
-from controller import add_assignment, delete_assignment, modify_assignment
-from controller.app_controller import AppController
-from model.enums import GradeType
+from controller import AppController, ExamController, add_assignment, delete_assignment, modify_assignment
+from model import GradeType
 
 
 class AssignmentForms:
@@ -84,14 +83,23 @@ class AssignmentForms:
                 st.info(f"Mark weight is not applicable for {weighted_mark_input.upper()} grades")
 
             if st.form_submit_button("Add Assignment"):
-                if not assessment or not weighted_mark_input:
-                    st.error("Assessment name and weighted mark are required")
+                if not assessment:
+                    st.error("Assessment name is required")
                     return
+                # If weighted_mark_input is empty, treat as zero
+                if not weighted_mark_input:
+                    weighted_mark_input = 0
 
                 success, message = add_assignment(
                     self.controller.semester_obj, subject_code, assessment, weighted_mark_input, mark_weight
                 )
                 if success:
+                    # Use ExamController to update exam weight after adding assignment
+                    try:
+                        exam_controller = ExamController(self.controller)
+                        exam_controller.auto_calculate_exam(subject_code)
+                    except Exception:
+                        pass
                     st.success(message)
                     st.rerun()
                 else:
@@ -209,9 +217,12 @@ class AssignmentForms:
                         st.write("No changes detected")
 
                 if st.form_submit_button("Modify Assignment", type="primary"):
-                    if not new_assessment_name or not new_weighted_mark:
-                        st.error("Assessment name and weighted mark are required")
+                    if not new_assessment_name:
+                        st.error("Assessment name is required")
                         return
+                    # If new_weighted_mark is empty, treat as zero
+                    if not new_weighted_mark:
+                        new_weighted_mark = 0
 
                     success, message = modify_assignment(
                         self.controller.semester_obj,
@@ -222,6 +233,13 @@ class AssignmentForms:
                         new_mark_weight,
                     )
                     if success:
+                        # Use ExamController to update exam weight after modifying assignment
+                        try:
+                            exam_controller = ExamController(self.controller)
+                            exam_controller.auto_calculate_exam(subject_code)
+                        except Exception as exception:
+                            st.error(f"Error updating exam: {str(exception)}")
+                            return
                         st.success(message)
                         st.rerun()
                     else:
@@ -259,6 +277,12 @@ class AssignmentForms:
             if st.form_submit_button("Delete Assignment", type="secondary"):
                 success, message = delete_assignment(self.controller.semester_obj, subject_code, del_assessment)
                 if success:
+                    # Use ExamController to update exam weight after deleting assignment
+                    try:
+                        exam_controller = ExamController(self.controller)
+                        exam_controller.auto_calculate_exam(subject_code)
+                    except Exception:
+                        pass
                     st.success(message)
                     st.rerun()
                 else:

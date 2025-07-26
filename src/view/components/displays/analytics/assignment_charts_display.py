@@ -28,7 +28,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from controller.app_controller import AppController
+from controller import AppController
 
 
 class AssignmentChartsDisplay:
@@ -386,7 +386,10 @@ class AssignmentChartsDisplay:
 
         if assignment_analytics["is_small_scale"]:
             max_mark: float = assignment_analytics["max_mark"]
-            avg_percentage: float = (metrics["average"] / max_mark) * 100
+            if max_mark == 0:
+                avg_percentage: float = 0.0
+            else:
+                avg_percentage: float = (metrics["average"] / max_mark) * 100
             with col_pct:
                 st.metric("Average %", f"{avg_percentage:.1f}%")
             st.info(f"📊 **Scale:** ~{max_mark:.0f} marks")

@@ -1,7 +1,6 @@
 from typing import Tuple
 
-from model.domain import Semester, Subject
-from model.repositories.data_persistence import DataPersistence
+from model import DataPersistence, Semester, Subject
 
 
 class SubjectHandler:

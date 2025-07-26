@@ -18,7 +18,7 @@ Dependencies:
 
 import streamlit as st
 
-from controller.app_controller import AppController
+from controller import AppController
 
 
 class NavigationBar:

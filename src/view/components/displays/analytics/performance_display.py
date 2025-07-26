@@ -29,7 +29,7 @@ from typing import Any, Dict, List, Tuple
 import pandas as pd
 import streamlit as st
 
-from controller.app_controller import AppController
+from controller import AppController
 
 
 class PerformanceDisplay:
@@ -329,7 +329,7 @@ class PerformanceDisplay:
             # Small-scale marking analysis (e.g., out of 15, 20 marks)
             max_mark: float = assignment_analytics["max_mark"]
             scale_factor: float = assignment_analytics["scale_factor"]
-            avg_percentage: float = (metrics["average"] / max_mark) * 100
+            avg_percentage: float = (metrics["average"] / max_mark) * 100 if max_mark > 0 else 0.0
 
             st.info(f"📊 **Scale Detection:** Marks appear to be out of ~{max_mark:.0f}")
             st.success(f"📊 **Average Performance:** {avg_percentage:.1f}% on detected scale")

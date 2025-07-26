@@ -30,8 +30,7 @@ from typing import Any, Dict, Optional
 
 import streamlit as st
 
-from controller.analytics_controller import AnalyticsController
-from controller.app_controller import AppController
+from controller import AnalyticsController, AppController
 
 from .assignment_charts_display import AssignmentChartsDisplay
 from .exam_management_display import ExamManagementDisplay

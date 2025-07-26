@@ -94,6 +94,7 @@ Example:
 from .domain import Assignment, Examination, Semester, Subject
 from .enums import DataKeys, GradeType, SemesterName
 from .repositories import DataPersistence
+from .services import AnalyticsService, GradeCalculationService, PerformanceMetricsService
 from .types import AssignmentDict, SemesterDict, SubjectDict
 
 __all__ = [
@@ -112,6 +113,10 @@ __all__ = [
     "AssignmentDict",  # JSON structure for assignment data
     "SubjectDict",  # JSON structure for subject data
     "SemesterDict",  # JSON structure for semester data
+    # Services - Business logic and analytics operations
+    "AnalyticsService",  # Analytics and performance calculations
+    "GradeCalculationService",  # Grade calculations and statistics
+    "PerformanceMetricsService",  # Performance metrics and analysis
 ]
 
 # Package metadata

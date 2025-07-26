@@ -35,10 +35,10 @@ Example:
     >>> display.render()
 """
 
-from controller.app_controller import AppController
+from controller import AppController
 
 # Import the new modular analytics system
-from view.components.displays.analytics.analytics_display import AnalyticsDisplay as NewAnalyticsDisplay
+from view import AnalyticsDisplay as NewAnalyticsDisplay
 
 
 class AnalyticsDisplay:

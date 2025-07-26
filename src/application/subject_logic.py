@@ -1,8 +1,6 @@
 from typing import Tuple
 
-from model.data_persistence import DataPersistence
-from model.models import Subject
-from model.semester import Semester
+from model import DataPersistence, Semester, Subject
 
 
 def add_subject(sem_obj: Semester, code: str, name: str, sync_subject: bool) -> Tuple[bool, str]:
