@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
-from ...enums.grade_types import GradeType
+from model.enums import GradeType
 
 
 class Assignment(BaseModel):
@@ -23,21 +23,21 @@ class Assignment(BaseModel):
 
     @field_validator("weighted_mark")
     @classmethod
-    def validate_mark_weight(cls, value: Union[float, str]) -> Union[float, str]:
+    def validate_weighted_mark(cls, value: Union[float, str]) -> Union[float, str]:
         """
-        Validates the weighted mark to ensure it is either a float or a string.
-        If the value is a string, it should be either "S" or "U".
+        Validates the weighted mark to ensure it is either a numeric value or 'S'/'U'.
         Args:
             value (Union[float, str]): The weighted mark to validate.
         Returns:
             Union[float, str]: The validated weighted mark.
         Raises:
-            ValueError: If the value is not a float or not one of the allowed strings.
+            ValueError: If the value is not a valid numeric value or 'S'/'U'.
         """
-        if isinstance(value, str) and value not in [GradeType.SATISFACTORY, GradeType.UNSATISFACTORY]:
-            raise ValueError(
-                f"Weighted mark must be '{GradeType.SATISFACTORY}', '{GradeType.UNSATISFACTORY}', or a numeric value."
-            )
+        if isinstance(value, str):
+            if value not in [GradeType.SATISFACTORY.value, GradeType.UNSATISFACTORY.value]:
+                raise ValueError(
+                    f"String weighted mark must be '{GradeType.SATISFACTORY.value}' or '{GradeType.UNSATISFACTORY.value}'"
+                )
         return value
 
     def to_dict(self) -> Dict[str, Any]:

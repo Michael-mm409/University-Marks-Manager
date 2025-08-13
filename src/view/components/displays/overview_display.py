@@ -1,10 +1,8 @@
 """Overview tab display components."""
 
-from typing import List, Union
-
-import pandas as pd
 import streamlit as st
 
+from application.queries.summary_queries import build_assignment_table_rows
 from controller import AppController, get_all_subjects, get_summary
 from model import Subject
 
@@ -39,24 +37,9 @@ class OverviewDisplay:
             f"in {self.controller.semester_obj.name} {self.controller.semester_obj.year}"
         )
 
-        # Create assignment rows
-        rows: List[List[Union[str, float, None]]] = []
-        for assignment in subject.assignments:
-            rows.append(
-                [
-                    assignment.subject_assessment,
-                    assignment.unweighted_mark,
-                    assignment.weighted_mark,
-                    f"{assignment.mark_weight}%" if assignment.mark_weight is not None else "N/A",
-                ]
-            )
-
-        df = pd.DataFrame(
-            rows,
-            columns=["Assessment", "Unweighted Mark", "Weighted Mark", "Mark Weight"],
-        ).astype(str)
-
-        st.dataframe(df.reset_index(drop=True), use_container_width=True, key=f"summary_editor_{subject_code}")
+        # Build rows via DuckDB helper (list of dicts) and display directly
+        rows = build_assignment_table_rows(subject)
+        st.dataframe(rows, use_container_width=True, hide_index=True, key=f"summary_editor_{subject_code}")
 
         # Summary
         total_weighted_mark, total_weight, exam_mark, exam_weight, total_mark = get_summary(subject)

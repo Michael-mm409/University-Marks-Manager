@@ -1,4 +1,4 @@
-import pandas as pd
+import duckdb
 
 from model import Assignment, DataPersistence, Examination, Semester, Subject
 
@@ -31,9 +31,10 @@ def get_all_subjects(sem_obj: Semester, data_persistence: DataPersistence) -> di
     subjects = dict(sem_obj.subjects)
     # Collect all subjects from other semesters except the current one
     other_semesters = {k: v for k, v in data_persistence.data.items() if k != sem_obj.name}
-    # Flatten all subjects from other semesters into a DataFrame for vectorized filtering
+
+    # Flatten all subjects from other semesters into a list for DuckDB processing
     records = []
-    for sem_name, sem_data in other_semesters.items():
+    for _, sem_data in other_semesters.items():
         for subj_code, subj in sem_data.items():
             if isinstance(subj, dict):
                 sync = subj.get("sync_subject", False)
@@ -42,13 +43,25 @@ def get_all_subjects(sem_obj: Semester, data_persistence: DataPersistence) -> di
             else:
                 sync = False
             records.append({"subj_code": subj_code, "subj": subj, "is_synced": sync})
-    df = pd.DataFrame(records)
-    # Filter for synced subjects not already in current semester
-    if not df.empty:
-        df = df[df["is_synced"] & (~df["subj_code"].isin(subjects.keys()))]
-        for _, row in df.iterrows():
-            subj_code = row["subj_code"]
-            subj = row["subj"]
+
+    # Use DuckDB to filter for synced subjects not already in current semester
+    if records:
+        conn = duckdb.connect()
+        # Create a temporary table from records
+        conn.execute("CREATE TEMP TABLE subjects_data AS SELECT * FROM ?", [records])
+        # Filter for synced subjects that aren't in current semester
+        current_subjects = list(subjects.keys())
+        filtered_results = conn.execute(
+            """
+            SELECT subj_code, subj, is_synced
+            FROM subjects_data 
+            WHERE is_synced = true 
+            AND subj_code NOT IN (SELECT unnest(?))
+        """,
+            [current_subjects],
+        ).fetchall()
+
+        for subj_code, subj, _ in filtered_results:
             if isinstance(subj, dict):
                 assignments = [Assignment(**a) for a in subj["assignments"]] if "assignments" in subj else []
                 examinations = Examination(**subj.get("examinations", {})) if "examinations" in subj else None
@@ -63,6 +76,8 @@ def get_all_subjects(sem_obj: Semester, data_persistence: DataPersistence) -> di
             else:
                 subject = subj
             subjects[subj_code] = subject
+
+        conn.close()
     return subjects
 
 
@@ -88,9 +103,35 @@ def get_summary(subject: Subject) -> tuple:
             - exam_weight (float): The weight of the examination (100 if no examination exists).
             - total_mark (float): The total mark for the subject.
     """
-    df = pd.DataFrame([a.__dict__ for a in subject.assignments if isinstance(a.weighted_mark, (int, float))])
-    total_weighted_mark = df["weighted_mark"].dropna().astype(float).sum() if not df.empty else 0
-    total_weight = df["mark_weight"].dropna().astype(float).sum() if not df.empty else 0
+    # Prepare assignment data for DuckDB processing
+    assignment_data = []
+    for a in subject.assignments:
+        if isinstance(a.weighted_mark, (int, float)):
+            assignment_data.append(
+                {
+                    "weighted_mark": float(a.weighted_mark) if a.weighted_mark is not None else 0.0,
+                    "mark_weight": float(a.mark_weight) if a.mark_weight is not None else 0.0,
+                }
+            )
+
+    # Use DuckDB to calculate sums
+    if assignment_data:
+        conn = duckdb.connect()
+        result = conn.execute(
+            """
+            SELECT 
+                COALESCE(SUM(weighted_mark), 0) as total_weighted_mark,
+                COALESCE(SUM(mark_weight), 0) as total_weight
+            FROM ?
+        """,
+            [assignment_data],
+        ).fetchone()
+        total_weighted_mark = float(result[0]) if result and result[0] is not None else 0.0
+        total_weight = float(result[1]) if result and result[1] is not None else 0.0
+        conn.close()
+    else:
+        total_weighted_mark, total_weight = 0.0, 0.0
+
     exam_mark = subject.examinations.exam_mark if subject.examinations else 0
     exam_weight = subject.examinations.exam_weight if subject.examinations else 100
     total_mark = subject.total_mark

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Protocol, Union
 
 import pandas as pd
 import streamlit as st
@@ -6,15 +6,16 @@ import streamlit as st
 from application.entry_logic import add_assignment, delete_assignment
 from application.subject_logic import add_subject, delete_subject, set_total_mark
 from application.table_logic import get_all_subjects, get_summary
-from domain import DataPersistence, Semester
-from domain.enums import GradeType
-from domain.models import Assignment, Subject
+from model import Assignment, DataPersistence, GradeType, Semester, Subject
 
-# If you created the types file:
-# from model.types import SubjectDict, AssignmentDict
 
-if TYPE_CHECKING:
-    from main import App
+# Define a lightweight protocol for the expected App interface to satisfy type checkers
+class App(Protocol):
+    sem_obj: Semester
+    data_persistence: DataPersistence
+    subject_code: Optional[str]
+    year: str
+    semester: Optional[str]
 
 
 def safe_float(val) -> Optional[float]:
