@@ -126,7 +126,8 @@ class ExamManagementDisplay:
 
         # Check for updates needed
         if exam_analytics.get("needs_update", False):
-            calculated: float = exam_analytics["calculated_exam"]
+            # Use analytics-layer value for calculated exam mark
+            calculated = exam_analytics["calculated_exam"]
             st.warning(f"⚠️ **Update Available:** Calculated exam mark is {calculated:.1f}")
 
             if st.button("🔄 Auto-Update to Calculated Mark", key=f"auto_update_{subject_code}"):
@@ -238,6 +239,18 @@ class ExamManagementDisplay:
                     suggested_exam = float(exam_analytics["exam_mark"])
                 except (TypeError, ValueError):
                     suggested_exam = 0.0
+
+            # Special case: if total mark is 50, set exam mark to 20% of exam weight (Pass Supplementary)
+            total_mark = None
+            exam_weight = 0
+            if "requirements" in exam_analytics and exam_analytics["requirements"]:
+                total_mark = exam_analytics["requirements"].get("total_mark")
+                exam_weight = exam_analytics["requirements"].get("exam_weight")
+            if total_mark is not None and float(total_mark) == 50 and exam_weight is not None:
+                try:
+                    suggested_exam = float(exam_weight) * 0.2
+                except Exception:
+                    pass
 
             with exam_mark_column:
                 exam_mark: float = st.number_input(

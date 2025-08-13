@@ -88,26 +88,3 @@ def get_summary(subject: Subject) -> tuple:
     exam_weight = subject.examinations.exam_weight if subject.examinations else 100
     total_mark = subject.total_mark
     return total_weighted_mark, total_weight, exam_mark, exam_weight, total_mark
-
-
-def update_table(sem_obj: Semester, data_persistence: DataPersistence) -> dict:
-    """
-    Update the table with subjects from the current semester and synchronized subjects
-    from other semesters.
-
-    Args:
-        sem_obj (Semester): The current semester object containing subjects.
-        data_persistence (DataPersistence): An object containing data for all semesters.
-
-    Returns:
-        dict: A dictionary of subjects where the keys are subject codes and the values
-        are `Subject` objects, including synchronized subjects.
-    """
-    subjects = get_all_subjects(sem_obj, data_persistence)
-    records = []
-    for sem_name, sem_data in data_persistence.data.items():
-        if sem_name == sem_obj.name:
-            continue
-        synced_subjects = get_all_subjects(sem_obj, data_persistence)
-        records.extend(synced_subjects.values())
-    return subjects

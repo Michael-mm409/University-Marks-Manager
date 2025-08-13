@@ -49,13 +49,18 @@ class ExamController:
             if not subject or subject.total_mark is None:
                 return False
 
-            exam_requirements = self.analytics_service.calculate_exam_requirements(subject)
             weight_total = self.analytics_service.calculate_weight_total(subject.assignments)
             remaining_weight = 100 - weight_total
 
-            subject.examinations = Examination(
-                exam_mark=exam_requirements["required_exam"], exam_weight=remaining_weight
-            )
+            # Pass Supplementary logic: if total_mark == 50, use 20% of exam weight
+            if subject.total_mark == 50:
+                exam_mark = remaining_weight * 0.2
+            else:
+                # Normal logic: calculate required exam mark
+                exam_requirements = self.analytics_service.calculate_exam_requirements(subject)
+                exam_mark = exam_requirements["required_exam"]
+
+            subject.examinations = Examination(exam_mark=exam_mark, exam_weight=remaining_weight)
 
             self.app_controller.semester_obj.data_persistence.save_data(
                 self.app_controller.semester_obj.data_persistence.data
