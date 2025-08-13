@@ -23,116 +23,43 @@ Example:
 
 from typing import Any, Dict, List, Tuple
 
-import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from application.queries.summary_queries import select_name_mark_ordered
 from controller import AppController
 
 
 class AssignmentChartsDisplay:
-    """Handles assignment charts and analysis visualization.
-
-    This class provides comprehensive assignment analysis through interactive charts
-    and statistical displays. It automatically adapts chart formatting based on data
-    characteristics such as label length and number of assignments.
-
-    The class generates multiple visualization types:
-        - Performance bar charts with hover details
-        - Weight distribution progress bars and pie charts
-        - Grade distribution summaries
-        - Performance metrics and statistics
-
-    Attributes:
-        controller: Main application controller for data access
-
-    Design Principles:
-        - Responsive design that adapts to data size
-        - Clear visual hierarchy with consistent styling
-        - Interactive elements for detailed data exploration
-        - Accessible color schemes and typography
-
-    Example:
-        >>> controller = AppController()
-        >>> display = AssignmentChartsDisplay(controller)
-        >>> display.render(analytics_data)
-    """
+    """Handles assignment charts and analysis visualization."""
 
     def __init__(self, controller: AppController) -> None:
-        """Initialize assignment charts display.
-
-        Args:
-            controller: Main application controller providing data access
-        """
         self.controller: AppController = controller
 
     def render(self, analytics_data: Dict[str, Any]) -> None:
-        """Render assignment charts and analysis interface.
-
-        Creates a comprehensive assignment analysis display with performance charts
-        and weight distribution analysis. Handles empty data states gracefully.
-
-        Args:
-            analytics_data: Complete analytics dataset containing:
-                - assignment_analytics: Processed assignment data and metrics
-                - basic_metrics: Summary statistics and calculations
-
-        Layout Structure:
-            - Left column: Assignment performance bar chart with grade reference
-            - Right column: Weight distribution analysis and summary
-            - Error handling: Graceful display when no assignments exist
-
-        Example:
-            >>> charts.render(analytics_data)
-        """
         assignment_analytics: Dict[str, Any] = analytics_data["assignment_analytics"]
 
-        if not assignment_analytics["has_data"]:
+        if not assignment_analytics.get("has_data", False):
             st.info("📝 No assignments to display. Add assignments in the Manage tab.")
             return
 
-        # Create charts using the processed data
         assignment_data: List[Dict[str, Any]] = assignment_analytics["assignment_data"]
-        df: pd.DataFrame = pd.DataFrame(assignment_data)
+        names, marks = select_name_mark_ordered(assignment_data)
 
         col1, col2 = st.columns(2)
 
         with col1:
-            self._render_performance_chart(df, assignment_analytics)
+            self._render_performance_chart(names, marks, assignment_analytics)
 
         with col2:
             self._render_weight_distribution(assignment_analytics, analytics_data["basic_metrics"])
 
-    def _get_chart_height(self, df: pd.DataFrame) -> int:
-        """Calculate optimal chart height based on data characteristics.
+    def _get_chart_height(self, names: List[str]) -> int:
+        num_assignments: int = len(names)
+        max_label_length: int = max((len(str(n)) for n in names), default=0)
 
-        Dynamically adjusts chart height based on the number of assignments
-        and maximum label length to ensure proper visualization without crowding.
-
-        Args:
-            df: DataFrame containing assignment data with 'name' column
-
-        Returns:
-            Optimal height in pixels for the chart
-
-        Height Calculation Logic:
-            - Base height: 500px
-            - +50px for many assignments (>6) or very long labels (>15 chars)
-            - +25px for moderate assignments (>4) or long labels (>10 chars)
-            - Minimum height maintained for readability
-
-        Example:
-            >>> height = self._get_chart_height(assignment_df)
-            >>> print(height)  # 525 (for 7 assignments)
-        """
-        num_assignments: int = len(df)
-        max_label_length: int = max(len(str(name)) for name in df["name"]) if len(df) > 0 else 0
-
-        # Base height
         base_height: int = 500
-
-        # Add height for long labels or many assignments
         if max_label_length > 15 or num_assignments > 6:
             return base_height + 50
         elif max_label_length > 10 or num_assignments > 4:
@@ -140,36 +67,13 @@ class AssignmentChartsDisplay:
         else:
             return base_height
 
-    def _get_tick_angle(self, df: pd.DataFrame) -> int:
-        """Determine optimal tick angle based on label lengths.
-
-        Calculates the best rotation angle for x-axis labels to prevent overlap
-        while maintaining readability. Uses smart heuristics based on label
-        length and number of data points.
-
-        Args:
-            df: DataFrame containing assignment data with 'name' column
-
-        Returns:
-            Rotation angle in degrees (0, 15, 30, or 45)
-
-        Angle Selection Logic:
-            - 0°: Short labels (≤10 chars) and few assignments (≤3)
-            - 15°: Medium labels (≤15 chars) and moderate assignments (≤5)
-            - 30°: Long labels (≤20 chars) and many assignments (≤8)
-            - 45°: Very long labels or many assignments
-
-        Example:
-            >>> angle = self._get_tick_angle(assignment_df)
-            >>> print(angle)  # 30 (for assignments with 12-char names)
-        """
-        if len(df) == 0:
+    def _get_tick_angle(self, names: List[str]) -> int:
+        if len(names) == 0:
             return 0
 
-        max_label_length: int = max(len(str(name)) for name in df["name"])
-        num_assignments: int = len(df)
+        max_label_length: int = max((len(str(n)) for n in names), default=0)
+        num_assignments: int = len(names)
 
-        # Smart angle calculation
         if max_label_length > 20 or num_assignments > 8:
             return 45
         elif max_label_length > 15 or num_assignments > 5:
@@ -179,48 +83,20 @@ class AssignmentChartsDisplay:
         else:
             return 0
 
-    def _render_performance_chart(self, df: pd.DataFrame, assignment_analytics: Dict[str, Any]) -> None:
-        """Render assignment performance chart using Plotly.
-
-        Creates an interactive bar chart showing assignment marks with adaptive
-        formatting, hover details, and professional styling. Includes grade
-        reference and performance summary below the chart.
-
-        Args:
-            df: DataFrame containing assignment data with columns:
-                - name: Assignment names
-                - mark: Assignment marks/scores
-            assignment_analytics: Analytics data containing performance metrics
-
-        Chart Features:
-            - Interactive hover with detailed information
-            - Adaptive height and label rotation
-            - Professional color scheme and typography
-            - Outside text labels for clear mark display
-            - Responsive layout with auto-margins
-
-        Styling:
-            - Steel blue bars with navy borders
-            - Transparent background for Streamlit integration
-            - Arial font family for consistency
-            - Grid lines for better value reading
-
-        Example:
-            >>> self._render_performance_chart(assignment_df, analytics)
-        """
+    def _render_performance_chart(
+        self, names: List[str], marks: List[float], assignment_analytics: Dict[str, Any]
+    ) -> None:
         st.markdown("#### 📊 Assignment Performance")
 
-        # Calculate optimal settings
-        chart_height: int = self._get_chart_height(df)
-        tick_angle: int = self._get_tick_angle(df)
+        chart_height: int = self._get_chart_height(names)
+        tick_angle: int = self._get_tick_angle(names)
 
-        # Create Plotly bar chart
         fig = go.Figure(
             data=[
                 go.Bar(
-                    x=df["name"],
-                    y=df["mark"],
-                    text=df["mark"].round(1),
+                    x=names,
+                    y=marks,
+                    text=[f"{m:.1f}" for m in marks],
                     textposition="outside",
                     textfont=dict(size=11, family="Arial"),
                     marker=dict(color="steelblue", opacity=0.8, line=dict(color="navy", width=1)),
@@ -230,7 +106,6 @@ class AssignmentChartsDisplay:
             ]
         )
 
-        # Update layout for better appearance
         fig.update_layout(
             height=chart_height,
             title=dict(text="Assignment Performance", font=dict(size=16, family="Arial"), x=0.5),
@@ -239,7 +114,7 @@ class AssignmentChartsDisplay:
                 tickangle=tick_angle,
                 tickfont=dict(size=12, family="Arial"),
                 showgrid=False,
-                automargin=True,  # Auto-adjust margins for long labels
+                automargin=True,
             ),
             yaxis=dict(
                 title=dict(text="Mark", font=dict(size=12, family="Arial")),
@@ -248,18 +123,16 @@ class AssignmentChartsDisplay:
                 gridwidth=1,
                 gridcolor="rgba(128, 128, 128, 0.2)",
             ),
-            plot_bgcolor="rgba(0,0,0,0)",  # Transparent plot background
-            paper_bgcolor="rgba(0,0,0,0)",  # Transparent paper background
-            margin=dict(l=60, r=20, t=60, b=100),  # Increased bottom margin for angled labels
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=60, r=20, t=60, b=100),
             showlegend=False,
-            font=dict(family="Arial", size=14),  # Global font setting
+            font=dict(family="Arial", size=14),
             hoverlabel=dict(bgcolor="white", font_size=12, font_family="Arial", bordercolor="black"),
         )
 
-        # Display the chart
         st.plotly_chart(fig, use_container_width=True)
 
-        # Grade reference and performance summary
         self._render_grade_reference(assignment_analytics)
         self._render_performance_summary(assignment_analytics)
 

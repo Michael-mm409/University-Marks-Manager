@@ -1,7 +1,7 @@
 # config/settings.py
 from pathlib import Path
 
-from domain import GradeType
+from model import GradeType
 
 
 class Settings:
