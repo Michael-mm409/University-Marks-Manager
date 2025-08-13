@@ -130,6 +130,7 @@ class AnalyticsService:
         Calculate the exam requirements for a given subject.
         This function determines the marks required in the exam to achieve the
         total mark for the subject, based on the marks obtained in assignments.
+        Implements Pass Supplementary logic: if total_mark == 50, required_exam = 20% of exam weight.
         Args:
             subject (Subject): The subject object containing details about
                 assignments and the total mark required.
@@ -139,17 +140,27 @@ class AnalyticsService:
                 - "assignment_total" (float): The total marks obtained from assignments.
                 - "required_exam" (float): The marks required in the exam to achieve the total mark.
                 - "achievable" (bool): Whether the required exam mark is achievable (<= 100).
+                - "exam_weight" (float): The weight of the exam (remaining weight after assignments).
         """
 
         if subject.total_mark is None:
             return {}
 
         assignment_total = AnalyticsService.calculate_assignment_total(subject.assignments)
-        required_exam = max(0, subject.total_mark - assignment_total)
+        weight_total = AnalyticsService.calculate_weight_total(subject.assignments)
+        exam_weight = 100 - weight_total
+
+        # Pass Supplementary logic: if total_mark == 50, use 40% of exam weight
+        if subject.total_mark == 50:
+            required_exam = exam_weight * 0.4
+        else:
+            # Normal logic: calculate required exam mark
+            required_exam = max(0, subject.total_mark - assignment_total)
 
         return {
             "total_mark": subject.total_mark,
             "assignment_total": assignment_total,
             "required_exam": required_exam,
             "achievable": required_exam <= 100,
+            "exam_weight": exam_weight,
         }

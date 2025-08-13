@@ -195,7 +195,7 @@ class GradeStatusDisplay:
         for col, grade, threshold in boundaries:
             with col:
                 if grade_value >= threshold:
-                    st.markdown(f"🟢 **{grade}** ({threshold}+")
+                    st.markdown(f"🟢 **{grade}** ({threshold}+)")
                 else:
                     st.markdown(f"⚪ {grade} ({threshold}+)")
 

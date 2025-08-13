@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from typing import cast
 
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
@@ -16,7 +15,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from controller.table_logic import update_table
 from model import DataPersistence, Semester
 
 from .ui import SemesterSelectionDialog
@@ -408,27 +406,6 @@ class Application(QMainWindow):
             if not sync_semester:
                 QMessageBox.critical(None, "Error", f"Sync semester '{sync_semester_name}' not found.")  # Debugging
                 continue
-
-        # Pass the Semester object to update_table to refresh the table view
-        self.update_table(cast(Semester, semester))
-
-    def update_table(self, semester: Semester | str):
-        """
-        Updates the table widget with data from the specified semester, including subjects and their assignments.
-
-        Args:
-            semester (Semester | str): The semester to display data for. Can be a Semester object or a string
-                           representing the semester name.
-
-        Behavior:
-            - Clears the table before populating it with new data.
-            - If `semester` is a string, attempts to retrieve the corresponding Semester object.
-            - Gathers all subjects from the specified semester, including synced subjects from other semesters.
-            - Sorts subjects by their codes.
-            - Builds rows for each subject, including assignment details, summary rows, and separators.
-            - Inserts rows into the table and adjusts column sizes to fit content.
-        """
-        update_table(self, semester)
 
     def resizeEvent(self, a0):
         """
