@@ -182,8 +182,9 @@ class GradeStatusDisplay:
 
     def _show_grade_boundaries(self, grade_value: float) -> None:
         """Show grade boundaries with highlighting."""
+
         st.markdown("**Grade Boundaries:**")
-        col_hd, col_d, col_c, col_p = st.columns(4)
+        col_hd, col_d, col_c, col_p, col_f = st.columns(5)
 
         boundaries: list[Tuple[Any, str, int]] = [
             (col_hd, "HD", 85),
@@ -198,6 +199,13 @@ class GradeStatusDisplay:
                     st.markdown(f"🟢 **{grade}** ({threshold}+)")
                 else:
                     st.markdown(f"⚪ {grade} ({threshold}+)")
+
+        # Add fail indicator if grade_value < 50
+        with col_f:
+            if grade_value < 50:
+                st.markdown("🔴 **F** (<50)")
+            else:
+                st.markdown("⚪ F (<50)")
 
     def _show_no_data_status(self) -> None:
         """Show status when no data is available."""
