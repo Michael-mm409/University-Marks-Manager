@@ -11,14 +11,10 @@ from typing import Any, Dict, List
 import duckdb
 import pandas as pd
 
-# Prefer model-layer types to avoid domain/model mismatches
-try:
-    from model import Subject  # type: ignore
-except Exception:  # pragma: no cover - fallback for alt import paths
-    Subject = Any  # noqa: N816
+from model import Subject
 
 
-def build_assignment_table_rows(subject: Any) -> List[Dict[str, str]]:
+def build_assignment_table_rows(subject: Subject | Any) -> List[Dict[str, str]]:
     """Return assignment rows for a subject using DuckDB transformations.
 
     Output rows are ready for Streamlit's st.dataframe (list of dicts).
