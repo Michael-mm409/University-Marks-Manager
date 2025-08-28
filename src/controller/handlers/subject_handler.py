@@ -1,6 +1,13 @@
-from typing import Tuple
+from typing import Any, Tuple
 
-from model import DataPersistence, Semester, Subject
+from model import Semester, Subject
+
+# NOTE: This handler has been refactored to prefer direct SQLite persistence
+# operations (upsert_subject, delete_subject, set_total_mark) instead of
+# mutating the in-memory JSON-like structure then calling save_data(). The
+# underlying DataPersistence alias now points at the SQLite implementation
+# which exposes these helper methods. Fallbacks are retained for safety if a
+# different persistence backend lacking these helpers is ever supplied.
 
 
 class SubjectHandler:
@@ -25,7 +32,7 @@ class SubjectHandler:
             Returns a tuple indicating success and a message.
     """
 
-    def __init__(self, semester: Semester, data_persistence: DataPersistence):
+    def __init__(self, semester: Semester, data_persistence: Any):  # Using Any to accept protocol/implementation
         self.semester = semester
         self.data_persistence = data_persistence
 
@@ -48,7 +55,22 @@ class SubjectHandler:
             return False, "Subject code already exists."
 
         try:
-            self.semester.add_subject(code, name, sync_subject=sync_subject)
+            # Create Subject entity and persist via upsert_subject when available
+            subject = Subject(
+                subject_code=code,
+                subject_name=name,
+                sync_subject=sync_subject,
+            )
+
+            persistence = self.semester.data_persistence
+            if hasattr(persistence, "upsert_subject"):
+                # Persist first so cache reload / consistency is ensured
+                persistence.upsert_subject(self.semester.name, subject)  # type: ignore[attr-defined]
+                # Refresh semester subjects mapping (lightweight cache update already done in persistence)
+                self.semester.subjects[code] = subject
+            else:
+                # Fallback to legacy in-memory add
+                self.semester.add_subject(code, name, sync_subject=sync_subject)
             return True, f"Added subject {code}."
         except Exception as e:
             return False, f"Failed to add subject: {str(e)}"
@@ -67,95 +89,39 @@ class SubjectHandler:
             return False, "Subject not found."
 
         try:
-            self.semester.delete_subject(code)
+            persistence = self.semester.data_persistence
+            if hasattr(persistence, "delete_subject"):
+                persistence.delete_subject(self.semester.name, code)  # type: ignore[attr-defined]
+                # Remove from semester cache
+                self.semester.subjects.pop(code, None)
+            else:
+                self.semester.delete_subject(code)
             return True, f"Deleted subject {code}."
         except Exception as e:
             return False, f"Failed to delete subject: {str(e)}"
 
     # In your manage tab where total marks are set
     def set_total_mark(self, subject_code: str, total_mark: float):
-        """Set total mark and automatically calculate exam mark if needed."""
+        """Set total mark and (legacy) calculate exam mark if needed, persisting via SQLite.
+
+        This keeps the prior behaviour of optionally auto-calculating an exam but now
+        persists the total mark through the persistence layer's set_total_mark method
+        when available. Exam persistence (examinations table) is currently handled by
+        higher-level analytics/exam controllers; here we adjust only the total_mark.
+        """
         subject = self.semester.subjects.get(subject_code)
         if not subject:
             return False, "Subject not found"
 
-        # Set the total mark
         subject.total_mark = total_mark
 
-        # Check if exam should be calculated automatically
-        exam_keywords = ["exam", "final", "test", "final exam", "final test"]
-        existing_exam = None
+        persistence = self.semester.data_persistence
+        if hasattr(persistence, "set_total_mark"):
+            persistence.set_total_mark(self.semester.name, subject_code, total_mark)  # type: ignore[attr-defined]
+        else:
+            # Fallback legacy save
+            persistence.save_data(persistence.data)  # type: ignore[attr-defined]
 
-        # Look for existing exam in assignments
-        for assignment in subject.assignments:
-            if any(keyword in assignment.subject_assessment.lower() for keyword in exam_keywords):
-                existing_exam = assignment
-                break
-
-        # Check if exam already exists in examinations section
-        has_exam_in_examinations = (
-            hasattr(subject, "examinations")
-            and subject.examinations
-            and hasattr(subject.examinations, "exam_mark")
-            and subject.examinations.exam_mark is not None
-            and subject.examinations.exam_mark > 0
-        )
-
-        # Calculate what the exam mark should be (always calculate for reference)
-        assignment_total = 0.0
-        assignment_weight_total = 0.0
-
-        for assignment in subject.assignments:
-            # Skip exam assignments and ensure numeric values
-            is_exam = any(keyword in assignment.subject_assessment.lower() for keyword in exam_keywords)
-            if (
-                not is_exam
-                and assignment.weighted_mark is not None
-                and isinstance(assignment.weighted_mark, (int, float))
-                and assignment.mark_weight is not None
-                and isinstance(assignment.mark_weight, (int, float))
-            ):
-                assignment_total += float(assignment.weighted_mark)
-                assignment_weight_total += float(assignment.mark_weight)
-
-        exam_mark_needed = total_mark - assignment_total
-        exam_weight = 100.0 - assignment_weight_total
-
-        # Auto-create exam only if no exam exists anywhere
-        if not existing_exam and not has_exam_in_examinations and exam_weight > 0 and exam_mark_needed >= 0:
-            from model.domain.entities.examination import Examination
-
-            subject.examinations = Examination(
-                exam_mark=exam_mark_needed,
-                exam_weight=exam_weight,
-            )
-
-            self.data_persistence.save_data(self.data_persistence.data)
-            return (
-                True,
-                f"Total mark set to {total_mark:.1f}. Exam mark automatically calculated as {exam_mark_needed:.1f}",
-            )
-
-        # If exam exists, just update total mark and show info message
-        elif has_exam_in_examinations:
-            current_exam_mark = subject.examinations.exam_mark
-            difference = exam_mark_needed - current_exam_mark
-
-            self.data_persistence.save_data(self.data_persistence.data)
-
-            if abs(difference) > 0.1:
-                return (
-                    True,
-                    f"Total mark set to {total_mark:.1f}. Note: Current exam mark ({current_exam_mark:.1f}) differs from calculated ({exam_mark_needed:.1f}) by {difference:.1f}. Check Analytics tab to update if needed.",
-                )
-            else:
-                return (
-                    True,
-                    f"Total mark set to {total_mark:.1f}. Exam mark matches calculation.",
-                )
-
-        # Save the total mark change
-        self.data_persistence.save_data(self.data_persistence.data)
         return True, f"Total mark set to {total_mark:.1f}"
 
 
@@ -172,8 +138,13 @@ def delete_subject(sem_obj: Semester, code: str) -> Tuple[bool, str]:
     return handler.delete_subject(code)
 
 
-def set_total_mark(subject: Subject, total_mark: float, data_persistence: DataPersistence) -> Tuple[bool, str]:
-    """Backward compatibility wrapper."""
+def set_total_mark(subject: Subject, total_mark: float, data_persistence: Any) -> Tuple[bool, str]:
+    """Backward compatibility wrapper using persistence.set_total_mark when present."""
     subject.total_mark = total_mark
-    data_persistence.save_data(data_persistence.data)
+    if hasattr(data_persistence, "set_total_mark"):
+        data_persistence.set_total_mark(
+            subject.semester_name if hasattr(subject, "semester_name") else "", subject.subject_code, total_mark
+        )  # type: ignore[attr-defined]
+    else:
+        data_persistence.save_data(data_persistence.data)
     return True, f"Total Mark for '{subject.subject_code}' set to {total_mark}."

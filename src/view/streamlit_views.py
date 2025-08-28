@@ -159,6 +159,30 @@ class StreamlitView:
             >>> view.render()
             >>> # Displays title, navigation, and content based on state
         """
+        # Restore controller state from session on rerun (Streamlit re-executes script each time)
+        prev_year = st.session_state.get("_active_year")
+        prev_subject = st.session_state.get("_active_subject")
+        if self.controller.year is None and "year_select" in st.session_state:
+            try:
+                self.controller.set_year(st.session_state["year_select"])
+            except Exception:
+                pass
+        if self.controller.semester is None and "semester_select" in st.session_state and self.controller.year:
+            try:
+                self.controller.set_semester(st.session_state["semester_select"])
+            except Exception:
+                pass
+
+        # Detect changes and clear feedback keys if year or subject changed
+        current_subject = st.session_state.get("selected_subject")
+        if prev_year and self.controller.year and prev_year != self.controller.year:
+            self._clear_feedback_keys()
+        elif prev_subject and current_subject and prev_subject != current_subject:
+            self._clear_feedback_keys()
+
+        st.session_state["_active_year"] = self.controller.year
+        st.session_state["_active_subject"] = current_subject
+
         st.title("University Marks Manager")
 
         # Render navigation using component
@@ -166,8 +190,17 @@ class StreamlitView:
 
         # Check if ready to render main content
         if not self.controller.is_ready():
-            st.info("Please select year and semester to continue.")
-            return
+            # Attempt auto-select only if there are semesters and semester missing
+            if self.controller.year and not self.controller.semester:
+                semesters = self.controller.available_semesters
+                if semesters:
+                    chosen = st.session_state.get("semester_select") or semesters[0]
+                    if chosen in semesters:
+                        self.controller.set_semester(chosen)
+                        st.session_state["semester_select"] = chosen
+            if not self.controller.is_ready():
+                st.info("Please select year and semester to continue.")
+                return
 
         # Render main content
         self._render_main_content()
@@ -266,3 +299,16 @@ class StreamlitView:
         with modify_assignment_column:
             with st.expander("📅 Manage Semesters", expanded=False):
                 self.settings_forms.render_semester_management_form()
+
+    def _clear_feedback_keys(self) -> None:
+        """Remove any session_state feedback messages (called on year/subject change)."""
+        to_delete = [
+            feedback_key
+            for feedback_key in list(st.session_state.keys())
+            if isinstance(feedback_key, str) and (feedback_key.endswith("_feedback") or "feedback" in feedback_key)
+        ]
+        for key in to_delete:
+            try:
+                del st.session_state[key]
+            except KeyError:
+                pass

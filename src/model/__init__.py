@@ -93,7 +93,8 @@ Example:
 
 from .domain import Assignment, Examination, Semester, Subject
 from .enums import DataKeys, GradeType, SemesterName
-from .repositories import DataPersistence
+from .repositories import DataPersistenceSQLite as DataPersistence  # Prefer SQLite backend
+from .repositories.sqlite_persistence import PersistenceProtocol  # re-export protocol
 from .services import AnalyticsService, GradeCalculationService, PerformanceMetricsService
 from .types import AssignmentDict, SemesterDict, SubjectDict
 
@@ -104,7 +105,8 @@ __all__ = [
     "Examination",  # Exam data with marks and weight information
     "Subject",  # Complete subject with assignments and exams
     # Data access - Repository pattern implementation
-    "DataPersistence",  # JSON storage and retrieval operations
+    "DataPersistence",  # SQLite storage and retrieval operations (aliased)
+    "PersistenceProtocol",  # protocol for duck-typed persistence
     # Enums - Constants and controlled vocabularies
     "GradeType",  # Assessment categories (assignment, quiz, project)
     "SemesterName",  # Standardized semester naming conventions

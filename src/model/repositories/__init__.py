@@ -112,9 +112,11 @@ Example:
 """
 
 from .data_persistence import DataPersistence
+from .sqlite_persistence import DataPersistenceSQLite
 
 __all__ = [
-    "DataPersistence",  # Primary repository for JSON-based academic data persistence
+    "DataPersistence",  # JSON-based persistence
+    "DataPersistenceSQLite",  # SQLite-based persistence
 ]
 
 # Package metadata

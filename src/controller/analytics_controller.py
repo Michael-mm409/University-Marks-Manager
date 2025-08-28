@@ -283,7 +283,14 @@ class AnalyticsController:
         analytics: Dict[str, Any] = {"has_exam": has_exam, "exam_mark": exam_mark}
 
         if subject.total_mark is not None:
-            exam_requirements = self.analytics_service.calculate_exam_requirements(subject)
+            # Include Pass Supplementary flag if present in session state
+            try:
+                from streamlit import session_state as _st_session  # type: ignore
+
+                ps_flag = bool(_st_session.get(f"ps_flag_{subject.subject_code}", False))
+            except Exception:
+                ps_flag = False
+            exam_requirements = self.analytics_service.calculate_exam_requirements(subject, ps_flag=ps_flag)
             analytics["requirements"] = exam_requirements
 
             if has_exam and exam_requirements:

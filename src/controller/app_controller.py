@@ -4,7 +4,8 @@ from typing import List, Optional
 
 from model.domain import Semester
 from model.enums import SemesterName
-from model.repositories import DataPersistence
+from model.repositories import DataPersistenceSQLite as DataPersistence
+from model.repositories.sqlite_persistence import PersistenceProtocol
 
 
 class AppController:
@@ -50,7 +51,8 @@ class AppController:
         self._data_persistence_factory = data_persistence_factory or DataPersistence
         self._year: Optional[str] = None
         self._semester: Optional[str] = None
-        self._data_persistence: Optional[DataPersistence] = None
+
+        self._data_persistence: Optional[PersistenceProtocol] = None
         self._sem_obj: Optional[Semester] = None
 
     @property
@@ -125,7 +127,15 @@ class AppController:
         if not self._data_persistence:
             return [semester.value for semester in SemesterName]
 
-        existing_semesters = list(self._data_persistence.data.keys())
+        # Prefer DB-backed helper if available
+        if hasattr(self._data_persistence, "list_semesters"):
+            try:
+                semesters = self._data_persistence.list_semesters()  # type: ignore[attr-defined]
+                if semesters:
+                    return semesters
+            except Exception:
+                pass
+        existing_semesters = list(getattr(self._data_persistence, "data", {}).keys())
         return existing_semesters or [semester.value for semester in SemesterName]
 
     @property
@@ -153,7 +163,8 @@ class AppController:
         if self._semester != semester:
             self._semester = semester
             # Type checker now knows these are not None due to explicit checks above
-            self._sem_obj = Semester(semester, self._year, self._data_persistence)
+            # mypy/pylance: PersistenceProtocol compatible with expected interface
+            self._sem_obj = Semester(semester, self._year, self._data_persistence)  # type: ignore[arg-type]
 
         return True
 
@@ -183,7 +194,7 @@ class AppController:
         return self._sem_obj
 
     @property
-    def data_persistence(self) -> Optional[DataPersistence]:
+    def data_persistence(self) -> Optional[PersistenceProtocol]:
         """
         Retrieves the data persistence instance.
         Returns:

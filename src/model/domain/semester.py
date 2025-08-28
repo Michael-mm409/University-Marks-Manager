@@ -5,12 +5,12 @@ in the University Marks Manager application.
 The Semester class is responsible for handling assignments and examinations for a given semester.
 """
 
-from typing import Dict, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 
 import streamlit as st  # Use Streamlit for feedback
 
 from model.domain.entities import Assignment, Examination, Subject
-from model.repositories.data_persistence import DataPersistence
+from model.repositories.sqlite_persistence import PersistenceProtocol
 
 
 class Semester:
@@ -29,34 +29,32 @@ class Semester:
             An instance of the DataPersistence class for managing data storage and retrieval.
     """
 
-    def __init__(self, name: str, year: str, data_persistence: DataPersistence):
+    def __init__(self, name: str, year: str, data_persistence: PersistenceProtocol):
         self.name = name
         self.year = year
         self.data_persistence = data_persistence
         # Initialize subjects from loaded data if available
-        loaded_subjects = self.data_persistence.data.get(self.name, {})
+        # Leverage already loaded cache (data) but perform lightweight object normalization
+        cache_subjects = self.data_persistence.data.get(self.name, {})  # type: ignore[attr-defined]
         self.subjects: Dict[str, Subject] = {}
-        for code, subj in loaded_subjects.items():
+        for code, subj in cache_subjects.items():
             if isinstance(subj, Subject):
                 self.subjects[code] = subj
-            elif isinstance(subj, dict):
-                # Convert assignments
-                assignments = [
-                    a if isinstance(a, Assignment) else Assignment(**a)
-                    for a in list(subj.get("assignments", subj.get("Assignments", [])) or [])
-                ]
-                # Convert examinations
-                examinations = subj.get("examinations", subj.get("Examinations", None))
-                if examinations and isinstance(examinations, dict):
-                    examinations = Examination(**examinations)
-                elif not examinations:
-                    examinations = Examination()
+            elif isinstance(subj, dict):  # legacy dict form
+                assignments_raw = subj.get("assignments") or subj.get("Assignments") or []
+                assignments_list = assignments_raw if isinstance(assignments_raw, list) else []
+                assignments = [a if isinstance(a, Assignment) else Assignment(**a) for a in assignments_list]
+                examinations_raw: Any = subj.get("examinations") or subj.get("Examinations")
+                if examinations_raw and isinstance(examinations_raw, dict):
+                    examination = Examination(**examinations_raw)
+                else:
+                    examination = examinations_raw if isinstance(examinations_raw, Examination) else Examination()
                 self.subjects[code] = Subject(
                     subject_code=subj.get("subject_code", code),
-                    subject_name=subj.get("subject_name", subj.get("Subject Name", "N/A")),
+                    subject_name=subj.get("subject_name", subj.get("Subject Name", code)),
                     assignments=assignments,
                     total_mark=subj.get("total_mark", subj.get("Total Mark", 0)),
-                    examinations=examinations,
+                    examinations=examination,
                     sync_subject=subj.get("sync_subject", subj.get("Sync Subject", False)),
                 )
 
@@ -75,7 +73,7 @@ class Semester:
         Returns:
             Subject: The `Subject` instance corresponding to the given subject code."""
         if subject_code not in self.subjects:
-            self.subjects[subject_code] = Subject(
+            new_subject = Subject(
                 subject_code=subject_code,
                 subject_name=subject_name or "N/A",
                 assignments=[],
@@ -83,9 +81,9 @@ class Semester:
                 examinations=Examination(),
                 sync_subject=False,
             )
-            # Update persistence data
-            self.data_persistence.data[self.name] = {code: subj for code, subj in self.subjects.items()}
-            self.data_persistence.save_data(self.data_persistence.data)
+            if hasattr(self.data_persistence, "upsert_subject"):
+                self.data_persistence.upsert_subject(self.name, new_subject)  # type: ignore[attr-defined]
+            self.subjects[subject_code] = new_subject
         return self.subjects[subject_code]
 
     def add_subject(self, subject_code: str, subject_name: str, sync_subject: bool = False):
@@ -122,10 +120,9 @@ class Semester:
             sync_subject=sync_subject,
         )
 
+        if hasattr(self.data_persistence, "upsert_subject"):
+            self.data_persistence.upsert_subject(self.name, subject)  # type: ignore[attr-defined]
         self.subjects[subject_code] = subject
-
-        self.data_persistence.data[self.name] = {code: subj for code, subj in self.subjects.items()}
-        self.data_persistence.save_data(self.data_persistence.data)
         st.success(f"Added new subject '{subject_name}' with code '{subject_code}'.")
 
     def delete_subject(self, subject_code: str):
@@ -149,9 +146,9 @@ class Semester:
         if subject_code not in self.subjects:
             st.error(f"Subject '{subject_code}' does not exist.")
             return
-        del self.subjects[subject_code]
-        self.data_persistence.data[self.name] = {code: subj for code, subj in self.subjects.items()}
-        self.data_persistence.save_data(self.data_persistence.data)
+        if hasattr(self.data_persistence, "delete_subject"):
+            self.data_persistence.delete_subject(self.name, subject_code)  # type: ignore[attr-defined]
+        self.subjects.pop(subject_code, None)
         st.success(f"Deleted subject '{subject_code}'.")
 
     def add_entry(
@@ -189,7 +186,7 @@ class Semester:
         if subject_code not in self.subjects:
             st.error(f"Subject '{subject_code}' does not exist in {self.name}.")
             return
-        subject = self.subjects[subject_code]
+        # Retrieve subject (already validated existence above) - local ref not needed beyond validation
         if grade_type in ("S", "U"):
             unweighted_mark = None
             mark_weight = None
@@ -202,29 +199,34 @@ class Semester:
             mark_weight = float(mark_weight)
             unweighted_mark = round(weighted_mark / mark_weight, 4) if mark_weight > 0 else 0
 
-        updated = False
-        for a in subject.assignments:
-            if a.subject_assessment == subject_assessment:
-                a.unweighted_mark = unweighted_mark
-                a.weighted_mark = weighted_mark
-                a.mark_weight = mark_weight
-                updated = True
-                break
-        else:
-            assignment = Assignment(
-                subject_assessment=subject_assessment,
-                unweighted_mark=unweighted_mark,
-                weighted_mark=weighted_mark,
-                mark_weight=mark_weight,
-            )
-            subject.assignments.append(assignment)
+        # Delegate persistence to assignment upsert
+        if hasattr(self.data_persistence, "upsert_assignment"):
+            from model.enums import GradeType  # local import to avoid circular
 
-        self.data_persistence.data[self.name] = {code: subj for code, subj in self.subjects.items()}
-        self.data_persistence.save_data(self.data_persistence.data)
-        if updated:
-            st.info(f"Entry for '{subject_assessment}' updated in semester '{self.name}'.")
+            grade_enum = (
+                GradeType.SATISFACTORY
+                if weighted_mark == "S"
+                else (GradeType.UNSATISFACTORY if weighted_mark == "U" else GradeType.NUMERIC)
+            )
+            self.data_persistence.upsert_assignment(  # type: ignore[attr-defined]
+                self.name,
+                subject_code,
+                subject_assessment,
+                weighted_mark,
+                unweighted_mark,
+                mark_weight,
+                grade_enum,
+            )
+            # Refresh local cache from persistence fresh data for this subject
+            refreshed = self.data_persistence.data.get(self.name, {}).get(subject_code)  # type: ignore[attr-defined]
+            if isinstance(refreshed, Subject):
+                self.subjects[subject_code] = refreshed
+            changed = any(a.subject_assessment == subject_assessment for a in self.subjects[subject_code].assignments)
+            st.success(
+                f"Entry for '{subject_assessment}' {'updated' if changed else 'added'} in semester '{self.name}'."
+            )
         else:
-            st.success(f"Entry for '{subject_assessment}' added in semester '{self.name}'.")
+            st.error("Persistence layer missing upsert_assignment; operation not applied.")
 
     def delete_entry(self, subject_code: str, subject_assessment: str):
         """
@@ -245,11 +247,15 @@ class Semester:
             KeyError: If the `subject_code` does not exist in the semester's subjects.
         """
         if subject_code in self.subjects:
-            subject = self.subjects[subject_code]
-            subject.assignments = [a for a in subject.assignments if a.subject_assessment != subject_assessment]
-            self.data_persistence.data[self.name] = {code: subj for code, subj in self.subjects.items()}
-            self.data_persistence.save_data(self.data_persistence.data)
-            st.success(f"Deleted assessment '{subject_assessment}' from subject '{subject_code}'.")
+            if hasattr(self.data_persistence, "delete_assignment"):
+                self.data_persistence.delete_assignment(self.name, subject_code, subject_assessment)  # type: ignore[attr-defined]
+                # refresh subject cache
+                refreshed = self.data_persistence.data.get(self.name, {}).get(subject_code)  # type: ignore[attr-defined]
+                if isinstance(refreshed, Subject):
+                    self.subjects[subject_code] = refreshed
+                st.success(f"Deleted assessment '{subject_assessment}' from subject '{subject_code}'.")
+            else:
+                st.error("Persistence layer missing delete_assignment; operation not applied.")
 
     def calculate_exam_mark(self, subject_code: str) -> Optional[float]:
         """
@@ -290,9 +296,17 @@ class Semester:
         subject.examinations.exam_mark = calculated_exam_mark
         subject.examinations.exam_weight = exam_weight
 
-        # Save to JSON file
-        self.data_persistence.data[self.name] = {code: subj for code, subj in self.subjects.items()}
-        self.data_persistence.save_data(self.data_persistence.data)
+        # Persist via examination helper if available
+        if hasattr(self.data_persistence, "upsert_exam"):
+            self.data_persistence.upsert_exam(self.name, subject_code, calculated_exam_mark, exam_weight)  # type: ignore[attr-defined]
+            # Refresh cache for subject
+            refreshed = self.data_persistence.data.get(self.name, {}).get(subject_code)  # type: ignore[attr-defined]
+            if isinstance(refreshed, Subject):
+                self.subjects[subject_code] = refreshed
+        else:
+            # Legacy fallback
+            self.data_persistence.data[self.name] = {code: subj for code, subj in self.subjects.items()}
+            self.data_persistence.save_data(self.data_persistence.data)
 
         st.success(f"Calculated and saved exam mark for {subject_code}: {calculated_exam_mark}%")
         return calculated_exam_mark
