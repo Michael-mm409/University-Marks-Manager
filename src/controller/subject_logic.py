@@ -1,7 +1,7 @@
 from typing import Tuple
 
 from model.domain import Semester, Subject
-from model.repositories.data_persistence import DataPersistence
+from model.repositories.sqlite_persistence import PersistenceProtocol as DataPersistence
 
 
 def add_subject(sem_obj: Semester, code: str, name: str, sync_subject: bool) -> Tuple[bool, str]:

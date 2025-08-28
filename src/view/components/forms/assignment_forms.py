@@ -65,6 +65,13 @@ class AssignmentForms:
             st.error("Semester not initialized.")
             return
 
+        fb_key = f"assignment_add_feedback_{subject_code}"
+        if fb := st.session_state.get(fb_key):
+            st.success(fb)
+            if st.button("Dismiss", key=f"dismiss_{fb_key}", type="secondary"):
+                st.session_state.pop(fb_key, None)
+                st.rerun()
+
         with st.form(f"add_assignment_form_{subject_code}"):
             assessment = st.text_input("Assessment Name")
 
@@ -100,7 +107,7 @@ class AssignmentForms:
                         exam_controller.auto_calculate_exam(subject_code)
                     except Exception:
                         pass
-                    st.success(message)
+                    st.session_state[fb_key] = message
                     st.rerun()
                 else:
                     st.warning(message)
@@ -146,6 +153,12 @@ class AssignmentForms:
                 break
 
         if current_assignment:
+            mod_fb_key = f"assignment_modify_feedback_{subject_code}"
+            if mfb := st.session_state.get(mod_fb_key):
+                st.success(mfb)
+                if st.button("Dismiss", key=f"dismiss_{mod_fb_key}", type="secondary"):
+                    st.session_state.pop(mod_fb_key, None)
+                    st.rerun()
             # Show current values clearly
             st.markdown(f"**Currently Modifying: {selected_assessment}**")
 
@@ -240,7 +253,7 @@ class AssignmentForms:
                         except Exception as exception:
                             st.error(f"Error updating exam: {str(exception)}")
                             return
-                        st.success(message)
+                        st.session_state[mod_fb_key] = message
                         st.rerun()
                     else:
                         st.warning(message)
@@ -271,6 +284,13 @@ class AssignmentForms:
 
         assessments = [a.subject_assessment for a in subject.assignments]
 
+        del_fb_key = f"assignment_delete_feedback_{subject_code}"
+        if dfb := st.session_state.get(del_fb_key):
+            st.success(dfb)
+            if st.button("Dismiss", key=f"dismiss_{del_fb_key}", type="secondary"):
+                st.session_state.pop(del_fb_key, None)
+                st.rerun()
+
         with st.form(f"delete_assignment_form_{subject_code}"):
             del_assessment = st.selectbox("Select Assessment to Delete", assessments)
 
@@ -283,7 +303,7 @@ class AssignmentForms:
                         exam_controller.auto_calculate_exam(subject_code)
                     except Exception:
                         pass
-                    st.success(message)
+                    st.session_state[del_fb_key] = message
                     st.rerun()
                 else:
                     st.warning(message)

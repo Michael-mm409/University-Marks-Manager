@@ -125,12 +125,14 @@ class AnalyticsService:
         }
 
     @staticmethod
-    def calculate_exam_requirements(subject: Subject) -> Dict[str, float]:
+    def calculate_exam_requirements(subject: Subject, ps_flag: bool = False) -> Dict[str, float]:
         """
         Calculate the exam requirements for a given subject.
-        This function determines the marks required in the exam to achieve the
-        total mark for the subject, based on the marks obtained in assignments.
-        Implements Pass Supplementary logic: if total_mark == 50, required_exam = 20% of exam weight.
+        Normal scenario: required_exam = max(0, total_mark - assignment_total).
+        Pass Supplementary (PS) scenario (ps_flag True and total_mark == 50):
+            required_exam is proportional to the remaining weight share of the total mark:
+                required_exam = (exam_weight / 100) * total_mark
+            (Independent of assignment marks achieved; driven by assessment weighting.)
         Args:
             subject (Subject): The subject object containing details about
                 assignments and the total mark required.
@@ -148,14 +150,23 @@ class AnalyticsService:
 
         assignment_total = AnalyticsService.calculate_assignment_total(subject.assignments)
         weight_total = AnalyticsService.calculate_weight_total(subject.assignments)
-        exam_weight = 100 - weight_total
+        exam_weight = max(0.0, 100 - weight_total)
 
-        # Pass Supplementary logic: if total_mark == 50, use 40% of exam weight
-        if subject.total_mark == 50:
-            required_exam = exam_weight * 0.4
+        if ps_flag and subject.total_mark == 50:
+            # PS rule: enforce user-specified minimum exam weight (default 40) and compute proportional requirement only.
+            try:  # Access session_state lazily to avoid hard dependency if not in Streamlit context
+                from streamlit import session_state as _st_session  # type: ignore
+
+                min_exam_weight_key = f"ps_min_exam_weight_{subject.subject_code}"
+                user_min_exam_weight = float(_st_session.get(min_exam_weight_key, 40.0))
+            except Exception:
+                user_min_exam_weight = 40.0
+            # Clamp between 0 and 100
+            enforced_min = max(0.0, min(100.0, user_min_exam_weight))
+            exam_weight = enforced_min
+            required_exam = (exam_weight / 100.0) * subject.total_mark
         else:
-            # Normal logic: calculate required exam mark
-            required_exam = max(0, subject.total_mark - assignment_total)
+            required_exam = max(0.0, subject.total_mark - assignment_total)
 
         return {
             "total_mark": subject.total_mark,

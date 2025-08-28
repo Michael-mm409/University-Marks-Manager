@@ -1,9 +1,11 @@
+from typing import Any
+
 import duckdb
 
-from model import Assignment, DataPersistence, Examination, Semester, Subject
+from model import Assignment, Examination, PersistenceProtocol, Semester, Subject
 
 
-def get_all_subjects(sem_obj: Semester, data_persistence: DataPersistence) -> dict:
+def get_all_subjects(sem_obj: Semester, data_persistence: PersistenceProtocol) -> dict:
     """
     Retrieve all subjects for a given semester object, including synchronized subjects
     from other semesters.
@@ -30,54 +32,56 @@ def get_all_subjects(sem_obj: Semester, data_persistence: DataPersistence) -> di
     """
     subjects = dict(sem_obj.subjects)
     # Collect all subjects from other semesters except the current one
-    other_semesters = {k: v for k, v in data_persistence.data.items() if k != sem_obj.name}
-
-    # Flatten all subjects from other semesters into a list for DuckDB processing
-    records = []
-    for _, sem_data in other_semesters.items():
-        for subj_code, subj in sem_data.items():
-            if isinstance(subj, dict):
-                sync = subj.get("sync_subject", False)
-            elif hasattr(subj, "sync_subject"):
-                sync = subj.sync_subject
-            else:
-                sync = False
-            records.append({"subj_code": subj_code, "subj": subj, "is_synced": sync})
-
-    # Use DuckDB to filter for synced subjects not already in current semester
-    if records:
-        conn = duckdb.connect()
-        # Create a temporary table from records
-        conn.execute("CREATE TEMP TABLE subjects_data AS SELECT * FROM ?", [records])
-        # Filter for synced subjects that aren't in current semester
-        current_subjects = list(subjects.keys())
-        filtered_results = conn.execute(
-            """
-            SELECT subj_code, subj, is_synced
-            FROM subjects_data 
-            WHERE is_synced = true 
-            AND subj_code NOT IN (SELECT unnest(?))
-        """,
-            [current_subjects],
-        ).fetchall()
-
-        for subj_code, subj, _ in filtered_results:
-            if isinstance(subj, dict):
-                assignments = [Assignment(**a) for a in subj["assignments"]] if "assignments" in subj else []
-                examinations = Examination(**subj.get("examinations", {})) if "examinations" in subj else None
-                subject = Subject(
-                    subject_code=subj_code,
-                    subject_name=subj.get("subject_name", "N/A"),
-                    assignments=assignments,
-                    total_mark=subj.get("total_mark", 0.0),
-                    examinations=examinations or Examination(exam_mark=0, exam_weight=100),
-                    sync_subject=True,
-                )
-            else:
-                subject = subj
-            subjects[subj_code] = subject
-
-        conn.close()
+    # If SQLite persistence provides helper use it; fallback to legacy in-memory traversal
+    fetch_helper: Any = getattr(data_persistence, "fetch_synced_subjects", None)
+    if callable(fetch_helper):
+        synced_list = fetch_helper(sem_obj.name)  # expected List[Subject]
+        if isinstance(synced_list, list):
+            for s in synced_list:
+                if s.subject_code not in subjects:
+                    subjects[s.subject_code] = s
+    else:
+        other_semesters = {k: v for k, v in data_persistence.data.items() if k != sem_obj.name}
+        records = []
+        for _, sem_data in other_semesters.items():
+            for subj_code, subj in sem_data.items():
+                if isinstance(subj, dict):
+                    sync = subj.get("sync_subject", False)
+                elif hasattr(subj, "sync_subject"):
+                    sync = subj.sync_subject
+                else:
+                    sync = False
+                records.append({"subj_code": subj_code, "subj": subj, "is_synced": sync})
+        if records:
+            conn = duckdb.connect()
+            conn.execute("CREATE TEMP TABLE subjects_data AS SELECT * FROM ?", [records])
+            current_subjects = list(subjects.keys())
+            filtered_results = conn.execute(
+                """
+                SELECT subj_code, subj, is_synced
+                FROM subjects_data 
+                WHERE is_synced = true 
+                AND subj_code NOT IN (SELECT unnest(?))
+                ORDER BY id;
+            """,
+                [current_subjects],
+            ).fetchall()
+            for subj_code, subj, _ in filtered_results:
+                if isinstance(subj, dict):
+                    assignments = [Assignment(**a) for a in subj["assignments"]] if "assignments" in subj else []
+                    examinations = Examination(**subj.get("examinations", {})) if "examinations" in subj else None
+                    subject = Subject(
+                        subject_code=subj_code,
+                        subject_name=subj.get("subject_name", "N/A"),
+                        assignments=assignments,
+                        total_mark=subj.get("total_mark", 0.0),
+                        examinations=examinations or Examination(exam_mark=0, exam_weight=100),
+                        sync_subject=True,
+                    )
+                else:
+                    subject = subj
+                subjects[subj_code] = subject
+            conn.close()
     return subjects
 
 

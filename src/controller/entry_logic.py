@@ -1,7 +1,7 @@
 from model.domain import Semester
 
 
-def add_assignment(sem_obj, subject_code, assessment, weighted_mark, mark_weight):
+def add_assignment(sem_obj: Semester, subject_code: str, assessment: str, weighted_mark: float, mark_weight: float):
     if not assessment:
         return False, "Assessment name cannot be empty."
     sem_obj.add_entry(
@@ -15,12 +15,12 @@ def add_assignment(sem_obj, subject_code, assessment, weighted_mark, mark_weight
     return True, f"Added assignment '{assessment}' to {subject_code}."
 
 
-def delete_assignment(sem_obj: Semester, subject_code, assessment):
+def delete_assignment(sem_obj: Semester, subject_code: str, assessment: str):
     sem_obj.delete_entry(subject_code, assessment)
     return True, f"Deleted assessment '{assessment}' from {subject_code}."
 
 
-def delete_subject(sem_obj, subject_code):
+def delete_subject(sem_obj: Semester, subject_code: str):
     if subject_code not in sem_obj.subjects:
         return False, "Subject not found."
     sem_obj.delete_subject(subject_code)

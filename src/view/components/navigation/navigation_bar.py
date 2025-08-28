@@ -1,19 +1,7 @@
-"""
-Navigation bar component.
+"""Navigation bar component.
 
-This module defines the `NavigationBar` class, responsible for rendering
-the top-level navigation controls in the Streamlit interface. These controls
-allow users to select:
-    - Year
-    - Semester
-    - Subject
-
-Selections are handled via dropdown menus and update the Streamlit session state
-or controller state accordingly.
-
-Dependencies:
-    - streamlit
-    - AppController
+Provides year, semester, and subject selection controls. Includes semester
+initialization UI when a year has no configured semesters.
 """
 
 import streamlit as st
@@ -22,88 +10,84 @@ from controller import AppController
 
 
 class NavigationBar:
-    """
-    Handles navigation controls in the application UI.
-
-    This component provides dropdown-based navigation for year, semester,
-    and subject selection. Changes to the dropdowns trigger updates to
-    the application state via the AppController.
-
-    Args:
-        controller (AppController): The main application controller that manages
-            current year, semester, and subject selections.
-    """
+    """Handles navigation controls (year, semester, subject)."""
 
     def __init__(self, controller: AppController):
-        """
-        Initialize the NavigationBar with the main application controller.
-
-        Args:
-            controller (AppController): Controller instance used to access and update
-            available years, semesters, and subjects.
-        """
         self.controller = controller
 
     def render(self) -> None:
-        """
-        Render the navigation bar layout, which includes:
-
-        - Year selector (left column)
-        - Semester selector (middle column)
-        - Subject selector (right column)
-
-        Each selector updates the application state via the controller or Streamlit session state.
-        """
-        year_column, semester_column, subject_column = st.columns(3)
-
-        with year_column:
+        year_col, sem_col, subj_col = st.columns(3)
+        with year_col:
             self._render_year_selector()
-
-        with semester_column:
+        with sem_col:
             self._render_semester_selector()
-
-        with subject_column:
+        with subj_col:
             self._render_subject_selector()
 
     def _render_year_selector(self) -> None:
-        """
-        Render a dropdown to select the academic year.
-
-        Updates the controller's current year based on selection.
-        """
         selected_year = st.selectbox(
             "Select Year",
             options=self.controller.available_years,
             index=self.controller.available_years.index(self.controller.current_year),
             key="year_select",
         )
-        self.controller.set_year(selected_year)
+        if self.controller.year != selected_year:
+            self.controller.set_year(selected_year)
+        semesters = self.controller.available_semesters
+        needs_init = (not semesters) or (len(semesters) == 1 and semesters[0] == "Semester 1")
+        if needs_init:
+            with st.expander("Initialize Semesters", expanded=True):
+                st.caption("Choose preset or enter custom comma-separated list.")
+                presets = {
+                    "Autumn/Spring/Summer": ["Autumn", "Spring", "Summer"],
+                    "Autumn/Spring/Annual": ["Autumn", "Spring", "Annual"],
+                    "Autumn & Spring": ["Autumn", "Spring"],
+                    "Session 1 & 2": ["Session 1", "Session 2"],
+                    "Annual Only": ["Annual"],
+                }
+                preset_choice = st.selectbox("Preset", options=list(presets.keys()), key="preset_semesters_choice")
+                custom = st.text_input(
+                    "Custom (comma separated)",
+                    placeholder="Autumn, Spring, Summer",
+                    key="custom_semesters_input",
+                )
+                if st.button("Create Semesters", key="create_semesters_btn"):
+                    names = [s.strip() for s in custom.split(",") if s.strip()] or presets[preset_choice]
+                    dp = self.controller.data_persistence
+                    if dp and hasattr(dp, "add_semesters"):
+                        try:
+                            dp.add_semesters(names)  # type: ignore[attr-defined]
+                            if "Semester 1" not in names and hasattr(dp, "remove_semester"):
+                                try:
+                                    dp.remove_semester("Semester 1")  # type: ignore[attr-defined]
+                                except Exception:
+                                    pass
+                            self.controller.set_year(selected_year)
+                            first = names[0]
+                            self.controller.set_semester(first)
+                            st.session_state["semester_select"] = first
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to add semesters: {e}")
+                    else:
+                        st.error("Persistence does not support adding semesters.")
 
     def _render_semester_selector(self) -> None:
-        """
-        Render a dropdown to select the semester.
-
-        This is only displayed if a year has been selected.
-        On selection, updates the semester in the controller.
-        Displays an error if the semester selection fails.
-        """
-        if self.controller.year:
-            selected_semester = st.selectbox(
-                "Select Semester", options=self.controller.available_semesters, index=0, key="semester_select"
-            )
-            success = self.controller.set_semester(selected_semester)
-            if not success:
-                st.error("Failed to set semester. Please try again.")
+        if not self.controller.year:
+            return
+        semesters = self.controller.available_semesters
+        if not semesters:
+            return
+        prev = st.session_state.get("semester_select")
+        index = 0
+        if prev in semesters:  # type: ignore[arg-type]
+            index = semesters.index(prev)  # type: ignore[arg-type]
+        selected = st.selectbox("Select Semester", options=semesters, index=index, key="semester_select")
+        self.controller.set_semester(selected)
 
     def _render_subject_selector(self) -> None:
-        """
-        Render a dropdown to select a subject from the available subjects list.
-
-        Updates the Streamlit session state with the selected subject.
-        This control is only shown if subjects are available.
-        """
-        if self.controller.available_subjects:
-            selected_subject = st.selectbox(
-                "Select Subject", options=self.controller.available_subjects, key="subject_select"
-            )
-            st.session_state["selected_subject"] = selected_subject
+        subs = self.controller.available_subjects
+        if not subs:
+            return
+        selected_subject = st.selectbox("Select Subject", options=subs, key="subject_select")
+        st.session_state["selected_subject"] = selected_subject

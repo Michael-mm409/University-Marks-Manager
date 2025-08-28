@@ -49,22 +49,27 @@ class ExamController:
             if not subject or subject.total_mark is None:
                 return False
 
-            weight_total = self.analytics_service.calculate_weight_total(subject.assignments)
-            remaining_weight = 100 - weight_total
+            # Assignment weights used implicitly via analytics service; explicit aggregation not needed here
 
-            # Pass Supplementary logic: if total_mark == 50, use 20% of exam weight
-            if subject.total_mark == 50:
-                exam_mark = remaining_weight * 0.2
-            else:
-                # Normal logic: calculate required exam mark
-                exam_requirements = self.analytics_service.calculate_exam_requirements(subject)
-                exam_mark = exam_requirements["required_exam"]
+            # Pass Supplementary logic: explicit flag takes precedence; fallback to total_mark heuristic
+            from streamlit import session_state as _st_session
 
-            subject.examinations = Examination(exam_mark=exam_mark, exam_weight=remaining_weight)
+            ps_flag_key = f"ps_flag_{subject_code}"
+            is_ps = bool(_st_session.get(ps_flag_key, False))
+            if not is_ps and subject.total_mark == 50:
+                # Heuristic fallback only if user hasn't explicitly toggled
+                is_ps = True
+            # Delegate calculation (PS or normal) to analytics service
+            exam_requirements = self.analytics_service.calculate_exam_requirements(subject, ps_flag=is_ps)
+            exam_mark = exam_requirements.get("required_exam", 0.0)
+            exam_weight = exam_requirements.get("exam_weight", 0.0)
 
-            self.app_controller.semester_obj.data_persistence.save_data(
-                self.app_controller.semester_obj.data_persistence.data
-            )
+            subject.examinations = Examination(exam_mark=exam_mark, exam_weight=exam_weight)
+            persistence = self.app_controller.semester_obj.data_persistence
+            if hasattr(persistence, "upsert_exam"):
+                persistence.upsert_exam(self.app_controller.semester_obj.name, subject_code, exam_mark, exam_weight)  # type: ignore[attr-defined]
+            else:  # legacy fallback
+                persistence.save_data(persistence.data)  # type: ignore[attr-defined]
 
             return True
 
@@ -95,10 +100,11 @@ class ExamController:
                 return False
 
             subject.examinations = Examination(exam_mark=exam_mark, exam_weight=exam_weight)
-
-            self.app_controller.semester_obj.data_persistence.save_data(
-                self.app_controller.semester_obj.data_persistence.data
-            )
+            persistence = self.app_controller.semester_obj.data_persistence
+            if hasattr(persistence, "upsert_exam"):
+                persistence.upsert_exam(self.app_controller.semester_obj.name, subject_code, exam_mark, exam_weight)  # type: ignore[attr-defined]
+            else:
+                persistence.save_data(persistence.data)  # type: ignore[attr-defined]
 
             return True
 

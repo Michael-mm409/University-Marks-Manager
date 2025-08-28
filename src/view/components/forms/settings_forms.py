@@ -28,13 +28,9 @@ Example:
     >>> settings_forms.render_total_mark_form()
 """
 
-from typing import Dict
-
 import streamlit as st
 
-from controller import set_total_mark
 from controller.app_controller import AppController
-from model.domain.entities import Subject
 
 
 class SettingsForms:
@@ -142,6 +138,13 @@ class SettingsForms:
             st.warning("Subject not found.")
             return
 
+        fb_key = f"total_mark_feedback_{subject_code}"
+        if fb := st.session_state.get(fb_key):
+            st.success(fb)
+            if st.button("Dismiss", key=f"dismiss_{fb_key}", type="secondary"):
+                st.session_state.pop(fb_key, None)
+                st.rerun()
+
         with st.form(f"set_total_mark_compact_{subject_code}"):
             col1, col2 = st.columns([3, 1])
 
@@ -155,11 +158,59 @@ class SettingsForms:
                     help=f"Current: {subject.total_mark}",
                 )
 
+                # Pass Supplementary (PS) option when total mark is exactly 50
+                ps_flag_key = f"ps_flag_{subject_code}"
+                if int(new_total_mark) == 50:
+                    current_ps = st.session_state.get(ps_flag_key, False)
+                    ps_cols = st.columns([2, 1])
+                    with ps_cols[0]:
+                        updated_ps = st.checkbox(
+                            "Pass Supplementary (PS) scenario?",
+                            value=current_ps,
+                            help="Tick if this 50 mark represents a Pass Supplementary (PS). You'll be able to set the minimum exam weight threshold.",
+                        )
+                    st.session_state[ps_flag_key] = updated_ps
+
+                    if updated_ps:
+                        # Allow user to specify the enforced minimum exam weight (default 40%)
+                        min_exam_weight_key = f"ps_min_exam_weight_{subject_code}"
+                        default_min_exam_weight = float(st.session_state.get(min_exam_weight_key, 40.0))
+                        with ps_cols[1]:
+                            new_min_exam_weight = st.number_input(
+                                "Min Exam %",
+                                min_value=0.0,
+                                max_value=100.0,
+                                value=default_min_exam_weight,
+                                step=1.0,
+                                help="Minimum exam weight applied in PS mode (default 40).",
+                            )
+                        # Persist in session
+                        st.session_state[min_exam_weight_key] = new_min_exam_weight
+                else:
+                    # Clear flag if total mark moved away from 50
+                    if ps_flag_key in st.session_state:
+                        st.session_state.pop(ps_flag_key)
+                    # Also clear any stored min exam weight for PS
+                    min_exam_weight_key = f"ps_min_exam_weight_{subject_code}"
+                    if min_exam_weight_key in st.session_state:
+                        st.session_state.pop(min_exam_weight_key)
+
             with col2:
                 if st.form_submit_button("Update", type="secondary"):
-                    success, message = set_total_mark(subject, new_total_mark, self.controller.data_persistence)
+                    # Perform total mark persistence using persistence helper if available
+                    dp = self.controller.data_persistence
+                    subject.total_mark = new_total_mark
+                    # PS flag persists only in session_state; exam logic will read it when calculating
+                    try:
+                        if hasattr(dp, "set_total_mark"):
+                            dp.set_total_mark(self.controller.semester or "", subject.subject_code, new_total_mark)  # type: ignore[attr-defined]
+                        else:
+                            return  # Abort if unsupported persistence
+                        success, message = True, f"Total Mark for '{subject.subject_code}' set to {new_total_mark}."
+                    except Exception as e:
+                        success, message = False, f"Failed to set total mark: {e}"
                     if success:
-                        st.success(message)
+                        st.session_state[fb_key] = message
                         st.rerun()
                     else:
                         st.error(message)
@@ -326,17 +377,79 @@ class SettingsForms:
         # Display current semesters
         st.write(f"**Managing semesters for {current_year}:**")
 
-        existing_semesters = list(self.controller.data_persistence.data.keys())
+        persistence = self.controller.data_persistence
+        # Prefer DB-backed semester list if available
+        if hasattr(persistence, "list_semesters"):
+            existing_semesters = persistence.list_semesters()  # type: ignore[attr-defined]
+        else:  # legacy fallback
+            existing_semesters = list(persistence.data.keys())  # type: ignore[attr-defined]
+
+        feedback_add_sem_key = "semester_add_feedback"
+        if fb := st.session_state.get(feedback_add_sem_key):
+            st.success(fb)
+            if st.button("Dismiss", key="dismiss_semester_add_feedback", type="secondary"):
+                st.session_state.pop(feedback_add_sem_key, None)
+                st.rerun()
+
+        feedback_remove_sem_key = "semester_remove_feedback"
+        if fb := st.session_state.get(feedback_remove_sem_key):
+            st.success(fb)
+            if st.button("Dismiss", key="dismiss_semester_remove_feedback", type="secondary"):
+                st.session_state.pop(feedback_remove_sem_key, None)
+                st.rerun()
 
         if existing_semesters:
             # Display existing semesters in a nice format
             cols = st.columns(len(existing_semesters) if len(existing_semesters) <= 4 else 4)
             for i, semester in enumerate(existing_semesters):
                 with cols[i % 4]:
-                    subject_count = len(self.controller.data_persistence.data.get(semester, {}))
-                    st.metric(label=semester, value=f"{subject_count} subjects", delta=None)
+                    if hasattr(persistence, "count_subjects_per_semester"):
+                        # Single pass count retrieval cached per loop if needed
+                        # For simplicity, compute once per semester (small list)
+                        try:
+                            counts_map = {name: cnt for name, cnt in persistence.count_subjects_per_semester()}  # type: ignore[attr-defined]
+                            subject_count = counts_map.get(semester, 0)
+                        except Exception:
+                            subject_count = 0
+                    else:
+                        subject_count = len(getattr(persistence, "data", {}).get(semester, {}))  # type: ignore
+                    st.metric(label=semester, value=f"{subject_count} subjects")
         else:
             st.info("No semesters found for this year.")
+            # Offer quick initialization when no semesters exist yet
+            with st.form("initialize_year_semesters_form"):
+                st.markdown("**Initialize Semesters for Year**")
+                default_presets = ["Autumn", "Spring", "Summer"]
+                st.caption(
+                    "Enter a comma separated list of semester names or use the preset buttons below. "
+                    "You can still add/remove later."
+                )
+                semester_input = st.text_input(
+                    "Semester Names",
+                    placeholder=", ".join(default_presets),
+                    help="Comma separated. Example: Autumn, Spring, Summer",
+                )
+                preset_col1, preset_col2, preset_col3 = st.columns(3)
+                with preset_col1:
+                    if st.form_submit_button("Use Standard", type="secondary", disabled=bool(semester_input)):
+                        self._bulk_add_semesters(default_presets)
+                        st.session_state[feedback_add_sem_key] = "Initialized standard semesters."
+                        st.rerun()
+                with preset_col2:
+                    if st.form_submit_button("Annual Only", type="secondary", disabled=bool(semester_input)):
+                        self._bulk_add_semesters(["Annual"])
+                        st.session_state[feedback_add_sem_key] = "Initialized Annual semester."
+                        st.rerun()
+                with preset_col3:
+                    if st.form_submit_button("Session 1&2", type="secondary", disabled=bool(semester_input)):
+                        self._bulk_add_semesters(["Session 1", "Session 2"])
+                        st.session_state[feedback_add_sem_key] = "Initialized Session 1 & 2 semesters."
+                        st.rerun()
+                if st.form_submit_button("Create Listed Semesters", type="primary"):
+                    names = [s.strip() for s in semester_input.split(",") if s.strip()] or default_presets
+                    self._bulk_add_semesters(names)
+                    st.session_state[feedback_add_sem_key] = f"Initialized semesters: {', '.join(names)}"
+                    st.rerun()
 
         st.divider()
 
@@ -351,6 +464,7 @@ class SettingsForms:
                 if semester not in existing_semesters:
                     if st.button(f"Add {semester}", key=f"add_{semester}"):
                         self._add_semester(semester)
+                        st.session_state[feedback_add_sem_key] = f"Added semester '{semester}'"
                         st.rerun()
 
         with col2:
@@ -362,11 +476,11 @@ class SettingsForms:
 
                 if st.form_submit_button("Add Custom Semester"):
                     if custom_semester:
-                        if custom_semester in existing_semesters:
+                        if custom_semester in (existing_semesters or []):
                             st.error(f"Semester '{custom_semester}' already exists.")
                         else:
                             self._add_semester(custom_semester)
-                            st.success(f"Added semester '{custom_semester}'")
+                            st.session_state[feedback_add_sem_key] = f"Added semester '{custom_semester}'"
                             st.rerun()
                     else:
                         st.error("Please enter a semester name.")
@@ -392,7 +506,7 @@ class SettingsForms:
                 if st.form_submit_button("Remove Semester", type="secondary"):
                     if confirm_removal:
                         self._remove_semester(semester_to_remove)
-                        st.success(f"Removed semester '{semester_to_remove}'")
+                        st.session_state[feedback_remove_sem_key] = f"Removed semester '{semester_to_remove}'"
                         st.rerun()
                     else:
                         st.error("Please confirm that you want to remove the semester.")
@@ -408,14 +522,13 @@ class SettingsForms:
             return
 
         try:
-            # Add empty semester data (explicitly typed as Dict[str, Subject])
-            empty_semester: Dict[str, Subject] = {}
-            self.controller.data_persistence.data[semester_name] = empty_semester
+            persistence = self.controller.data_persistence
+            if hasattr(persistence, "add_semester"):
+                persistence.add_semester(semester_name)  # type: ignore[attr-defined]
+            else:
+                return
 
-            # Save the updated data
-            self.controller.data_persistence.save_data(self.controller.data_persistence.data)
-
-            st.success(f"Successfully added semester '{semester_name}'")
+            st.session_state["semester_add_feedback"] = f"Successfully added semester '{semester_name}'"
 
             # Update available semesters in controller by refreshing data persistence
             current_year = self.controller.year
@@ -424,6 +537,26 @@ class SettingsForms:
 
         except Exception as e:
             st.error(f"Failed to add semester: {str(e)}")
+
+    def _bulk_add_semesters(self, semester_names: list[str]) -> None:
+        """Add multiple semesters (UI helper)."""
+        if not self.controller.data_persistence:
+            return
+        try:
+            persistence = self.controller.data_persistence
+            if hasattr(persistence, "add_semesters"):
+                persistence.add_semesters(semester_names)  # type: ignore[attr-defined]
+            else:
+                # Fallback loop
+                for name in semester_names:
+                    if hasattr(persistence, "add_semester"):
+                        persistence.add_semester(name)  # type: ignore[attr-defined]
+            # Refresh controller
+            current_year = self.controller.year
+            if current_year:
+                self.controller.set_year(current_year)
+        except Exception as e:
+            st.error(f"Failed to initialize semesters: {e}")
 
     def _remove_semester(self, semester_name: str) -> None:
         """Remove a semester from the current year.
@@ -436,20 +569,19 @@ class SettingsForms:
             return
 
         try:
-            if semester_name in self.controller.data_persistence.data:
-                # Remove the semester data
-                del self.controller.data_persistence.data[semester_name]
-
-                # Save the updated data
-                self.controller.data_persistence.save_data(self.controller.data_persistence.data)
-
-                # Update available semesters in controller by refreshing data persistence
-                current_year = self.controller.year
-                if current_year:
-                    self.controller.set_year(current_year)  # This will refresh the data
-
+            persistence = self.controller.data_persistence
+            if hasattr(persistence, "remove_semester"):
+                if semester_name in (persistence.list_semesters() if hasattr(persistence, "list_semesters") else []):  # type: ignore[attr-defined]
+                    persistence.remove_semester(semester_name)  # type: ignore[attr-defined]
+                else:
+                    st.error(f"Semester '{semester_name}' not found.")
             else:
-                st.error(f"Semester '{semester_name}' not found.")
+                return
+
+            # Refresh controller state
+            current_year = self.controller.year
+            if current_year:
+                self.controller.set_year(current_year)
 
         except Exception as e:
             st.error(f"Failed to remove semester: {str(e)}")

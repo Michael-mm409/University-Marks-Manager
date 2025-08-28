@@ -1,6 +1,6 @@
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
-from model import Assignment, DataPersistence, Examination, Semester, Subject
+from model import DataPersistence, Semester, Subject
 
 
 class AnalyticsHandler:
@@ -34,45 +34,25 @@ class AnalyticsHandler:
         self.semester = semester
         self.data_persistence = data_persistence
 
-    def get_all_subjects_flat(self):
-        """
-        Retrieve all subjects for the semester, including synchronized subjects, as flat dicts (no custom objects).
-        Returns a list of dicts (one per subject), suitable for DuckDB/analytics use.
-        """
-        import duckdb
-        import pandas as pd
-
-        all_subjects = []
-        for sem_name, sem_data in self.data_persistence.data.items():
-            for subj_code, subj in sem_data.items():
-                if isinstance(subj, dict):
-                    subj_dict = dict(subj)
-                else:
-                    subj_dict = subj.__dict__.copy()
-                subj_dict["semester"] = sem_name
-                subj_dict["subject_code"] = subj_code
-                # Remove or flatten nested custom objects for DuckDB compatibility
-                subj_dict.pop("assignments", None)
-                subj_dict.pop("examinations", None)
-                all_subjects.append(subj_dict)
-
-        df = pd.DataFrame(all_subjects)
-        con = duckdb.connect(database=":memory:")
-        con.register("subjects", df)
-
-        query = f"""
-            SELECT * FROM subjects
-            WHERE semester = '{self.semester.name}'
-            UNION
-            SELECT * FROM subjects
-            WHERE semester != '{self.semester.name}'
-                AND sync_subject = TRUE
-                AND subject_code NOT IN (
-                    SELECT subject_code FROM subjects WHERE semester = '{self.semester.name}'
-                )
-        """
-        combined_df = con.execute(query).df()
-        return combined_df.to_dict(orient="records")
+    def get_all_subjects_flat(self) -> List[Dict]:
+        """Fetch subjects (primary + synced) via direct SQL helper."""
+        fetcher = getattr(self.data_persistence, "fetch_subjects_for_analytics", None)
+        if callable(fetcher):
+            result = fetcher(self.semester.name, include_synced=True)
+            if isinstance(result, list):
+                return result  # type: ignore[return-value]
+            return []
+        # Fallback to object version if helper missing
+        return [
+            {
+                "subject_code": s.subject_code,
+                "subject_name": s.subject_name,
+                "semester_name": self.semester.name,
+                "total_mark": s.total_mark,
+                "sync_subject": s.sync_subject,
+            }
+            for s in self.get_all_subjects().values()
+        ]
 
     @staticmethod
     def get_subject_summary(subject: Subject) -> Tuple[float, float, float, float, float]:
@@ -108,33 +88,19 @@ class AnalyticsHandler:
         return False
 
     def _convert_to_subject(self, subj_code: str, subj) -> Subject:
-        """Convert dictionary or object to Subject instance."""
-        if isinstance(subj, dict):
-            assignments = [Assignment(**a) for a in subj.get("assignments", [])]
-            examinations = Examination(**subj.get("examinations", {})) if "examinations" in subj else None
-
-            return Subject(
-                subject_code=subj_code,
-                subject_name=subj.get("subject_name", "N/A"),
-                assignments=assignments,
-                total_mark=subj.get("total_mark", 0.0),
-                examinations=examinations or Examination(exam_mark=0, exam_weight=100),
-                sync_subject=True,
-            )
-        else:
-            return subj
+        return subj  # With SQLite backend, subjects already hydrated
 
     def get_all_subjects(self) -> Dict[str, Subject]:
         """Retrieve all subjects for the semester, including synchronized subjects (returns Subject objects)."""
+        # Use existing semester subjects + SQL synced fetch
         subjects = dict(self.semester.subjects)
-        for sem_name, sem_data in self.data_persistence.data.items():
-            if sem_name == self.semester.name:
-                continue
-            for subj_code, subj in sem_data.items():
-                is_synced = self._is_subject_synced(subj)
-                if is_synced and subj_code not in subjects:
-                    subject = self._convert_to_subject(subj_code, subj)
-                    subjects[subj_code] = subject
+        fetch_helper = getattr(self.data_persistence, "fetch_synced_subjects", None)
+        if callable(fetch_helper):
+            synced_obj = fetch_helper(self.semester.name)
+            if isinstance(synced_obj, list):
+                for s in synced_obj:
+                    if getattr(s, "subject_code", None) and s.subject_code not in subjects:
+                        subjects[s.subject_code] = s
         return subjects
 
 

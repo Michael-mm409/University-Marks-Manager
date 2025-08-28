@@ -1,6 +1,6 @@
 from model.domain import Semester
 from model.domain.entities import Assignment, Examination, Subject
-from model.repositories.data_persistence import DataPersistence
+from model.repositories.sqlite_persistence import PersistenceProtocol as DataPersistence
 
 
 def get_all_subjects(sem_obj: Semester, data_persistence: DataPersistence) -> dict:

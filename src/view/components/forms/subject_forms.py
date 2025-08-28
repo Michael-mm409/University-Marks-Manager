@@ -60,23 +60,39 @@ class SubjectForms:
             st.error("Semester not initialized.")
             return
 
+        # Persistent feedback display
+        feedback_key = "subject_add_feedback"
+        if fb := st.session_state.get(feedback_key):
+            st.success(fb)  # Could differentiate types later
+            if st.button("Dismiss", key=f"dismiss_{feedback_key}", type="secondary"):
+                st.session_state.pop(feedback_key, None)
+                st.rerun()
+
         with st.form("add_subject_form"):
             subject_code = st.text_input("Subject Code")
             subject_name = st.text_input("Subject Name")
             sync_subject = st.checkbox("Sync Subject")
+            attempt_flag = "_subject_add_attempted"
+            # Show validation error only after attempted submit; auto-hide when corrected
+            if st.session_state.get(attempt_flag) and (not subject_code or not subject_name):
+                st.error("Please fill in all fields")
+            elif st.session_state.get(attempt_flag) and subject_code and subject_name:
+                st.session_state.pop(attempt_flag, None)
 
             if st.form_submit_button("Add Subject"):
-                if subject_code and subject_name:
+                if not subject_code or not subject_name:
+                    st.session_state[attempt_flag] = True
+                    st.error("Please fill in all fields")
+                else:
                     success, message = add_subject(
                         self.controller.semester_obj, subject_code, subject_name, sync_subject
                     )
                     if success:
-                        st.success(message)
+                        st.session_state[feedback_key] = message
+                        st.session_state.pop(attempt_flag, None)
                         st.rerun()
                     else:
                         st.warning(message)
-                else:
-                    st.error("Please fill in all fields")
 
     def render_delete_form(self) -> None:
         """
@@ -94,14 +110,20 @@ class SubjectForms:
             st.info("No subjects to delete.")
             return
 
+        feedback_key = "subject_delete_feedback"
+        if fb := st.session_state.get(feedback_key):
+            st.success(fb)
+            if st.button("Dismiss", key=f"dismiss_{feedback_key}", type="secondary"):
+                st.session_state.pop(feedback_key, None)
+                st.rerun()
+
         with st.form("delete_subject_form"):
             subject_to_delete = st.selectbox("Select Subject to Delete", subjects)
-
             if st.form_submit_button("Delete Subject", type="secondary"):
                 if self.controller.semester_obj:
                     success, message = delete_subject(self.controller.semester_obj, subject_to_delete)
                     if success:
-                        st.success(message)
+                        st.session_state[feedback_key] = message
                         st.rerun()
                     else:
                         st.warning(message)
