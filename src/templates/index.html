@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="flex flex-col gap-6">
+  <section class="p-5 rounded-xl bg-base-100 shadow card-glow">
+    <h2 class="text-xl font-semibold mb-3">Add Semester</h2>
+    <form method="post" action="/semester/create" class="flex flex-wrap gap-4 items-end">
+      <label class="form-control w-40">
+        <span class="label-text">Name</span>
+        <input name="name" class="input input-bordered input-sm" placeholder="Autumn" required />
+      </label>
+      <label class="form-control w-32">
+        <span class="label-text">Year</span>
+        <input name="year" class="input input-bordered input-sm" placeholder="2025" required />
+      </label>
+      <button class="btn btn-sm btn-primary mt-4" type="submit">Add</button>
+    </form>
+  </section>
+
+  <section>
+    <div class="flex items-center gap-3 mb-3 flex-wrap">
+      <div class="flex items-center gap-2">
+        <h2 class="text-xl font-semibold">Semesters</h2>
+        <span class="badge badge-info badge-sm">{{ semesters|length }}</span>
+      </div>
+      <!-- Year Filter -->
+      <form method="get" action="/" class="flex items-end gap-2">
+        <label class="form-control">
+          <span class="label-text text-xs">Filter Year</span>
+          <select name="year" class="select select-bordered select-xs" onchange="this.form.submit()">
+            <option value="" {% if not selected_year %}selected{% endif %}>All</option>
+            {% for y in years %}
+              <option value="{{y}}" {% if selected_year == y %}selected{% endif %}>{{y}}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% if selected_year %}
+          <a href="/" class="btn btn-xs btn-ghost" title="Clear year filter">Reset</a>
+        {% endif %}
+      </form>
+    </div>
+    {% if semesters %}
+    <div class="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+      {% for s in semesters %}
+      <div class="p-4 rounded-lg bg-base-100 border border-base-300 hover:border-primary/70 transition card-glow flex flex-col gap-3 group">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <h3 class="font-semibold"><a class="link link-hover" href="/semester/{{s.name}}?year={{s.year}}">{{s.name}}</a></h3>
+            <span class="badge badge-outline">{{s.year}}</span>
+          </div>
+          <button class="btn btn-ghost btn-xs" onclick="this.closest('.p-4').querySelector('.manage-panel').classList.toggle('hidden');" title="Manage">
+            ⚙️
+          </button>
+        </div>
+        <p class="text-xs opacity-70">View subjects & assignments</p>
+        <div class="manage-panel hidden mt-1 animate-fade-in text-xs space-y-2">
+          <form method="post" action="/semester/{{s.name}}/update" class="flex gap-1 items-end flex-wrap">
+            <input type="hidden" name="year" value="{{s.year}}" />
+            <label class="form-control w-28">
+              <span class="label-text text-xs">Rename</span>
+              <input name="new_name" placeholder="New name" class="input input-bordered input-xs" required />
+            </label>
+            <button class="btn btn-xs btn-primary mt-4" type="submit">Save</button>
+          </form>
+          <form method="post" action="/semester/{{s.name}}/delete" onsubmit="return confirm('Delete semester {{s.name}} {{s.year}} and ALL its data?');">
+            <input type="hidden" name="year" value="{{s.year}}" />
+            <button class="btn btn-xs btn-error btn-outline">Delete</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+      <div class="p-8 rounded-xl border-dashed border-2 text-center opacity-70">No semesters{% if selected_year %} for {{selected_year}}{% endif %}. Add your first above.</div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

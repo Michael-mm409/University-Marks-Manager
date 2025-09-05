@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="flex items-center gap-3 mb-4">
+  <h2 class="text-2xl font-semibold">{{semester}} <span class="text-base font-normal opacity-70">({{year}})</span></h2>
+  <span class="badge badge-info badge-sm">{{ subject_summaries|length }} subjects</span>
+</div>
+<div class="p-5 rounded-xl bg-base-100 shadow card-glow mb-6">
+  <h3 class="font-semibold mb-3">Add Subject</h3>
+  <form method="post" action="/semester/{{semester}}/subject/create" class="flex flex-wrap gap-4 items-end">
+    <input type="hidden" name="year" value="{{year}}" />
+    <label class="form-control w-40">
+      <span class="label-text">Code</span>
+      <input name="subject_code" class="input input-bordered input-sm" placeholder="CSCI101" required />
+    </label>
+    <label class="form-control w-60">
+      <span class="label-text">Name</span>
+      <input name="subject_name" class="input input-bordered input-sm" placeholder="Intro to ..." required />
+    </label>
+    <label class="label cursor-pointer flex gap-2 items-center mt-5">
+      <span class="label-text">Sync</span>
+      <input type="checkbox" name="sync_subject" class="checkbox checkbox-sm" value="1" />
+    </label>
+    <button class="btn btn-sm btn-primary mt-5" type="submit">Add</button>
+  </form>
+</div>
+<table class="table table-sm w-full border rounded-xl overflow-hidden">
+  <thead>
+  <tr>
+    <th>Subject Title</th>
+    <th>Assessment Mark</th>
+    <th>Assessment Weight</th>
+    <th>Final Exam Mark</th>
+    <th>Final Exam Weight</th>
+    <th>Total Mark</th>
+    <th></th>
+  </tr>
+  </thead>
+  <tbody>
+  {% for row in subject_summaries %}
+  <tr class="hover">
+    <td class="font-mono">{{row.code}}</td>
+    <td>{{ row.assessment_mark }}</td>
+    <td>{{ row.assessment_weight | default('-') }}%</td>
+    <td>{% if row.exam_mark is not none %}{{ row.exam_mark }}{% else %}-{% endif %}</td>
+    <td>{% if row.exam_weight is not none %}{{ row.exam_weight }}%{% else %}-{% endif %}</td>
+    <td>{% if row.total_mark is not none %}{{ row.total_mark }}{% else %}-{% endif %}</td>
+    <td><a class="btn btn-xs btn-outline" href="/semester/{{semester}}/subject/{{row.code}}?year={{year}}">Open</a></td>
+  </tr>
+  {% else %}
+  <tr><td colspan="7" class="opacity-70">No subjects.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
