@@ -3,3 +3,11 @@ pydantic>=2.11
 plotly>=6.2
 duckdb>=0.8.0
 pandas>=2.1
+
+# FastAPI stack
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+sqlmodel>=0.0.16
+jinja2>=3.1.4
+python-multipart>=0.0.9
+itsdangerous>=2.2
