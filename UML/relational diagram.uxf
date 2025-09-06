@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<diagram program="umlet" version="15.1">
+  <zoom_level>6</zoom_level>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>72</x>
+      <y>336</y>
+      <w>126</w>
+      <h>108</h>
+    </coordinates>
+    <panel_attributes>Semester
+--
+name: int  PK
+year: string  PK
+</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>312</x>
+      <y>330</y>
+      <w>198</w>
+      <h>108</h>
+    </coordinates>
+    <panel_attributes>Subjects
+--
+subject_code: string  PK
+subject_name: string  
+semester_name: string FK1 Ref Semester(name)  PK
+year: string  PK
+total_makr: float[0.0]
+sync_subject: boolean
+</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>192</x>
+      <y>378</y>
+      <w>132</w>
+      <h>24</h>
+    </coordinates>
+    <panel_attributes>lt=-
+m1=1..*
+m2=1</panel_attributes>
+    <additional_attributes>200.0;10.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>324</x>
+      <y>102</y>
+      <w>234</w>
+      <h>174</h>
+    </coordinates>
+    <panel_attributes>Assignment
+--
+subject_code: string NOT NULL  PK
+semester_name: string  PK
+year: string  PK
+assessment: string  PK
+weighted_mark: float
+unweighted_mark: float
+mark_weight: float
+grade_type: enum
+
+UNIQUE(assessment, subject_code, semester_name, year)
+
+FOREIGN KEY 1(subject_code, semester_name, year) REF 
+Subjects(subject_code, semester_name, year)
+</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>312</x>
+      <y>528</y>
+      <w>204</w>
+      <h>120</h>
+    </coordinates>
+    <panel_attributes>Examination
+--
+subject_code: string          PK
+semester_name: string     PK
+year: string                        PK
+exam_mark: float
+exam_weight: float
+
+UNIQUE(subject_code, semester_name, year)
+FK1(subject_code, semester_name, year) REF
+subjects(subject_code, semestr_name, year)</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>444</x>
+      <y>432</y>
+      <w>24</w>
+      <h>108</h>
+    </coordinates>
+    <panel_attributes>lt=-
+m1=1
+m2=1</panel_attributes>
+    <additional_attributes>10.0;10.0;10.0;160.0</additional_attributes>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>636</x>
+      <y>330</y>
+      <w>144</w>
+      <h>90</h>
+    </coordinates>
+    <panel_attributes>ExamSettings
+--
+subject_code: string          PK
+semester_name: string      PK
+year: string                         PK
+ps_exam: bool
+ps_factor: float
+</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>504</x>
+      <y>360</y>
+      <w>144</w>
+      <h>24</h>
+    </coordinates>
+    <panel_attributes>lt=-
+m1=1
+m2=1</panel_attributes>
+    <additional_attributes>220.0;10.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>402</x>
+      <y>270</y>
+      <w>30</w>
+      <h>72</h>
+    </coordinates>
+    <panel_attributes>lt=-
+m1=1
+m2=1..*</panel_attributes>
+    <additional_attributes>10.0;100.0;10.0;10.0</additional_attributes>
+  </element>
+</diagram>
