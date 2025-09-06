@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="flex items-center gap-3 mb-4">
+  <a href="/?year={{year}}" class="btn btn-xs btn-outline">Back</a>
   <h2 class="text-2xl font-semibold">{{semester}} <span class="text-base font-normal opacity-70">({{year}})</span></h2>
   <span class="badge badge-info badge-sm">{{ subject_summaries|length }} subjects</span>
 </div>
@@ -39,11 +40,11 @@
   {% for row in subject_summaries %}
   <tr class="hover">
     <td class="font-mono">{{row.code}}</td>
-    <td>{{ row.assessment_mark }}</td>
-    <td>{{ row.assessment_weight | default('-') }}%</td>
-    <td>{% if row.exam_mark is not none %}{{ row.exam_mark }}{% else %}-{% endif %}</td>
-    <td>{% if row.exam_weight is not none %}{{ row.exam_weight }}%{% else %}-{% endif %}</td>
-    <td>{% if row.total_mark is not none %}{{ row.total_mark }}{% else %}-{% endif %}</td>
+    <td>{{ '%.2f' % row.assessment_mark if row.assessment_mark is not none else '-' }}</td>
+    <td>{{ '%.2f' % row.assessment_weight if row.assessment_weight is not none else '-' }}%</td>
+    <td>{% if row.exam_mark is not none %}{{ '%.2f' % row.exam_mark }}{% else %}-{% endif %}</td>
+    <td>{% if row.exam_weight is not none %}{{ '%.2f' % row.exam_weight }}%{% else %}-{% endif %}</td>
+    <td>{% if row.total_mark is not none %}{{ '%.2f' % row.total_mark }}{% else %}-{% endif %}</td>
     <td><a class="btn btn-xs btn-outline" href="/semester/{{semester}}/subject/{{row.code}}?year={{year}}">Open</a></td>
   </tr>
   {% else %}

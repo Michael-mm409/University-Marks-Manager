@@ -10,7 +10,7 @@
       </label>
       <label class="form-control w-32">
         <span class="label-text">Year</span>
-        <input name="year" class="input input-bordered input-sm" placeholder="2025" required />
+  <input name="year" type="number" class="input input-bordered input-sm" value="{{ current_year }}" min="2000" max="2100" step="1" id="add-semester-year" />
       </label>
       <button class="btn btn-sm btn-primary mt-4" type="submit">Add</button>
     </form>
@@ -75,3 +75,12 @@
   </section>
 </div>
 {% endblock %}
+<script>
+  // Dynamically set the default year to the current year
+  document.addEventListener('DOMContentLoaded', function() {
+    var yearInput = document.getElementById('add-semester-year');
+    if (yearInput) {
+      yearInput.value = new Date().getFullYear();
+    }
+  });
+</script>
