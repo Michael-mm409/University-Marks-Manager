@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import List, Optional, Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select
 
 from src.infrastructure.db.models import Assignment, GradeType
@@ -12,7 +13,7 @@ from src.presentation.api.deps import get_session
 router = APIRouter()
 
 
-@router.get("/", response_model=List[Assignment])
+@router.api_route("/", response_model=List[Assignment], methods=["GET", "HEAD"], response_class=HTMLResponse)
 def list_assignments(
 	session: Session = Depends(get_session),
 	subject_code: Optional[str] = None,
@@ -41,7 +42,7 @@ def list_assignments(
     return session.exec(stmt).all()
 
 
-@router.post("/", response_model=Assignment, status_code=status.HTTP_201_CREATED)
+@router.api_route("/", response_model=Assignment, status_code=status.HTTP_201_CREATED, methods=["POST"], response_class=HTMLResponse)
 def create_assignment(data: Assignment, session: Session = Depends(get_session)) -> Assignment:
     """
     Create a new assignment.
@@ -69,7 +70,7 @@ def create_assignment(data: Assignment, session: Session = Depends(get_session))
     return assignment
 
 
-@router.get("/{assignment_id}", response_model=Assignment)
+@router.api_route("/{assignment_id}", response_model=Assignment, methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_assignment(assignment_id: int, session: Session = Depends(get_session)) -> Assignment:
     """
     Retrieve an assignment by its ID.
@@ -90,7 +91,7 @@ def get_assignment(assignment_id: int, session: Session = Depends(get_session)) 
     return a
 
 
-@router.put("/{assignment_id}", response_model=Assignment)
+@router.api_route("/{assignment_id}", response_model=Assignment, methods=["PUT"], response_class=HTMLResponse)
 def update_assignment(assignment_id: int, data: Assignment, 
                       session: Session = Depends(get_session)) -> Assignment:
     """
@@ -127,7 +128,7 @@ def update_assignment(assignment_id: int, data: Assignment,
     return a
 
 
-@router.delete("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+@router.api_route("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response, methods=["DELETE"])
 def delete_assignment(assignment_id: int, session: Session = Depends(get_session)) -> Response:
     """
     Delete an assignment by its ID.

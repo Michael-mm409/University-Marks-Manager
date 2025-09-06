@@ -13,7 +13,7 @@ from . import assignments as _assignments_mod  # noqa: F401
 from . import exams as _exams_mod  # noqa: F401
 
 api_router = APIRouter(prefix="/api", tags=["api"])
-api_router.include_router(_semesters_mod.router)
+api_router.include_router(_semesters_mod.semester_router)
 api_router.include_router(_subjects_mod.router)
 api_router.include_router(_assignments_mod.router)
 api_router.include_router(_exams_mod.router)

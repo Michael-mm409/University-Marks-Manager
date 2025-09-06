@@ -4,15 +4,16 @@ from __future__ import annotations
 from typing import List, Optional, Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select
 
 from src.infrastructure.db.models import Semester
 from src.presentation.api.deps import get_session
 
-router = APIRouter()
+semester_router = APIRouter()
 
 
-@router.get("/", response_model=List[Semester])
+@semester_router.api_route("/", response_model=List[Semester], methods=["GET", "HEAD"])
 def list_semesters(session: Session = Depends(get_session), year: Optional[str] = None) -> Sequence[Semester]:
     """
     List all semesters, optionally filtered by year.
@@ -30,7 +31,7 @@ def list_semesters(session: Session = Depends(get_session), year: Optional[str] 
     return session.exec(stmt).all()
 
 
-@router.post("/", response_model=Semester, status_code=status.HTTP_201_CREATED)
+@semester_router.api_route("/", response_model=Semester, status_code=status.HTTP_201_CREATED, methods=["POST"], response_class=HTMLResponse)
 def create_semester(data: Semester, session: Session = Depends(get_session)) -> Semester:
     """
     Create a new semester if it does not already exist.
@@ -54,7 +55,7 @@ def create_semester(data: Semester, session: Session = Depends(get_session)) -> 
     return sem
 
 
-@router.get("/{semester_id}", response_model=Semester)
+@semester_router.api_route("/{semester_id}", response_model=Semester, methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_semester(semester_id: int, session: Session = Depends(get_session)) -> Semester:
     """
     Retrieve a semester by its ID.
@@ -71,7 +72,7 @@ def get_semester(semester_id: int, session: Session = Depends(get_session)) -> S
         raise HTTPException(status_code=404, detail="Not found")
     return sem
 
-@router.put("/{semester_id}", response_model=Semester)
+@semester_router.api_route("/{semester_id}", response_model=Semester, methods=["PUT"], response_class=HTMLResponse)
 def update_semester(semester_id: int, data: Semester, session: Session = Depends(get_session)) -> Semester:
     """
     Update an existing semester's details.
@@ -94,7 +95,7 @@ def update_semester(semester_id: int, data: Semester, session: Session = Depends
     session.refresh(sem)
     return sem
 
-@router.delete("/{semester_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+@semester_router.api_route("/{semester_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response, methods=["DELETE"])
 def delete_semester(semester_id: int, session: Session = Depends(get_session)) -> Response:
     """
     Delete a semester by its ID.
@@ -110,4 +111,4 @@ def delete_semester(semester_id: int, session: Session = Depends(get_session)) -
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-__all__ = ["router"]
+__all__ = ["semester_router"]
