@@ -2,7 +2,7 @@
 
 This document describes the data model for the University Marks Manager, aligning the UML diagram with the actual SQLite schema.
 
-![Relational Diagram](../UML/relational%20diagram.bmp)
+![Relational Diagram](../UML/relational%20diagram.png)
 ## Tables and Relationships
 
 ### Semester
