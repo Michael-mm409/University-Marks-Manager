@@ -33,7 +33,7 @@ class Subject(SQLModel, table=True):
     subject_name: str
     semester_name: str = Field(index=True)
     year: str = Field(index=True)
-    total_mark: float = 0
+    total_mark: Optional[float] = 0.0
     sync_subject: bool = False
 
 
@@ -46,7 +46,7 @@ class Assignment(SQLModel, table=True):
     semester_name: str = Field(index=True)
     year: str = Field(index=True)
     assessment: str
-    weighted_mark: Optional[str] = None  # numeric stored as text or S/U
+    weighted_mark: Optional[float] = None  # numeric stored as text or S/U
     unweighted_mark: Optional[float] = None
     mark_weight: Optional[float] = None
     grade_type: str = Field(default=GradeType.NUMERIC.value)
