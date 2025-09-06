@@ -41,9 +41,9 @@
   {% if effective_exam_weight %}<input type="hidden" name="exam_weight" value="{{ effective_exam_weight }}" />{% endif %}
   {% if ps_exam %}<input type="hidden" name="ps_exam" value="true" />{% endif %}
   {% if ps_exam and ps_factor %}<input type="hidden" name="ps_factor" value="{{ ps_factor }}" />{% endif %}
-  <input name="assessment" placeholder="Assessment" class="input input-bordered input-xs col-span-4" required />
-  <input id="weighted_mark_input" name="weighted_mark" type="number" step="any" min="0" placeholder="Weighted" class="input input-bordered input-xs col-span-2" />
-  <input id="mark_weight_input" name="mark_weight" type="number" step="any" min="0" placeholder="Weight %" class="input input-bordered input-xs col-span-2" />
+  <input name="assessment" placeholder="Assignment" class="input input-bordered input-xs col-span-4" required />
+  <input id="weighted_mark_input" name="weighted_mark" type="number" step="any" min="0" placeholder="Weighted mark" class="input input-bordered input-xs col-span-2" />
+  <input id="mark_weight_input" name="mark_weight" type="number" step="any" min="0" placeholder="Mark weight" class="input input-bordered input-xs col-span-2" />
   <select id="grade_type_select" name="grade_type" class="select select-bordered select-xs col-span-2">
     <option value="numeric">Numeric</option>
     <option value="S">S</option>
@@ -123,22 +123,21 @@
         </thead>
         <tbody>
   {% for assignment in assignments|sort(attribute='id') %}
-<tr data-assignment-id="{{ assignment.id }}" class="assignment-row">
-  <td class="assignment-assessment">{{assignment.assessment}}</td>
-  <td class="assignment-weighted">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.weighted_mark|float) if assignment.weighted_mark is not none else '0.00' }}{% endif %}</td>
-  <td class="assignment-unweighted">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}{% endif %}</td>
-  <td class="assignment-mark-weight">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.mark_weight|float) if assignment.mark_weight is not none else '0.00' }}{% endif %}</td>
-  <td class="assignment-grade-type">{{assignment.grade_type}}</td>
-  <td class="flex gap-1">
-    <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/{{assignment.id}}/delete" onsubmit="return confirm('Delete assignment?');">
-      <input type="hidden" name="year" value="{{year}}" />
-      <button class="btn btn-xs btn-error" type="submit">✕</button>
-    </form>
-    <button class="btn btn-xs btn-outline" type="button" onclick="startInlineEditAssignment('{{ assignment.id }}')">Edit</button>
-  </td>
-  <td class="assignment-edit-cell" style="display:none;" colspan="6"></td>
+  <tr data-assignment-id="{{ assignment.id }}" class="assignment-row">
+    <td class="assignment-assessment">{{assignment.assessment}}</td>
+    <td class="assignment-weighted">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.weighted_mark|float) if assignment.weighted_mark is not none else '0.00' }}{% endif %}</td>
+    <td class="assignment-unweighted">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}{% endif %}</td>
+    <td class="assignment-mark-weight">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.mark_weight|float) if assignment.mark_weight is not none else '0.00' }}{% endif %}</td>
+    <td class="assignment-grade-type">{{assignment.grade_type}}</td>
+    <td class="flex gap-1">
+      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/{{assignment.id}}/delete" onsubmit="return confirm('Delete assignment?');">
+        <input type="hidden" name="year" value="{{year}}" />
+        <button class="btn btn-xs btn-error" type="submit">✕</button>
+      </form>
+      <button class="btn btn-xs btn-outline" type="button" onclick="startInlineEditAssignment('{{ assignment.id }}')">Edit</button>
+    </td>
   </tr>
-{% endfor %}
+  {% endfor %}
 
   <!-- end assignment loop -->
   {% if assignments|length == 0 %}
@@ -206,22 +205,34 @@ document.addEventListener('DOMContentLoaded', function() {
   showTab('assignments');
 });
 let editing_assignment_id = null;
+let original_row_html = null;
 function startInlineEditAssignment(id) {
-  // Hide any open edit cells
-  document.querySelectorAll('.assignment-edit-cell').forEach(cell => cell.style.display = 'none');
-  // Fetch the edit form via AJAX and show it in the correct row
+  // Only one edit at a time
+  if (editing_assignment_id !== null) {
+    cancelInlineEditAssignment();
+  }
+  editing_assignment_id = id;
+  const row = document.querySelector(`tr[data-assignment-id='${id}']`);
+  // Clear any previous error message
+  if (row) {
+    row.innerHTML = original_row_html || row.innerHTML;
+  }
+  original_row_html = row.innerHTML;
   fetch(`/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/${id}/edit?year={{year}}`)
     .then(response => response.text())
     .then(html => {
-      const row = document.querySelector(`tr[data-assignment-id='${id}']`);
-      const cell = row.querySelector('.assignment-edit-cell');
-      cell.innerHTML = html;
-      cell.style.display = '';
+      row.innerHTML = html;
     });
 }
 function cancelInlineEditAssignment() {
-  // Hide all edit cells
-  document.querySelectorAll('.assignment-edit-cell').forEach(cell => cell.style.display = 'none');
+  if (editing_assignment_id !== null) {
+    const row = document.querySelector(`tr[data-assignment-id='${editing_assignment_id}']`);
+    if (row && original_row_html) {
+      row.innerHTML = original_row_html;
+    }
+    editing_assignment_id = null;
+    original_row_html = null;
+  }
 }
 function submitInlineEditAssignment(event, id) {
   event.preventDefault();
@@ -233,17 +244,57 @@ function submitInlineEditAssignment(event, id) {
     method: 'POST',
     body: formData
   })
-  .then(response => {
-    if (response.redirected) {
-      window.location.href = response.url;
-      return;
+  .then(response => response.json())
+  .then(data => {
+    const row = document.querySelector(`tr[data-assignment-id='${id}']`);
+    if (data.success && typeof data.row_html === 'string') {
+      row.innerHTML = data.row_html;
+      editing_assignment_id = null;
+      original_row_html = null;
+    } else {
+      // Replace the entire row with the error message only
+      row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>${data.error || 'Unknown error.'}</div></td>`;
     }
-    return response.text().then(text => {
-      alert(text);
-    });
   })
   .catch(err => {
-    alert('Error submitting edit.');
+    const row = document.querySelector(`tr[data-assignment-id='${id}']`);
+    row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>Error submitting edit.</div></td>`;
+  });
+  return false;
+}
+function submitInlineEditAssignmentRow(id, year) {
+  const row = document.querySelector(`tr[data-assignment-id='${id}']`);
+  if (!row) return;
+  // Collect values from inputs in the row
+  const assessment = row.querySelector("input[name='assessment']")?.value || '';
+  const weighted_mark = row.querySelector("input[name='weighted_mark']")?.value || '';
+  const mark_weight = row.querySelector("input[name='mark_weight']")?.value || '';
+  const grade_type = row.querySelector("select[name='grade_type']")?.value || 'numeric';
+  // Build FormData
+  const formData = new FormData();
+  formData.append('assessment', assessment);
+  formData.append('weighted_mark', weighted_mark);
+  formData.append('mark_weight', mark_weight);
+  formData.append('grade_type', grade_type);
+  formData.append('year', year);
+  // Send AJAX POST
+  const url = `/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/${id}/update`;
+  fetch(url, {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success && typeof data.row_html === 'string') {
+      row.innerHTML = data.row_html;
+      editing_assignment_id = null;
+      original_row_html = null;
+    } else {
+      row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>${data.error || 'Unknown error.'}</div></td>`;
+    }
+  })
+  .catch(err => {
+    row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>Error submitting edit.</div></td>`;
   });
   return false;
 }
