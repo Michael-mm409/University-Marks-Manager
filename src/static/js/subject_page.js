@@ -25,44 +25,48 @@
   window.submitSubjectEditForm = function(event) { return true; };
 
   // Inline edit state
-  let editing_assignment_id = null;
+  let editing_assignment_keys = null;
   let original_row_html = null;
-  window.startInlineEditAssignment = function(id) {
-    if (editing_assignment_id !== null) { window.cancelInlineEditAssignment(); }
-    editing_assignment_id = id;
-    const row = document.querySelector(`tr[data-assignment-id='${id}']`);
+  window.startInlineEditAssignment = function(assessment, code, semester, year) {
+    if (editing_assignment_keys !== null) { window.cancelInlineEditAssignment(); }
+    editing_assignment_keys = { assessment, code, semester, year };
+    const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
     if (!row) return;
     original_row_html = row.innerHTML;
-    fetch(`${window.subjectBasePath}/assignment/${id}/edit?year=${window.subjectYear}`)
+    fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/edit`)
       .then(r => r.text())
       .then(html => { row.innerHTML = html; });
   };
   window.cancelInlineEditAssignment = function() {
-    if (editing_assignment_id !== null) {
-      const row = document.querySelector(`tr[data-assignment-id='${editing_assignment_id}']`);
+    if (editing_assignment_keys && typeof editing_assignment_keys === 'object') {
+      const { assessment, code, semester, year } = editing_assignment_keys;
+      const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
       if (row && original_row_html) row.innerHTML = original_row_html;
-      editing_assignment_id = null; original_row_html = null;
+      editing_assignment_keys = null; original_row_html = null;
+    } else {
+      editing_assignment_keys = null; original_row_html = null;
     }
   };
-  window.submitInlineEditAssignmentRow = function(id, year) {
-    const row = document.querySelector(`tr[data-assignment-id='${id}']`);
+  window.submitInlineEditAssignmentRow = function(assessment, code, semester, year) {
+    const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
     if (!row) return false;
-    const assessment = row.querySelector("input[name='assessment']")?.value || '';
     const weighted_mark = row.querySelector("input[name='weighted_mark']")?.value || '';
     const mark_weight = row.querySelector("input[name='mark_weight']")?.value || '';
     const grade_type = row.querySelector("select[name='grade_type']")?.value || 'numeric';
     const formData = new FormData();
     formData.append('assessment', assessment);
+    formData.append('subject_code', code);
+    formData.append('semester_name', semester);
+    formData.append('year', year);
     formData.append('weighted_mark', weighted_mark);
     formData.append('mark_weight', mark_weight);
     formData.append('grade_type', grade_type);
-    formData.append('year', year);
-    fetch(`${window.subjectBasePath}/assignment/${id}/update`, { method: 'POST', body: formData })
+    fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/update`, { method: 'POST', body: formData })
       .then(r => r.json())
       .then(data => {
         if (data.success && typeof data.row_html === 'string') {
           row.innerHTML = data.row_html;
-          editing_assignment_id = null; original_row_html = null;
+          editing_assignment_keys = null; original_row_html = null;
         } else {
           row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>${data.error || 'Unknown error.'}</div></td>`;
         }
