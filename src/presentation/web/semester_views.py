@@ -94,22 +94,27 @@ def semester_detail(
     Returns:
         HTMLResponse: Rendered semester detail page.
     """
+    # Get all subjects for the year, including synced subjects from other semesters
     subjects = session.exec(
-        select(Subject).where(Subject.semester_name == semester, Subject.year == year)
+        select(Subject).where(Subject.year == year)
     ).all()
-    # Build summary rows similar to provided screenshot
+    # Only show subjects for the current semester and all synced subjects
+    main_subjects = [s for s in subjects if s.semester_name == semester]
+    synced_subjects = [s for s in subjects if s.sync_subject and s.semester_name != semester]
+    display_subjects = main_subjects + synced_subjects
     summaries = []
-    for sub in subjects:
+    for sub in display_subjects:
+        # Use correct semester for assignments/exams
         assignments = session.exec(
             select(Assignment).where(
-                Assignment.semester_name == semester,
+                Assignment.semester_name == sub.semester_name,
                 Assignment.year == year,
                 Assignment.subject_code == sub.subject_code,
             )
         ).all()
         exam = session.exec(
             select(Examination).where(
-                Examination.semester_name == semester,
+                Examination.semester_name == sub.semester_name,
                 Examination.year == year,
                 Examination.subject_code == sub.subject_code,
             )
@@ -134,22 +139,13 @@ def semester_detail(
                 exam_weight = float(exam.exam_weight)
             except (TypeError, ValueError):
                 exam_weight = None
-        total_mark = None
-        if assess_weight_sum or exam_weight:
-            try:
-                total_weighted = assess_weighted_total
-                total_weight_percent = assess_weight_sum
-                if exam_mark is not None and exam_weight is not None:
-                    total_weighted += (exam_mark / 100.0) * exam_weight
-                    total_weight_percent += exam_weight
-                if total_weight_percent > 0:
-                    total_mark = round((total_weighted / total_weight_percent) * 100.0, 2)
-            except ZeroDivisionError:
-                total_mark = None
+        # Use the saved total_mark from the database
+        total_mark = sub.total_mark if sub.total_mark not in (None, 0) else None
         summaries.append(
             {
                 "code": sub.subject_code,
                 "name": sub.subject_name,
+                "semester_name": sub.semester_name,
                 "assessment_mark": round(assess_weighted_total, 2),
                 "assessment_weight": assess_weight_sum,
                 "exam_mark": exam_mark,
@@ -161,5 +157,5 @@ def semester_detail(
     return _render(
         request,
         "semester.html",
-        {"semester": semester, "year": year, "subjects": subjects, "subject_summaries": summaries},
+        {"semester": semester, "year": year, "subjects": display_subjects, "subject_summaries": summaries},
     )

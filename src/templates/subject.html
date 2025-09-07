@@ -17,7 +17,12 @@
     <p class="mt-1 text-xs opacity-70 uppercase tracking-wide">Semester {{semester}} — {{year}}</p>
   </div>
   <div class="flex gap-2">
-  <a href="/semester/{{semester}}?year={{year}}" class="btn btn-xs btn-outline">Back to Semester</a>
+    {% if return_to %}
+      {% set ret = return_to.split('-') %}
+      <a href="/semester/{{ret[0]}}?year={{ret[1]}}" class="btn btn-xs btn-outline">Back to Semester</a>
+    {% else %}
+      <a href="/semester/{{semester}}?year={{year}}" class="btn btn-xs btn-outline">Back to Semester</a>
+    {% endif %}
     <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/delete" onsubmit="return confirm('Delete this subject and all related assignments/exams?');">
       <input type="hidden" name="year" value="{{year}}" />
       <button class="btn btn-xs btn-error" type="submit">Delete Subject</button>
@@ -68,9 +73,8 @@
       </div>
     {% endif %}
   <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/totalMark/save" class="grid grid-cols-12 gap-3 text-sm">
-    <input type="hidden" name="year" value="{{year}}" />
-    {% if ps_exam %}<input type="hidden" name="ps_exam" value="true" />{% endif %}
-    {% if ps_exam and ps_factor %}<input type="hidden" name="ps_factor" value="{{ ps_factor }}" />{% endif %}
+  <input type="hidden" name="year" value="{{year}}" />
+  <!-- Remove hidden ps_exam and ps_factor inputs, use only visible ones below -->
     <div class="col-span-4">
       <label class="form-control">
         <span class="label-text text-xs">Desired Final Total Mark</span>
@@ -92,7 +96,7 @@
     <div class="col-span-2 flex items-end">
       <label class="label cursor-pointer flex gap-2 items-center text-xs">
         <span>PS Exam?</span>
-        <input type="checkbox" name="ps_exam" value="true" class="toggle toggle-xs" {% if ps_exam %}checked{% endif %} onchange="this.form.submit()" />
+  <input type="checkbox" name="ps_exam" value="true" class="toggle toggle-xs" {% if ps_exam %}checked{% endif %} id="ps-exam-toggle" />
       </label>
     </div>
     <div class="col-span-4 flex items-end">
@@ -122,19 +126,19 @@
           </tr>
         </thead>
         <tbody>
-  {% for assignment in assignments|sort(attribute='id') %}
-  <tr data-assignment-id="{{ assignment.id }}" class="assignment-row">
+  {% for assignment in assignments %}
+  <tr data-assessment="{{ assignment.assessment }}" data-code="{{ assignment.subject_code }}" data-semester="{{ assignment.semester_name }}" data-year="{{ assignment.year }}" class="assignment-row">
     <td class="assignment-assessment">{{assignment.assessment}}</td>
     <td class="assignment-weighted">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.weighted_mark|float) if assignment.weighted_mark is not none else '0.00' }}{% endif %}</td>
     <td class="assignment-unweighted">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}{% endif %}</td>
     <td class="assignment-mark-weight">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.mark_weight|float) if assignment.mark_weight is not none else '0.00' }}{% endif %}</td>
     <td class="assignment-grade-type">{{assignment.grade_type}}</td>
     <td class="flex gap-1">
-      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/{{assignment.id}}/delete" onsubmit="return confirm('Delete assignment?');">
+      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/{{assignment.assessment}}/{{assignment.subject_code}}/{{assignment.semester_name}}/{{assignment.year}}/delete" onsubmit="return confirm('Delete assignment?');">
         <input type="hidden" name="year" value="{{year}}" />
         <button class="btn btn-xs btn-error" type="submit">✕</button>
       </form>
-      <button class="btn btn-xs btn-outline" type="button" onclick="startInlineEditAssignment('{{ assignment.id }}')">Edit</button>
+      <button class="btn btn-xs btn-outline" type="button" onclick="startInlineEditAssignment('{{ assignment.assessment }}','{{ assignment.subject_code }}','{{ assignment.semester_name }}','{{ assignment.year }}')">Edit</button>
     </td>
   </tr>
   {% endfor %}
@@ -165,10 +169,10 @@
           <tr>
             <td>{{ subject.subject_name }}</td>
             <td>{{ '%.2f' % assignment_weighted_sum }}</td>
-            <td>{{ '%.2f' % assignment_weight_percent }}</td>
-            <td>{{ '%.2f' % raw_exam_percent if raw_exam_percent is not none else '-' }}</td>
-            <td>{{ '%.2f' % effective_exam_weight if effective_exam_weight else 0 }}</td>
-            <td>{{ '%.2f' % average if average is not none else 0 }}</td>
+            <td>{{ '%.0f' % assignment_weight_percent }}%</td>
+            <td>{{ '%.2f' % exam_mark if exam_mark is not none else '-' }}</td>
+            <td>{{ '%.0f' % effective_exam_weight if effective_exam_weight else 0 }}%</td>
+            <td>{{ '%.0f' % subject.total_mark if subject.total_mark is not none else '-' }}</td>
           </tr>
         </tbody>
       </table>
@@ -181,4 +185,110 @@
   console.log('subject.total_mark:', "{{ subject.total_mark }}");
 </script>
 <script src="/static/js/subject_page.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var saveForm = document.querySelector('form[action*="totalMark/save"]');
+    var psExamToggle = document.getElementById('ps-exam-toggle');
+    var psFactorInput = saveForm ? saveForm.querySelector('input[name="ps_factor"]') : null;
+    if (psExamToggle && psFactorInput) {
+      function updatePsFactorState() {
+        psFactorInput.disabled = !psExamToggle.checked;
+      }
+      psExamToggle.addEventListener('change', updatePsFactorState);
+      updatePsFactorState();
+    }
+    if (saveForm) {
+      saveForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        var formData = new FormData(saveForm);
+        fetch(saveForm.action, {
+          method: 'POST',
+          body: formData,
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            window.location.reload(); // Automatically refresh page
+          }
+        });
+      });
+    }
+  });
+// Force correct assignment edit function after all scripts load
+window.startInlineEditAssignment = function(assessment, code, semester, year) {
+    if (window.editing_assignment_keys !== null) { window.cancelInlineEditAssignment(); }
+    window.editing_assignment_keys = { assessment, code, semester, year };
+    const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
+    if (!row) return;
+    window.original_row_html = row.innerHTML;
+    fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/edit`)
+      .then(r => r.text())
+      .then(html => {
+        console.log('Edit row HTML:', html);
+        row.innerHTML = html;
+      });
+};
+window.submitInlineEditAssignmentRow = function(assessment, code, semester, year) {
+    const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
+    console.log('[Edit] Save clicked', { assessment, code, semester, year, row });
+    if (!row) { console.warn('[Edit] Row not found'); return false; }
+    const weighted_mark = row.querySelector("input[name='weighted_mark']")?.value || '';
+    const mark_weight = row.querySelector("input[name='mark_weight']")?.value || '';
+    const grade_type = row.querySelector("select[name='grade_type']")?.value || 'numeric';
+    console.log('[Edit] Form values', { weighted_mark, mark_weight, grade_type });
+    const formData = new FormData();
+    formData.append('assessment', assessment);
+    formData.append('subject_code', code);
+    formData.append('semester_name', semester);
+    formData.append('year', year);
+    formData.append('weighted_mark', weighted_mark);
+    formData.append('mark_weight', mark_weight);
+    formData.append('grade_type', grade_type);
+    fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/update`, { method: 'POST', body: formData })
+        .then(r => {
+            console.log('[Edit] AJAX response status', r.status);
+            return r.json();
+        })
+        .then(data => {
+            console.log('[Edit] AJAX response data', data);
+            if (data.success && typeof data.row_html === 'string') {
+                row.innerHTML = data.row_html;
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>${data.error || 'Unknown error.'}</div></td>`;
+            }
+            window.editing_assignment_keys = null;
+            window.original_row_html = null;
+            console.log('[Edit] State cleared after save');
+        })
+        .catch((err) => {
+            console.error('[Edit] AJAX error', err);
+            row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>Error submitting edit.</div></td>`;
+            window.editing_assignment_keys = null;
+            window.original_row_html = null;
+            console.log('[Edit] State cleared after error');
+        });
+    return false;
+};
+window.cancelInlineEditAssignment = function() {
+  console.log('[Edit] Cancel clicked', window.editing_assignment_keys);
+  if (window.editing_assignment_keys && typeof window.editing_assignment_keys === 'object') {
+    const { assessment, code, semester, year } = window.editing_assignment_keys;
+    const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
+    if (row && window.original_row_html) {
+      row.innerHTML = window.original_row_html;
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      console.log('[Edit] Row restored after cancel');
+    } else {
+      console.warn('[Edit] Row not found or no original HTML');
+    }
+    window.editing_assignment_keys = null; window.original_row_html = null;
+    console.log('[Edit] State cleared after cancel');
+  } else {
+    window.editing_assignment_keys = null; window.original_row_html = null;
+    console.log('[Edit] State cleared (no keys to cancel)');
+  }
+};
+</script>
 {% endblock %}

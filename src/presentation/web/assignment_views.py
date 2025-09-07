@@ -165,12 +165,12 @@ def create_assignment(
     )
 
 
-@assignment_router.api_route("/assignment/{assignment_id}/delete", methods=["POST"], response_class=HTMLResponse)
+@assignment_router.api_route("/assignment/{assessment}/{year}/delete", methods=["POST"], response_class=HTMLResponse)
 def delete_assignment(
-    semester: str,
+    assessment: str,
     code: str,
-    assignment_id: int,
-    year: str = Form(...),
+    semester: str,
+    year: str,
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
     """
@@ -186,13 +186,15 @@ def delete_assignment(
     Returns:
         RedirectResponse: Redirect to subject detail page.
     """
-    existing = session.get(Assignment, assignment_id)
-    if (
-        existing
-        and existing.subject_code == code
-        and existing.semester_name == semester
-        and existing.year == year
-    ):
+    existing = session.exec(
+        select(Assignment).where(
+            Assignment.assessment == assessment,
+            Assignment.subject_code == code,
+            Assignment.semester_name == semester,
+            Assignment.year == year,
+        )
+    ).first()
+    if existing:
         session.delete(existing)
         session.commit()
     return RedirectResponse(
@@ -200,20 +202,27 @@ def delete_assignment(
     )
 
 # AJAX endpoint: return assignment edit form HTML
-@assignment_router.api_route("/assignment/{assignment_id}/edit", response_class=HTMLResponse, methods=["GET", "HEAD"])
+@assignment_router.api_route("/assignment/{assessment}/{year}/edit", response_class=HTMLResponse, methods=["GET", "HEAD"])
 def edit_assignment_form(
     request: Request,
-    semester: str,
-    code: str,
-    assignment_id: int,
+    assessment: str,
     year: str,
+    code: str,
+    semester: str,
     session: Session = Depends(get_session),
 ):
-        assignment = session.get(Assignment, assignment_id)
-        if not assignment or assignment.subject_code != code or assignment.semester_name != semester or assignment.year != year:
-                return HTMLResponse("Assignment not found", status_code=404)
-        # Return only <td> cells for inline editing, with a form inside the last cell
-        return HTMLResponse(f"""
+    assignment = session.exec(
+        select(Assignment).where(
+            Assignment.assessment == assessment,
+            Assignment.subject_code == code,
+            Assignment.semester_name == semester,
+            Assignment.year == year,
+        )
+    ).first()
+    if not assignment:
+        return HTMLResponse("Assignment not found", status_code=404)
+    # Return only <td> cells for inline editing, with a form inside the last cell
+    return HTMLResponse(f"""
     <td><input name='assessment' class='input input-xs w-24' value='{assignment.assessment}' required /></td>
     <td><input name='weighted_mark' type='number' step='any' min='0' class='input input-xs w-16' value='{assignment.weighted_mark if assignment.weighted_mark is not None else ''}' placeholder='Weighted mark' /></td>
     <td class='assignment-unweighted'><input name='unweighted_mark' type='text' class='input input-xs w-16' value="{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.unweighted_mark) if assignment.unweighted_mark is not None else '0.00')}" readonly /></td>
@@ -224,43 +233,35 @@ def edit_assignment_form(
             <option value='U' {'selected' if assignment.grade_type == 'U' else ''}>U</option>
         </select></td>
     <td class='flex gap-1'>
-        <button type='button' class='btn btn-xs btn-primary' onclick="submitInlineEditAssignmentRow('{assignment_id}', '{year}')">Save</button>
-        <button type='button' class='btn btn-xs' onclick='cancelInlineEditAssignment()'>Cancel</button>
+        <button type='button' class='btn btn-xs btn-primary' onclick="window.submitInlineEditAssignmentRow('{assessment}', '{code}', '{semester}', '{year}')">Save</button>
+        <button type='button' class='btn btn-xs' onclick='window.cancelInlineEditAssignment()'>Cancel</button>
     </td>
     """)
 # AJAX endpoint: update assignment and return JSON result
-@assignment_router.api_route("/assignment/{assignment_id}/update", methods=["POST"], response_class=JSONResponse)
+@assignment_router.api_route("/assignment/{assessment}/{year}/update", methods=["POST"], response_class=JSONResponse)
 def update_assignment_ajax(
-    semester: str,
+    assessment: str,
     code: str,
-    assignment_id: int,
-    year: str = Form(...),
-    assessment: str = Form(...),
-    weighted_mark: Optional[str] = Form(""),
-    mark_weight: Optional[str] = Form(""),
+    semester: str,
+    year: str,
+    weighted_mark: Optional[str] = Form("") ,
+    mark_weight: Optional[str] = Form("") ,
     grade_type: str = Form("numeric"),
     session: Session = Depends(get_session),
 ):
     try:
-        assignment = session.get(Assignment, assignment_id)
-        if not assignment or assignment.subject_code != code or assignment.semester_name != semester or assignment.year != year:
-            return JSONResponse({"success": False, "error": "Assignment not found."}, status_code=404)
-        # Check for duplicate assessment name (excluding self)
-        duplicate = session.exec(
+        assignment = session.exec(
             select(Assignment).where(
+                Assignment.assessment == assessment,
                 Assignment.subject_code == code,
                 Assignment.semester_name == semester,
                 Assignment.year == year,
-                Assignment.assessment == assessment,
-                Assignment.id != assignment_id,
             )
         ).first()
-        if duplicate:
-            return JSONResponse({"success": False, "error": "Another assignment with this name exists."}, status_code=400)
+        if not assignment:
+            return JSONResponse({"success": False, "error": "Assignment not found."}, status_code=404)
         # Update fields
-        assignment.assessment = assessment
         if grade_type == GradeType.NUMERIC.value:
-            # Update weighted_mark independently
             try:
                 if weighted_mark not in (None, ""):
                     weighted_val = float(weighted_mark)
@@ -281,6 +282,64 @@ def update_assignment_ajax(
             assignment.unweighted_mark = None
         assignment.grade_type = grade_type
         session.commit()
+        # Recalculate and update subject total_mark after assignment edit
+        subject = session.exec(
+            select(Subject).where(
+                Subject.subject_code == code,
+                Subject.semester_name == semester,
+                Subject.year == year,
+            )
+        ).first()
+        if subject:
+            assignments = session.exec(
+                select(Assignment).where(
+                    Assignment.subject_code == code,
+                    Assignment.semester_name == semester,
+                    Assignment.year == year,
+                )
+            ).all()
+            exams = session.exec(
+                select(Examination).where(
+                    Examination.subject_code == code,
+                    Examination.semester_name == semester,
+                    Examination.year == year,
+                )
+            ).all()
+            assess_weight_sum = 0.0
+            assess_weighted_total = 0.0
+            for a in assignments:
+                if a.grade_type == GradeType.NUMERIC.value and a.mark_weight and a.weighted_mark:
+                    try:
+                        assess_weight_sum += float(a.mark_weight)
+                        assess_weighted_total += float(a.weighted_mark)
+                    except ValueError:
+                        pass
+            exam_mark = None
+            exam_weight = None
+            if exams:
+                exam = exams[0]
+                try:
+                    exam_mark = float(exam.exam_mark)
+                except (TypeError, ValueError):
+                    exam_mark = None
+                try:
+                    exam_weight = float(exam.exam_weight)
+                except (TypeError, ValueError):
+                    exam_weight = None
+            total_mark = None
+            if assess_weight_sum or exam_weight:
+                try:
+                    total_weighted = assess_weighted_total
+                    total_weight_percent = assess_weight_sum
+                    if exam_mark is not None and exam_weight is not None:
+                        total_weighted += (exam_mark / 100.0) * exam_weight
+                        total_weight_percent += exam_weight
+                    if total_weight_percent > 0:
+                        total_mark = round((total_weighted / total_weight_percent) * 100.0, 2)
+                except ZeroDivisionError:
+                    total_mark = None
+            subject.total_mark = total_mark
+            session.commit()
         # Return updated row HTML for table
         row_html = (
             f"<td class='assignment-assessment'>{assignment.assessment}</td>"
@@ -289,11 +348,11 @@ def update_assignment_ajax(
             f"<td class='assignment-mark-weight'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.mark_weight) if assignment.mark_weight is not None else '0.00')}</td>"
             f"<td class='assignment-grade-type'>{assignment.grade_type}</td>"
             f"<td class='flex gap-1'>"
-            f"<form method='post' action='/semester/{semester}/subject/{code}/assignment/{assignment_id}/delete'>"
+            f"<form method='post' action='/semester/{semester}/subject/{code}/assignment/{assessment}/{code}/{semester}/{year}/delete'>"
             f"<input type='hidden' name='year' value='{year}' />"
             f"<button class='btn btn-xs btn-error' type='submit'>✕</button>"
             f"</form>"
-            f"<button class='btn btn-xs btn-outline' type='button' onclick=\"startInlineEditAssignment('{assignment_id}')\">Edit</button>"
+            f"<button class='btn btn-xs btn-outline' type='button' onclick=\"window.startInlineEditAssignment('{assessment}','{code}','{semester}','{year}')\">Edit</button>"
             f"</td>"
         )
         return JSONResponse({"success": True, "row_html": row_html})

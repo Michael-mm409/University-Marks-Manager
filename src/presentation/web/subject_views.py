@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col
 from typing import Optional
 from fastapi import Request
 from src.presentation.api.deps import get_session
@@ -65,6 +65,7 @@ def subject_detail(
     session: Session = Depends(get_session),
 ):
     """Render the subject detail page showing assignments, exams, and computed averages."""
+    # Fetch the main subject
     subject = session.exec(
         select(Subject).where(
             Subject.semester_name == semester,
@@ -75,18 +76,28 @@ def subject_detail(
     if not subject:
         return HTMLResponse("Subject not found", status_code=404)
 
+    # Find all synced subjects in the same year (regardless of semester)
+    synced_subjects = session.exec(
+        select(Subject).where(
+            Subject.year == year,
+            Subject.sync_subject == True,
+        )
+    ).all()
+    all_subjects = [subject] + [s for s in synced_subjects if s.subject_code != subject.subject_code]
+    subject_codes = [s.subject_code for s in all_subjects]
+
+    # Get assignments and exams for all relevant subjects
+
     assignments = session.exec(
         select(Assignment).where(
-            Assignment.semester_name == semester,
             Assignment.year == year,
-            Assignment.subject_code == code,
+            col(Assignment.subject_code).in_(subject_codes),
         )
     ).all()
     examinations = session.exec(
         select(Examination).where(
-            Examination.semester_name == semester,
             Examination.year == year,
-            Examination.subject_code == code,
+            col(Examination.subject_code).in_(subject_codes),
         )
     ).all()
 
@@ -189,6 +200,7 @@ def subject_detail(
         except ValueError:
             requirement_status = "invalid"
 
+    return_to = request.query_params.get("return_to")
     return _render(
         request,
         "subject.html",
@@ -211,9 +223,11 @@ def subject_detail(
             "ps_exam": ps_exam,
             "ps_factor": parsed_factor if ps_exam else None,
             "raw_exam_percent": exam_raw_percent,
+            "exam_mark": exam_raw_percent,
             "assignment_weighted_sum": round(assignment_weighted_sum, 2),
             "assignment_weight_percent": round(assignment_weight_percent, 2),
             "exam_weighted_sum": round(exam_contribution, 2),
             "effective_scoring_exam_weight": round(effective_scoring_exam_weight, 2),
+            "return_to": return_to,
         },
     )
