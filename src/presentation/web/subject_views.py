@@ -76,28 +76,17 @@ def subject_detail(
     if not subject:
         return HTMLResponse("Subject not found", status_code=404)
 
-    # Find all synced subjects in the same year (regardless of semester)
-    synced_subjects = session.exec(
-        select(Subject).where(
-            Subject.year == year,
-            Subject.sync_subject == True,
-        )
-    ).all()
-    all_subjects = [subject] + [s for s in synced_subjects if s.subject_code != subject.subject_code]
-    subject_codes = [s.subject_code for s in all_subjects]
-
-    # Get assignments and exams for all relevant subjects
-
+    # Only get assignments and exams for the current subject
     assignments = session.exec(
         select(Assignment).where(
             Assignment.year == year,
-            col(Assignment.subject_code).in_(subject_codes),
+            Assignment.subject_code == code,
         )
     ).all()
     examinations = session.exec(
         select(Examination).where(
             Examination.year == year,
-            col(Examination.subject_code).in_(subject_codes),
+            Examination.subject_code == code,
         )
     ).all()
 
