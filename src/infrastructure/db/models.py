@@ -43,7 +43,7 @@ class Assignment(SQLModel, table=True):
     subject_code: str = Field(primary_key=True, index=True)
     semester_name: str = Field(primary_key=True, index=True)
     year: str = Field(primary_key=True, index=True)
-    weighted_mark: Optional[float] = None  # numeric stored as text or S/U
+    weighted_mark: Optional[str] = None  # numeric stored as text or S/U
     unweighted_mark: Optional[float] = None
     mark_weight: Optional[float] = None
     grade_type: str = Field(default=GradeType.NUMERIC.value)
