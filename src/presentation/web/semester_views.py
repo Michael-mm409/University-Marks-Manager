@@ -1,10 +1,12 @@
 from fastapi import Depends, Form, Request, APIRouter
+from typing import List
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, select
 from src.presentation.api.deps import get_session
 from src.infrastructure.db.models import Semester, Subject, Assignment, Examination, ExamSettings, GradeType
 from .template_helpers import _render
 semester_router = APIRouter()
+from .types import SemesterSummary, SemesterContext
 
 @semester_router.api_route("/create", methods=["POST"])
 def create_semester(
@@ -102,7 +104,7 @@ def semester_detail(
     main_subjects = [s for s in subjects if s.semester_name == semester]
     synced_subjects = [s for s in subjects if s.sync_subject and s.semester_name != semester]
     display_subjects = main_subjects + synced_subjects
-    summaries = []
+    summaries: List[SemesterSummary] = []
     for sub in display_subjects:
         # Use correct semester for assignments/exams
         assignments = session.exec(
@@ -122,12 +124,19 @@ def semester_detail(
         assess_weight_sum = 0.0
         assess_weighted_total = 0.0
         for a in assignments:
-            if a.grade_type == GradeType.NUMERIC.value and a.mark_weight and a.weighted_mark:
-                try:
-                    assess_weight_sum += float(a.mark_weight)
-                    assess_weighted_total += float(a.weighted_mark)
-                except ValueError:
-                    pass
+            if a.grade_type == GradeType.NUMERIC.value:
+                # Always include the assignment's weight if present, even if not yet marked
+                if a.mark_weight not in (None, ""):
+                    try:
+                        assess_weight_sum += float(a.mark_weight)
+                    except ValueError:
+                        pass
+                # Only add to weighted total when a weighted mark exists
+                if a.weighted_mark not in (None, ""):
+                    try:
+                        assess_weighted_total += float(a.weighted_mark)
+                    except ValueError:
+                        pass
         exam_mark = None
         exam_weight = None
         if exam:
@@ -154,8 +163,12 @@ def semester_detail(
                 "sync_subject": sub.sync_subject,
             }
         )
-    return _render(
-        request,
-        "semester.html",
-        {"semester": semester, "year": year, "subjects": display_subjects, "subject_summaries": summaries},
-    )
+
+    ctx: SemesterContext = {
+        "semester": semester,
+        "year": year,
+        "subjects": display_subjects,
+        "subject_summaries": summaries,
+    }
+
+    return _render(request, "semester.html", ctx)

@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 
 # Third-party imports
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlmodel import SQLModel
@@ -52,10 +53,20 @@ static_dir.mkdir(exist_ok=True)
 APPLICATION.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Mount original assets (icons) if present at repo root / assets
-ROOT_DIR = BASE_DIR.parent
+# BASE_DIR = src/app -> repo root is two levels up
+ROOT_DIR = BASE_DIR.parent.parent
 assets_dir = ROOT_DIR / "assets"
 if assets_dir.exists():
     APPLICATION.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+# Explicit /favicon.ico for browsers requesting root path
+static_favicon = static_dir / "images" / "favicon.ico"
+assets_favicon = assets_dir / "favicon.ico"
+if static_favicon.exists() or assets_favicon.exists():
+    @APPLICATION.get("/favicon.ico")
+    def favicon():
+        path = str(static_favicon if static_favicon.exists() else assets_favicon)
+        return FileResponse(path)
 app = APPLICATION  # backwards compatible name for uvicorn target
 
 __all__ = ["app", "APPLICATION"]

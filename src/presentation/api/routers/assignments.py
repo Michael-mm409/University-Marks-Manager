@@ -8,12 +8,13 @@ from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select
 
 from src.infrastructure.db.models import Assignment, GradeType
+from src.presentation.api.schemas import AssignmentCreate, AssignmentRead
 from src.presentation.api.deps import get_session
 
 router = APIRouter()
 
 
-@router.api_route("/", response_model=List[Assignment], methods=["GET", "HEAD"], response_class=HTMLResponse)
+@router.api_route("/", response_model=List[AssignmentRead], methods=["GET", "HEAD"], response_class=HTMLResponse)
 def list_assignments(
 	session: Session = Depends(get_session),
 	subject_code: Optional[str] = None,
@@ -42,8 +43,8 @@ def list_assignments(
     return session.exec(stmt).all()
 
 
-@router.api_route("/", response_model=Assignment, status_code=status.HTTP_201_CREATED, methods=["POST"], response_class=HTMLResponse)
-def create_assignment(data: Assignment, session: Session = Depends(get_session)) -> Assignment:
+@router.api_route("/", response_model=AssignmentRead, status_code=status.HTTP_201_CREATED, methods=["POST"], response_class=HTMLResponse)
+def create_assignment(data: AssignmentCreate, session: Session = Depends(get_session)) -> Assignment:
     """
     Create a new assignment.
 
@@ -70,7 +71,7 @@ def create_assignment(data: Assignment, session: Session = Depends(get_session))
     return assignment
 
 
-@router.api_route("/{assignment_id}", response_model=Assignment, methods=["GET", "HEAD"], response_class=HTMLResponse)
+@router.api_route("/{assignment_id}", response_model=AssignmentRead, methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_assignment(assignment_id: int, session: Session = Depends(get_session)) -> Assignment:
     """
     Retrieve an assignment by its ID.
@@ -91,8 +92,8 @@ def get_assignment(assignment_id: int, session: Session = Depends(get_session)) 
     return a
 
 
-@router.api_route("/{assignment_id}", response_model=Assignment, methods=["PUT"], response_class=HTMLResponse)
-def update_assignment(assignment_id: int, data: Assignment, 
+@router.api_route("/{assignment_id}", response_model=AssignmentRead, methods=["PUT"], response_class=HTMLResponse)
+def update_assignment(assignment_id: int, data: AssignmentCreate, 
                       session: Session = Depends(get_session)) -> Assignment:
     """
     Update an existing assignment's details.

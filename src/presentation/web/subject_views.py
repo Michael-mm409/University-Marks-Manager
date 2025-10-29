@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlmodel import Session, select, col
+from sqlmodel import Session, select
 from typing import Optional
 from fastapi import Request
 from src.presentation.api.deps import get_session
 from src.infrastructure.db.models import Subject, Assignment, Examination, ExamSettings, GradeType
 from src.presentation.web.template_helpers import _render
+from .types import SubjectContext
 
 subject_router = APIRouter()
 
@@ -190,33 +191,31 @@ def subject_detail(
             requirement_status = "invalid"
 
     return_to = request.query_params.get("return_to")
-    return _render(
-        request,
-        "subject.html",
-        {
-            "semester": semester,
-            "year": year,
-            "subject": subject,
-            "assignments": assignments,
-            "examinations": examinations,
-            "total_weighted": round(total_weighted, 2),
-            "projected_total_weighted": projected_total_weighted,
-            "total_weight_percent": round(total_scoring_weight_percent, 2),
-            "average": average,
-            "final_total": desired_goal,
-            "total_mark": desired_goal,
-            "effective_exam_weight": effective_exam_weight,
-            "required_exam_mark": None if required_exam_mark is None
-                 else round(required_exam_mark, 2),
-            "requirement_status": requirement_status,
-            "ps_exam": ps_exam,
-            "ps_factor": parsed_factor if ps_exam else None,
-            "raw_exam_percent": exam_raw_percent,
-            "exam_mark": exam_raw_percent,
-            "assignment_weighted_sum": round(assignment_weighted_sum, 2),
-            "assignment_weight_percent": round(assignment_weight_percent, 2),
-            "exam_weighted_sum": round(exam_contribution, 2),
-            "effective_scoring_exam_weight": round(effective_scoring_exam_weight, 2),
-            "return_to": return_to,
-        },
-    )
+
+    ctx: SubjectContext = {
+        "semester": semester,
+        "year": year,
+        "subject": subject,
+        "assignments": assignments,
+        "examinations": examinations,
+        "total_weighted": round(total_weighted, 2),
+        "projected_total_weighted": projected_total_weighted,
+        "total_weight_percent": round(total_scoring_weight_percent, 2),
+        "average": average,
+        "final_total": desired_goal,
+        "total_mark": desired_goal,
+        "effective_exam_weight": effective_exam_weight,
+        "required_exam_mark": None if required_exam_mark is None else round(required_exam_mark, 2),
+        "requirement_status": requirement_status,
+        "ps_exam": ps_exam,
+        "ps_factor": parsed_factor if ps_exam else None,
+        "raw_exam_percent": exam_raw_percent,
+        "exam_mark": exam_raw_percent,
+        "assignment_weighted_sum": round(assignment_weighted_sum, 2),
+        "assignment_weight_percent": round(assignment_weight_percent, 2),
+        "exam_weighted_sum": round(exam_contribution, 2),
+        "effective_scoring_exam_weight": round(effective_scoring_exam_weight, 2),
+        "return_to": return_to,
+    }
+
+    return _render(request, "subject.html", ctx)
