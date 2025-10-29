@@ -7,12 +7,13 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlmodel import Session, select
 
 from src.infrastructure.db.models import Subject
+from src.presentation.api.schemas import SubjectCreate, SubjectRead
 from src.presentation.api.deps import get_session
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[Subject])
+@router.get("/", response_model=List[SubjectRead])
 def list_subjects(
 	session: Session = Depends(get_session),
 	semester_name: Optional[str] = None,
@@ -40,8 +41,8 @@ def list_subjects(
     return session.exec(stmt).all()
 
 
-@router.post("/", response_model=Subject, status_code=status.HTTP_201_CREATED)
-def create_subject(data: Subject, session: Session = Depends(get_session)) -> Subject:
+@router.post("/", response_model=SubjectRead, status_code=status.HTTP_201_CREATED)
+def create_subject(data: SubjectCreate, session: Session = Depends(get_session)) -> Subject:
     """
 	Create a new subject if it does not already exist in the specified semester and year.
 	
@@ -78,7 +79,7 @@ def create_subject(data: Subject, session: Session = Depends(get_session)) -> Su
     return subj
 
 
-@router.get("/{subject_id}", response_model=Subject)
+@router.get("/{subject_id}", response_model=SubjectRead)
 def get_subject(subject_id: int, session: Session = Depends(get_session)) -> Subject:
     """
     Retrieve a subject by its ID.
@@ -99,8 +100,8 @@ def get_subject(subject_id: int, session: Session = Depends(get_session)) -> Sub
     return subj
 
 
-@router.put("/{subject_id}", response_model=Subject)
-def update_subject(subject_id: int, data: Subject, session: Session = Depends(get_session)) -> Subject:
+@router.put("/{subject_id}", response_model=SubjectRead)
+def update_subject(subject_id: int, data: SubjectCreate, session: Session = Depends(get_session)) -> Subject:
     """
     Update an existing subject's details.
 

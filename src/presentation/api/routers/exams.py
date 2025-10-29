@@ -7,12 +7,13 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlmodel import Session, select
 
 from src.infrastructure.db.models import Examination, Assignment
+from src.presentation.api.schemas import ExaminationCreate, ExaminationRead
 from src.presentation.api.deps import get_session
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[Examination])
+@router.get("/", response_model=List[ExaminationRead])
 def list_exams(
 	session: Session = Depends(get_session),
 	subject_code: Optional[str] = None,
@@ -40,8 +41,8 @@ def list_exams(
     return session.exec(stmt).all()
 
 
-@router.post("/", response_model=Examination, status_code=status.HTTP_201_CREATED)
-def create_exam(data: Examination, session: Session = Depends(get_session)) -> Examination:
+@router.post("/", response_model=ExaminationRead, status_code=status.HTTP_201_CREATED)
+def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)) -> Examination:
     """
     Create a new examination record if one does not already exist for the subject in the given semester/year.
 
@@ -90,7 +91,7 @@ def create_exam(data: Examination, session: Session = Depends(get_session)) -> E
     return exam
 
 
-@router.get("/{exam_id}", response_model=Examination)
+@router.get("/{exam_id}", response_model=ExaminationRead)
 def get_exam(exam_id: int, session: Session = Depends(get_session)) -> Examination:
     """
     Retrieve an examination by its ID.
@@ -111,8 +112,8 @@ def get_exam(exam_id: int, session: Session = Depends(get_session)) -> Examinati
     return exam
 
 
-@router.put("/{exam_id}", response_model=Examination)
-def update_exam(exam_id: int, data: Examination,
+@router.put("/{exam_id}", response_model=ExaminationRead)
+def update_exam(exam_id: int, data: ExaminationCreate,
                 session: Session = Depends(get_session)) -> Examination:
     """
     Update an existing examination's details.

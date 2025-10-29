@@ -326,20 +326,19 @@ def update_assignment_ajax(
                     exam_weight = float(exam.exam_weight)
                 except (TypeError, ValueError):
                     exam_weight = None
-            total_mark = None
-            if assess_weight_sum or exam_weight:
-                try:
-                    total_weighted = assess_weighted_total
-                    total_weight_percent = assess_weight_sum
-                    if exam_mark is not None and exam_weight is not None:
-                        total_weighted += (exam_mark / 100.0) * exam_weight
-                        total_weight_percent += exam_weight
-                    if total_weight_percent > 0:
-                        total_mark = round((total_weighted / total_weight_percent) * 100.0, 2)
-                except ZeroDivisionError:
-                    total_mark = None
-            subject.total_mark = total_mark
-            session.commit()
+                # Recalculate totals for display only — do NOT persist subject.total_mark here.
+                total_mark = None
+                if assess_weight_sum or exam_weight:
+                    try:
+                        total_weighted = assess_weighted_total
+                        total_weight_percent = assess_weight_sum
+                        if exam_mark is not None and exam_weight is not None:
+                            total_weighted += (exam_mark / 100.0) * exam_weight
+                            total_weight_percent += exam_weight
+                        if total_weight_percent > 0:
+                            total_mark = round((total_weighted / total_weight_percent) * 100.0, 2)
+                    except ZeroDivisionError:
+                        total_mark = None
         # Return updated row HTML for table
         row_html = (
             f"<td class='assignment-assessment'>{assignment.assessment}</td>"

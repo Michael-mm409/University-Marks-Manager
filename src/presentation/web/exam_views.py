@@ -128,6 +128,44 @@ def save_total_mark(
         )
 
 
+@exam_router.api_route("/totalMark/reset", methods=["POST"], response_class=RedirectResponse)
+def reset_total_mark(
+    request: Request,
+    semester: str,
+    code: str,
+    year: str = Form(...),
+    session: Session = Depends(get_session),
+):
+    """Reset the stored total_mark on the Subject (clear the saved total).
+
+    This endpoint is intended for explicit user actions (reset/clear). It returns JSON if
+    called via AJAX, or redirects back to the subject page otherwise.
+    """
+    subject = session.exec(
+        select(Subject).where(
+            Subject.semester_name == semester,
+            Subject.year == year,
+            Subject.subject_code == code,
+        )
+    ).first()
+    if subject:
+        subject.total_mark = None
+        session.add(subject)
+        session.commit()
+
+    def is_ajax(req: Request):
+        try:
+            return req.headers.get("X-Requested-With") == "XMLHttpRequest"
+        except Exception:
+            return False
+
+    if is_ajax(request):
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse({"success": True})
+    return RedirectResponse(f"/semester/{semester}/subject/{code}?year={year}", status_code=303)
+
+
 @exam_router.api_route("/exam/{exam_id}/delete", methods=["POST"], response_class=RedirectResponse)
 def delete_exam(
     semester: str,

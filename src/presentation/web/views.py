@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Optional, List
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
@@ -16,6 +17,7 @@ from .assignment_views import assignment_router
 from .exam_views import exam_router
 from .semester_views import semester_router
 from .subject_views import subject_router
+from .types import IndexContext
 
 views = APIRouter()
 views.include_router(assignment_router, prefix="/semester/{semester}/subject/{code}", tags=["assignments"])
@@ -26,14 +28,36 @@ views.include_router(subject_router, prefix="/semester/{semester}", tags=["subje
 
 @views.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def home(request: Request, year: Optional[str] = None, session: Session = Depends(get_session)) -> HTMLResponse:
-    """Home with optional year filter."""
+    """Home with optional year filter. Defaults to current year when no filter is provided."""
+    current_year = str(datetime.now().year)
+    has_year_param = "year" in request.query_params
+
     query = select(Semester)
-    if year:
-        query = query.where(Semester.year == year)
+    if has_year_param:
+        # If user supplied year param: filter only when non-empty
+        if year:
+            query = query.where(Semester.year == year)
+        selected_year = year or ""  # empty string denotes 'All'
+    else:
+        # No explicit filter provided: default to current year
+        query = query.where(Semester.year == current_year)
+        selected_year = current_year
+
     semesters = session.exec(query).all()
-    # Distinct years for filter dropdown
-    years: List[str] = sorted({s.year for s in session.exec(select(Semester)).all()})
-    return _render(request, "index.html", {"semesters": semesters, "years": years, "selected_year": year})
+
+    # Distinct years for filter dropdown, ensure current year is present
+    years_set = {s.year for s in session.exec(select(Semester)).all()}
+    years_set.add(current_year)
+    years: List[str] = sorted(years_set)
+
+    ctx: IndexContext = {
+        "semesters": semesters,
+        "years": years,
+        "selected_year": selected_year,
+        "current_year": current_year,
+    }
+
+    return _render(request, "index.html", ctx)
 
 
 __all__ = ["views"]

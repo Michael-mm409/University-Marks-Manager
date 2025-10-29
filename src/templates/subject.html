@@ -100,7 +100,10 @@
       </label>
     </div>
     <div class="col-span-4 flex items-end">
-      <button class="btn btn-xs btn-secondary w-full" type="submit">Save Target</button>
+      <div class="flex gap-2">
+        <button class="btn btn-xs btn-secondary w-full" type="submit">Save Target</button>
+          <button id="confirm-reset-btn" class="btn btn-xs btn-ghost" type="button">Confirm Reset</button>
+      </div>
     </div>
   </form>
   <p class="mt-2 text-xs opacity-70">Provide a desired overall final %; the system derives and stores the required raw exam mark. Exam weight is automatically set to the remaining percentage after assignments (or retained if already created).{% if ps_exam %} PS mode: only {{ effective_scoring_exam_weight }}% (factor {{ ps_factor if ps_factor is not none else 40 }}%) of this weight counts toward the average.{% endif %}</p>
@@ -213,6 +216,25 @@
           }
         });
       });
+      var resetBtn = document.getElementById('reset-total-btn');
+        var confirmResetBtn = document.getElementById('confirm-reset-btn');
+        if (confirmResetBtn) {
+          confirmResetBtn.addEventListener('click', function() {
+            if (!confirm('Are you sure you want to reset the saved total mark for this subject? This will clear the stored total.')) return;
+            // POST to dedicated reset endpoint
+            var formData = new FormData();
+            formData.append('year', window.subjectYear);
+            fetch(window.subjectBasePath + '/totalMark/reset', {
+              method: 'POST',
+              body: formData,
+              headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(r => r.json())
+            .then(data => {
+              if (data.success) window.location.reload();
+            });
+          });
+        }
     }
   });
 // Force correct assignment edit function after all scripts load
