@@ -1,12 +1,25 @@
-version: '3.8'
+version: "3.8"
 services:
-  marks-manager:
+  web:
     build: .
     ports:
-      - "8501:8501"
+      - "8000:8000"
     volumes:
       - .:/app
     environment:
-      - STREAMLIT_SERVER_ENABLECORS=false
-      - STREAMLIT_SERVER_ENABLEXSRFPROTECTION=false
-    command: streamlit run src/main.py
+      - DATABASE_URL=postgresql://user:password@db/mydatabase
+    depends_on:
+      - db
+    command: uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  db:
+    image: postgres:13
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=mydatabase
+
+volumes:
+  postgres_data:

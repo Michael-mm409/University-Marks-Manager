@@ -30,7 +30,7 @@
   </div>
 </div>
 
-<div class="p-5 rounded-xl bg-base-100 shadow card-glow mb-6">
+<div class="p-4 md:p-5 rounded-xl bg-base-100 shadow card-glow mb-6">
   {% if error_messages and error_messages|length %}
     <div class="alert alert-error mb-4 text-sm relative" id="error-alert">
       <button type="button" class="btn btn-xs btn-circle absolute right-2 top-2" onclick="document.getElementById('error-alert').style.display='none'">✕</button>
@@ -40,25 +40,25 @@
     </div>
   {% endif %}
   <h3 class="font-semibold mb-3 flex items-center gap-2">Add Assignment <span class="badge badge-outline badge-sm">{{ assignments|length }} existing</span></h3>
-  <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/create" class="grid grid-cols-12 gap-3 text-sm">
+  <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/create" class="grid grid-cols-1 md:grid-cols-12 gap-3 text-sm">
   <input type="hidden" name="year" value="{{year}}" />
   {% if final_total is not none %}<input type="hidden" name="total_mark" value="{{ final_total }}" />{% endif %}
   {% if effective_exam_weight %}<input type="hidden" name="exam_weight" value="{{ effective_exam_weight }}" />{% endif %}
   {% if ps_exam %}<input type="hidden" name="ps_exam" value="true" />{% endif %}
   {% if ps_exam and ps_factor %}<input type="hidden" name="ps_factor" value="{{ ps_factor }}" />{% endif %}
-  <input name="assessment" placeholder="Assignment" class="input input-bordered input-xs col-span-4" required />
-  <input id="weighted_mark_input" name="weighted_mark" type="number" step="any" min="0" placeholder="Weighted mark" class="input input-bordered input-xs col-span-2" />
-  <input id="mark_weight_input" name="mark_weight" type="number" step="any" min="0" placeholder="Mark weight" class="input input-bordered input-xs col-span-2" />
-  <select id="grade_type_select" name="grade_type" class="select select-bordered select-xs col-span-2">
+  <input name="assessment" placeholder="Assignment" class="input input-bordered input-xs col-span-1 md:col-span-4" required />
+  <input id="weighted_mark_input" name="weighted_mark" type="number" step="any" min="0" placeholder="Weighted mark" class="input input-bordered input-xs col-span-1 md:col-span-2" />
+  <input id="mark_weight_input" name="mark_weight" type="number" step="any" min="0" placeholder="Mark weight" class="input input-bordered input-xs col-span-1 md:col-span-2" />
+  <select id="grade_type_select" name="grade_type" class="select select-bordered select-xs col-span-1 md:col-span-2">
     <option value="numeric">Numeric</option>
     <option value="S">S</option>
     <option value="U">U</option>
   </select>
-  <button class="btn btn-xs btn-primary col-span-2" type="submit">Add</button>
+  <button class="btn btn-xs btn-primary col-span-1 md:col-span-2" type="submit">Add</button>
   </form>
 </div>
 
-<div class="p-5 rounded-xl bg-base-100 shadow card-glow mb-6">
+<div class="p-4 md:p-5 rounded-xl bg-base-100 shadow card-glow mb-6">
   <h3 class="font-semibold mb-3 flex items-center gap-2">Total Mark
       {% if subject.total_mark is not none and subject.total_mark != 0 %}
         <span class="badge badge-outline badge-sm">Saved</span>
@@ -72,34 +72,34 @@
         Total mark saved successfully.
       </div>
     {% endif %}
-  <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/totalMark/save" class="grid grid-cols-12 gap-3 text-sm">
+  <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/totalMark/save" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-4 text-sm">
   <input type="hidden" name="year" value="{{year}}" />
   <!-- Remove hidden ps_exam and ps_factor inputs, use only visible ones below -->
-    <div class="col-span-4">
+    <div class="col-span-1 sm:col-span-2 md:col-span-4">
       <label class="form-control">
         <span class="label-text text-xs">Desired Final Total Mark</span>
         <input name="total_mark" value="{{ final_total if final_total is not none else '' }}" placeholder="e.g. 75" class="input input-bordered input-xs" />
       </label>
     </div>
-    <div class="col-span-4">
+    <div class="col-span-1 sm:col-span-2 md:col-span-4">
       <label class="form-control">
         <span class="label-text text-xs">Exam Weight (%)</span>
         <input disabled value="{{ effective_exam_weight if effective_exam_weight else 0 }}" class="input input-bordered input-xs" />
       </label>
     </div>
-    <div class="col-span-2 flex items-end">
+    <div class="col-span-1 sm:col-span-1 md:col-span-2 flex items-end">
       <label class="form-control w-full">
         <span class="label-text text-xs">PS Factor %</span>
         <input name="ps_factor" value="{{ ps_factor if ps_factor is not none else '40' }}" class="input input-bordered input-xs" {% if not ps_exam %}disabled{% endif %} />
       </label>
     </div>
-    <div class="col-span-2 flex items-end">
+    <div class="col-span-1 sm:col-span-1 md:col-span-2 flex items-end">
       <label class="label cursor-pointer flex gap-2 items-center text-xs">
         <span>PS Exam?</span>
   <input type="checkbox" name="ps_exam" value="true" class="toggle toggle-xs" {% if ps_exam %}checked{% endif %} id="ps-exam-toggle" />
       </label>
     </div>
-    <div class="col-span-4 flex items-end">
+    <div class="col-span-1 sm:col-span-2 md:col-span-4 flex items-end">
       <div class="flex gap-2">
         <button class="btn btn-xs btn-secondary w-full" type="submit">Save Target</button>
           <button id="confirm-reset-btn" class="btn btn-xs btn-ghost" type="button">Confirm Reset</button>

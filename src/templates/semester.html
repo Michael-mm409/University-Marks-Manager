@@ -5,62 +5,67 @@
   <h2 class="text-2xl font-semibold">{{semester}} <span class="text-base font-normal opacity-70">({{year}})</span></h2>
   <span class="badge badge-info badge-sm">{{ subject_summaries|length }} subjects</span>
 </div>
-<div class="p-5 rounded-xl bg-base-100 shadow card-glow mb-6">
+<div class="p-4 md:p-5 rounded-xl bg-base-100 shadow card-glow mb-6">
   <h3 class="font-semibold mb-3">Add Subject</h3>
-  <form method="post" action="/semester/{{semester}}/subject/create" class="flex flex-wrap gap-4 items-end">
+  <form method="post" action="/semester/{{semester}}/subject/create" class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
     <input type="hidden" name="year" value="{{year}}" />
-    <label class="form-control w-40">
+    <label class="form-control md:col-span-1">
       <span class="label-text">Code</span>
-      <input name="subject_code" class="input input-bordered input-sm" placeholder="CSCI101" required />
+      <input name="subject_code" class="input input-bordered input-sm w-full" placeholder="CSCI101" required />
     </label>
-    <label class="form-control w-60">
+    <label class="form-control md:col-span-3">
       <span class="label-text">Name</span>
-      <input name="subject_name" class="input input-bordered input-sm" placeholder="Intro to ..." required />
+      <input name="subject_name" class="input input-bordered input-sm w-full" placeholder="Intro to ..." required />
     </label>
-    <label class="label cursor-pointer flex gap-2 items-center mt-5">
+    <label class="label cursor-pointer flex gap-2 items-center md:col-span-1">
       <span class="label-text">Sync</span>
       <input type="checkbox" name="sync_subject" class="checkbox checkbox-sm" value="1" />
     </label>
-    <button class="btn btn-sm btn-primary mt-5" type="submit">Add</button>
+    <button class="btn btn-sm btn-primary md:col-span-1" type="submit">Add</button>
   </form>
 </div>
-<table class="table table-sm w-full border rounded-xl overflow-hidden">
-  <thead>
-  <tr>
-    <th>Subject Title</th>
-    <th>Assessment Mark</th>
-    <th>Assessment Weight</th>
-    <th>Final Exam Mark</th>
-    <th>Final Exam Weight</th>
-    <th>Total Mark</th>
-    <th></th>
-  </tr>
-  </thead>
-  <tbody>
-  {% for row in subject_summaries %}
-  <tr class="hover{% if row.sync_subject %} bg-blue-900/20 border-l-4 border-blue-400{% endif %}">
-    <td class="font-mono">
-      {{row.code}}
-      {% if row.sync_subject %}
-        <span class="badge badge-info badge-xs ml-1 align-middle">Sync</span>
-      {% endif %}
-    </td>
-    <td>{{ '%.2f' % row.assessment_mark if row.assessment_mark is not none else '-' }}</td>
-    <td>{{ '%.0f' % row.assessment_weight if row.assessment_weight is not none else '-' }}%</td>
-    <td>{% if row.exam_mark is not none %}{{ '%.2f' % row.exam_mark }}{% else %}-{% endif %}</td>
-    <td>{% if row.exam_weight is not none %}{{ '%.0f' % row.exam_weight }}%{% else %}-{% endif %}</td>
-    <td>{% if row.total_mark is not none %}{{ '%.0f' % row.total_mark }}{% else %}-{% endif %}</td>
-    <td>
-      {% if row.sync_subject and row.semester_name != semester %}
-        <a class="btn btn-xs btn-outline" href="/semester/{{row.semester_name}}/subject/{{row.code}}?year={{year}}&return_to={{semester}}-{{year}}">Open</a>
+
+<div class="overflow-x-auto">
+  <table class="table w-full">
+    <thead class="text-sm opacity-70">
+      <tr class="border-b border-base-300">
+        <th class="text-left p-4">Subject Title</th>
+        <th class="text-right p-4">Assessment Mark</th>
+        <th class="text-right p-4">Assessment Weight</th>
+        <th class="text-right p-4">Final Exam Mark</th>
+        <th class="text-right p-4">Final Exam Weight</th>
+        <th class="text-right p-4 font-bold">Total Mark</th>
+        <th class="text-right p-4"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in subject_summaries %}
+      <tr class="hover:bg-base-200/50 border-b border-base-300/50 {% if row.sync_subject %} bg-blue-900/10 border-l-4 border-blue-500{% endif %}">
+        <td class="p-4 font-mono">
+          {{row.code}}
+          {% if row.sync_subject %}
+            <span class="badge badge-info badge-xs ml-1 align-middle">Sync</span>
+          {% endif %}
+        </td>
+        <td class="p-4 text-right">{{ '%.2f' % row.assessment_mark if row.assessment_mark is not none else '-' }}</td>
+        <td class="p-4 text-right">{{ '%.0f' % row.assessment_weight if row.assessment_weight is not none else '-' }}%</td>
+        <td class="p-4 text-right">{% if row.exam_mark is not none %}{{ '%.2f' % row.exam_mark }}{% else %}-{% endif %}</td>
+        <td class="p-4 text-right">{% if row.exam_weight is not none %}{{ '%.0f' % row.exam_weight }}%{% else %}-{% endif %}</td>
+        <td class="p-4 text-right font-bold">{{ '%.0f' % row.total_mark if row.total_mark is not none else '-' }}</td>
+        <td class="p-4 text-right">
+          {% if row.sync_subject and row.semester_name != semester %}
+            <a class="btn btn-xs btn-outline" href="/semester/{{row.semester_name}}/subject/{{row.code}}?year={{year}}&return_to={{semester}}-{{year}}">Open</a>
+          {% else %}
+            <a class="btn btn-xs btn-outline" href="/semester/{{semester}}/subject/{{row.code}}?year={{year}}">Open</a>
+          {% endif %}
+        </td>
+      </tr>
       {% else %}
-        <a class="btn btn-xs btn-outline" href="/semester/{{semester}}/subject/{{row.code}}?year={{year}}">Open</a>
-      {% endif %}
-    </td>
-  </tr>
-  {% else %}
-  <tr><td colspan="7" class="opacity-70">No subjects.</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
+      <tr>
+        <td colspan="7" class="p-4 text-center opacity-70">No subjects.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endblock %}
