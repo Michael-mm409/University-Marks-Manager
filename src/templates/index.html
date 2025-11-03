@@ -2,7 +2,10 @@
 {% block content %}
 <div class="flex flex-col gap-6">
   <section class="p-5 rounded-xl bg-base-100 shadow card-glow">
-    <h2 class="text-xl font-semibold mb-3">Add Semester</h2>
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="text-xl font-semibold">Add Semester</h2>
+      <a href="/courses" class="btn btn-sm btn-outline">Manage Courses</a>
+    </div>
     <form method="post" action="/semester/create" class="flex flex-wrap gap-4 items-end">
       <label class="form-control w-40">
         <span class="label-text">Name</span>
@@ -10,8 +13,9 @@
       </label>
       <label class="form-control w-32">
         <span class="label-text">Year</span>
-  <input name="year" type="number" class="input input-bordered input-sm" value="{{ current_year }}" min="2000" max="2100" step="1" id="add-semester-year" />
+  <input name="year" type="number" class="input input-bordered input-sm" value="{{ selected_year or current_year }}" min="2000" max="2100" step="1" id="add-semester-year" />
       </label>
+      <input type="hidden" name="return_year" value="{{ selected_year or '' }}" />
       <button class="btn btn-sm btn-primary mt-4" type="submit">Add</button>
     </form>
   </section>
@@ -22,6 +26,13 @@
         <h2 class="text-xl font-semibold">Semesters</h2>
         <span class="badge badge-info badge-sm">{{ semesters|length }}</span>
       </div>
+      {% if course_filter %}
+        <div class="text-xs opacity-70">
+          Filtering by course:
+          <span class="font-semibold">{{ course_filter.name }}</span>
+          {% if course_filter.code %}<span class="ml-1">({{ course_filter.code }})</span>{% endif %}
+        </div>
+      {% endif %}
       <!-- Year Filter -->
       <form method="get" action="/" class="flex items-end gap-2">
         <label class="form-control">
@@ -55,6 +66,7 @@
         <div class="manage-panel hidden mt-1 animate-fade-in text-xs space-y-2">
           <form method="post" action="/semester/{{s.name}}/update" class="flex gap-1 items-end flex-wrap">
             <input type="hidden" name="year" value="{{s.year}}" />
+            <input type="hidden" name="return_year" value="{{ selected_year or s.year }}" />
             <label class="form-control w-28">
               <span class="label-text text-xs">Rename</span>
               <input name="new_name" placeholder="New name" class="input input-bordered input-xs" required />
@@ -63,6 +75,7 @@
           </form>
           <form method="post" action="/semester/{{s.name}}/delete" onsubmit="return confirm('Delete semester {{s.name}} {{s.year}} and ALL its data?');">
             <input type="hidden" name="year" value="{{s.year}}" />
+            <input type="hidden" name="return_year" value="{{ selected_year or s.year }}" />
             <button class="btn btn-xs btn-error btn-outline">Delete</button>
           </form>
         </div>
@@ -70,7 +83,10 @@
       {% endfor %}
     </div>
     {% else %}
-      <div class="p-8 rounded-xl border-dashed border-2 text-center opacity-70">No semesters{% if selected_year %} for {{selected_year}}{% endif %}. Add your first above.</div>
+      <div class="p-8 rounded-xl border-dashed border-2 text-center opacity-70">
+        No semesters{% if selected_year %} for {{selected_year}}{% endif %}
+        {% if course_filter %}in this course{% endif %}. Add your first above.
+      </div>
     {% endif %}
   </section>
 </div>

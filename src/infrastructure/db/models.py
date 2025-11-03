@@ -4,7 +4,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import ClassVar, Optional
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, Relationship
+from sqlalchemy import UniqueConstraint
+from sqlalchemy.orm import relationship as sa_relationship
 
 
 class GradeType(str, Enum):
@@ -15,24 +17,66 @@ class GradeType(str, Enum):
     UNSATISFACTORY = "U"
 
 
+class CourseSubjectLink(SQLModel, table=True):
+    """Link table for the many-to-many relationship between Course and Subject."""
+
+    __tablename__: ClassVar[str] = "course_subject_link"
+    course_id: Optional[int] = Field(
+        default=None, foreign_key="courses.id", primary_key=True
+    )
+    subject_id: Optional[int] = Field(
+        default=None, foreign_key="subjects.id", primary_key=True
+    )
+    
+
 class Semester(SQLModel, table=True):
     """Academic semester (e.g., Autumn 2025)."""
 
     __tablename__: ClassVar[str] = "semesters"
-    name: str = Field(primary_key=True, index=True)
-    year: str = Field(primary_key=True, index=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True)
+    year: int = Field(index=True)
+    course_id: Optional[int] = Field(default=None, foreign_key="courses.id")
+    __table_args__ = (
+        UniqueConstraint("name", "year", name="uq_semester_name_year"),
+    )
+
+    # Relationship is attached after class definitions to avoid forward-ref issues
+    # course: "Course" = Relationship(back_populates="semesters")
 
 
 class Subject(SQLModel, table=True):
     """Subject/course within a semester/year."""
 
     __tablename__: ClassVar[str] = "subjects"
-    subject_code: str = Field(primary_key=True, index=True)
-    semester_name: str = Field(primary_key=True, index=True)
-    year: str = Field(primary_key=True, index=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    subject_code: str = Field(index=True)
+    semester_name: str = Field(index=True)
+    year: str = Field(index=True)
     subject_name: str
     total_mark: Optional[float] = 0.0
     sync_subject: bool = False
+
+    # Define many-to-many only on Course side to avoid forward-ref generic issues here
+    # If needed later, reintroduce with list[Course] once mapping is stable
+    # courses: list["Course"] = Relationship(back_populates="subjects", link_model=CourseSubjectLink)
+
+
+class Course(SQLModel, table=True):
+    """Represents a degree or program of study."""
+
+    __tablename__: ClassVar[str] = "courses"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True)
+    code: str = Field(index=True)
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_course_code"),
+        UniqueConstraint("name", "code", name="uq_course_name_code"),
+    )
+
+    # Relationships are attached after class definitions to avoid forward-ref issues
+    # semesters: list[Semester] = Relationship(back_populates="course")
+    # subjects: list[Subject] = Relationship(back_populates="courses", link_model=CourseSubjectLink)
 
 
 class Assignment(SQLModel, table=True):
@@ -43,7 +87,8 @@ class Assignment(SQLModel, table=True):
     subject_code: str = Field(primary_key=True, index=True)
     semester_name: str = Field(primary_key=True, index=True)
     year: str = Field(primary_key=True, index=True)
-    weighted_mark: Optional[str] = None  # numeric stored as text or S/U
+    # Store numeric weighted marks as floats. Grade type tracks S/U separately.
+    weighted_mark: Optional[float] = None
     unweighted_mark: Optional[float] = None
     mark_weight: Optional[float] = None
     grade_type: str = Field(default=GradeType.NUMERIC.value)
@@ -82,5 +127,20 @@ __all__ = [
 	"Assignment",
 	"Examination",
     "ExamSettings",
+    "Course",
+    "CourseSubjectLink",
 ]
+
+# Attach relationships explicitly after all classes are defined to avoid
+# SQLAlchemy trying to resolve generic strings like "Optional['Course']" or "list['Semester']".
+Semester.course = sa_relationship("Course", back_populates="semesters")
+Course.semesters = sa_relationship("Semester", back_populates="course")
+# Many-to-many: define unidirectional relationship on Course to list subjects via association table
+# Use table name string to avoid Pylance attribute access issues on __table__
+Course.subjects = sa_relationship("Subject", secondary="course_subject_link")
+
+# Manually update forward references to resolve circular dependencies
+Course.model_rebuild()
+Semester.model_rebuild()
+Subject.model_rebuild()
 

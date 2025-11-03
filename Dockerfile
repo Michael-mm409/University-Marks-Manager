@@ -15,4 +15,3 @@ COPY . .
 EXPOSE 8000
 
 # The command to run the app is specified in docker-compose.yml
-# CMD ["uvicorn", "src.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

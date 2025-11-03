@@ -7,9 +7,11 @@ from src.infrastructure.db.models import Semester, Subject, Assignment, Examinat
 
 class IndexContext(TypedDict):
     semesters: Sequence[Semester]
-    years: List[str]
-    selected_year: str
+    years: List[int]
+    selected_year: Optional[int]
     current_year: str
+    flash_message: Optional[str]
+    course_filter: Optional[dict]
 
 
 class SemesterSummary(TypedDict):
