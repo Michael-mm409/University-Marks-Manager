@@ -14,8 +14,8 @@ def create_assignment(
     code: str,
     year: str = Form(...),
     assessment: str = Form(...),
-    weighted_mark: Optional[str] = Form(""),
-    mark_weight: Optional[str] = Form(""),
+    weighted_mark: Optional[float] = Form(None),
+    mark_weight: Optional[float] = Form(None),
     grade_type: str = Form("numeric"),
     total_mark: Optional[int] = Form(0),  # propagate desired final total to trigger recompute
     session: Session = Depends(get_session),
@@ -44,9 +44,9 @@ def create_assignment(
     mark_weight_val = None
     if grade_type == GradeType.NUMERIC.value:
         try:
-            if weighted_mark not in (None, ""):
+            if weighted_mark is not None:
                 weighted_val = float(weighted_mark)
-            if mark_weight not in (None, ""):
+            if mark_weight is not None:
                 mark_weight_val = float(mark_weight)
             # Only calculate unweighted if both are provided
             if weighted_val is not None and mark_weight_val is not None and mark_weight_val:
@@ -74,7 +74,8 @@ def create_assignment(
         semester_name=semester,
         year=year,
         assessment=assessment,
-        weighted_mark=weighted_val if grade_type == GradeType.NUMERIC.value else None,
+        # Persist numeric weighted marks as floats; S/U is tracked via grade_type.
+        weighted_mark=(weighted_val if (grade_type == GradeType.NUMERIC.value and weighted_val is not None) else None),
         unweighted_mark=unweighted_val,
         mark_weight=mark_weight_val,
         grade_type=grade_type,
@@ -108,7 +109,7 @@ def create_assignment(
                     Assignment.semester_name == semester,
                     Assignment.year == year,
                     Assignment.subject_code == code,
-                )
+                ).order_by(Assignment.assessment)
             ).all()
             assign_weight_sum = 0.0
             assign_weighted_total = 0.0
@@ -244,8 +245,8 @@ def update_assignment_ajax(
     code: str,
     semester: str,
     year: str,
-    weighted_mark: Optional[str] = Form("") ,
-    mark_weight: Optional[str] = Form("") ,
+    weighted_mark: Optional[float] = Form(None),
+    mark_weight: Optional[float] = Form(None),
     grade_type: str = Form("numeric"),
     session: Session = Depends(get_session),
 ):
@@ -265,14 +266,15 @@ def update_assignment_ajax(
             try:
                 if weighted_mark not in (None, ""):
                     weighted_val = float(weighted_mark)
+                    # store numeric weighted marks as floats
                     assignment.weighted_mark = weighted_val
                 else:
-                    weighted_val = assignment.weighted_mark if assignment.weighted_mark is not None else 0.0
+                    weighted_val = float(assignment.weighted_mark) if assignment.weighted_mark is not None else 0.0
                 if mark_weight not in (None, ""):
                     mark_weight_val = float(mark_weight)
                     assignment.mark_weight = mark_weight_val
                 else:
-                    mark_weight_val = assignment.mark_weight if assignment.mark_weight is not None else 0.0
+                    mark_weight_val = float(assignment.mark_weight) if assignment.mark_weight is not None else 0.0
                 assignment.unweighted_mark = round(weighted_val / mark_weight_val, 4) if mark_weight_val else None
             except ValueError:
                 return JSONResponse({"success": False, "error": "Invalid numeric values."}, status_code=400)
@@ -296,7 +298,7 @@ def update_assignment_ajax(
                     Assignment.subject_code == code,
                     Assignment.semester_name == semester,
                     Assignment.year == year,
-                )
+                ).order_by(Assignment.assessment)
             ).all()
             exams = session.exec(
                 select(Examination).where(

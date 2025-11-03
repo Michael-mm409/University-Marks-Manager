@@ -6,6 +6,7 @@ Run with:
 from __future__ import annotations
 
 from pathlib import Path
+import os
 from contextlib import asynccontextmanager
 
 # Third-party imports
@@ -14,8 +15,10 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlmodel import SQLModel
+from starlette.middleware.sessions import SessionMiddleware
 
 # Local imports
+from src.infrastructure.db import models  # noqa: F401
 from src.infrastructure.db.engine import engine
 from src.presentation.api.routers import api_router as api
 from src.presentation.web.views import views
@@ -32,11 +35,22 @@ async def lifespan(fastapi_app: FastAPI):
     Shutdown: currently no actions (placeholder for future resource cleanup).
     """
     # Startup
+    # For development: drop and recreate tables on each startup
+    # SQLModel.metadata.drop_all(engine)
     SQLModel.metadata.create_all(engine)
     fastapi_app.state.jinja_env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
         autoescape=select_autoescape(["html", "xml"]),
     )
+    # Debug routes gating (off by default). Enable by setting ENABLE_DEBUG_ROUTES to a truthy value.
+    fastapi_app.state.enable_debug_routes = str(os.getenv("ENABLE_DEBUG_ROUTES", "")).lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    # Optional shared secret for debug endpoints: require token query param if set
+    fastapi_app.state.debug_token = os.getenv("DEBUG_TOKEN")
     yield
     # Shutdown (no-op)
 
@@ -44,8 +58,16 @@ async def lifespan(fastapi_app: FastAPI):
 APPLICATION = FastAPI(title="University Marks Manager API", lifespan=lifespan)
 
 
-APPLICATION.include_router(api)
+APPLICATION.include_router(api, prefix="/api")
 APPLICATION.include_router(views)
+
+# Enable server-side sessions for lightweight state (e.g., selected course)
+# NOTE: Replace the secret key with an environment variable for production use.
+APPLICATION.add_middleware(
+    SessionMiddleware,
+    secret_key="dev-secret-change-me",
+    same_site="lax",
+)
 
 # Optionally serve static (tailwind compiled CSS could go here later)
 static_dir = BASE_DIR.parent / "static"
@@ -70,3 +92,8 @@ if static_favicon.exists() or assets_favicon.exists():
 app = APPLICATION  # backwards compatible name for uvicorn target
 
 __all__ = ["app", "APPLICATION"]
+
+# Root-level health endpoint (does not depend on API router mounting)
+@APPLICATION.get("/healthz")
+def healthz():
+    return {"status": "ok"}

@@ -20,6 +20,7 @@
       <div class="flex items-center gap-4 self-start md:self-center">
         <nav class="flex gap-4 text-sm font-medium">
           <a href="/" class="link link-hover">Home</a>
+          <a href="/courses" class="link link-hover">Courses</a>
         </nav>
         <label class="swap swap-rotate theme-toggle">
           <input type="checkbox" id="themeToggle" />
@@ -28,6 +29,28 @@
         </label>
       </div>
     </header>
+    {% if flash_message %}
+      <div role="alert" class="alert alert-success mb-4">
+        <span>{{ flash_message }}</span>
+      </div>
+    {% endif %}
+    {% if request and request.session and request.session.get('current_course_id') %}
+      <div class="mb-4 p-3 rounded-lg bg-base-100 border border-base-300 flex items-center justify-between">
+        <div class="text-sm">
+          <span class="opacity-70">Active Course:</span>
+          <span class="font-semibold">{{ request.session.get('current_course_name') or ('#' ~ request.session.get('current_course_id')) }}</span>
+          {% if request.session.get('current_course_code') %}
+            <span class="opacity-70 text-xs ml-2">{{ request.session.get('current_course_code') }}</span>
+          {% endif %}
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="/courses/{{ request.session.get('current_course_code') or request.session.get('current_course_id') }}" class="btn btn-xs btn-outline">View</a>
+          <form method="post" action="/courses/clear-selection">
+            <button class="btn btn-xs btn-ghost" type="submit">Clear</button>
+          </form>
+        </div>
+      </div>
+    {% endif %}
     <main class="space-y-6">
       {% block content %}{% endblock %}
     </main>

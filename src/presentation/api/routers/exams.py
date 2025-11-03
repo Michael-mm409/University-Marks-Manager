@@ -73,7 +73,7 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
                 Assignment.subject_code == data.subject_code,
                 Assignment.semester_name == data.semester_name,
                 Assignment.year == data.year,
-            )
+            ).order_by(Assignment.assessment)
         ).all()
         used = 0.0
         for a in assignments:
@@ -84,7 +84,9 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
                     pass
         data.exam_weight = max(0.0, 100.0 - used)
 
-    exam = Examination(**data.model_dump(exclude={"id"}))
+    # Exclude None values so SQLModel will use the model defaults for non-optional fields
+    payload = data.model_dump(exclude_none=True, exclude={"id"})
+    exam = Examination(**payload)
     session.add(exam)
     session.commit()
     session.refresh(exam)
@@ -132,8 +134,11 @@ def update_exam(exam_id: int, data: ExaminationCreate,
     exam = session.get(Examination, exam_id)
     if not exam:
         raise HTTPException(status_code=404, detail="Not found")
-    exam.exam_mark = data.exam_mark
-    exam.exam_weight = data.exam_weight or exam.exam_weight
+    # Only assign exam_mark if the client provided a value (it may be optional in the schema)
+    if data.exam_mark is not None:
+        exam.exam_mark = data.exam_mark
+    # exam_weight may be omitted; fall back to existing value if not provided
+    exam.exam_weight = data.exam_weight if data.exam_weight is not None else exam.exam_weight
     session.add(exam)
     session.commit()
     session.refresh(exam)

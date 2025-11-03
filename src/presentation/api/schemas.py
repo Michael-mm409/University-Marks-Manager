@@ -70,11 +70,11 @@ class ExaminationRead(SQLModel):
 
 class SemesterCreate(SQLModel, table=False):
     name: str
-    year: str
+    year: int
 
 
 class SemesterRead(SQLModel):
     name: str
-    year: str
+    year: int
     # pydantic v2: enable attribute population from ORM objects
     model_config = {"from_attributes": True}  # type: ignore[assignment]

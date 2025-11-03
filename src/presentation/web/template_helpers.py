@@ -17,7 +17,9 @@ def _render(request: Request, template: str, context: TemplateContext) -> HTMLRe
     """
     env = request.app.state.jinja_env
     tpl = env.get_template(template)
-    return HTMLResponse(tpl.render(**context))
+    # Always include request in the template context so base layout and
+    # components can access session and other request-scoped data.
+    return HTMLResponse(tpl.render(request=request, **context))
 
 
 __all__ = ["_render"]

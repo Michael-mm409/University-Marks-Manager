@@ -42,7 +42,7 @@ def save_total_mark(
             Assignment.semester_name == semester,
             Assignment.year == year,
             Assignment.subject_code == code,
-        )
+        ).order_by(Assignment.assessment)
     ).all()
     assignment_weight_percent = 0.0
     assignment_weighted_sum = 0.0

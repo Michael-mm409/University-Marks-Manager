@@ -77,12 +77,12 @@ def subject_detail(
     if not subject:
         return HTMLResponse("Subject not found", status_code=404)
 
-    # Only get assignments and exams for the current subject
+    # Only get assignments and exams for the current subject (ordered alphabetically)
     assignments = session.exec(
         select(Assignment).where(
             Assignment.year == year,
             Assignment.subject_code == code,
-        )
+        ).order_by(Assignment.assessment)
     ).all()
     examinations = session.exec(
         select(Examination).where(

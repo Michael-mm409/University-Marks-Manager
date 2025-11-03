@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="flex flex-col gap-6">
+  <!-- Header -->
+  <section class="p-5 rounded-xl bg-base-100 shadow card-glow">
+    <div class="flex justify-between items-start">
+      <div>
+        <h1 class="text-2xl font-bold">{{ course.name }}</h1>
+        {% if course.code %}
+          <p class="text-sm opacity-70">{{ course.code }}</p>
+        {% endif %}
+      </div>
+      <div class="flex items-center gap-2">
+          <div id="course-select-alert"></div>
+          <form method="post" action="/courses/{{ course.code or course.id }}/select" hx-post="/courses/{{ course.code or course.id }}/select" hx-target="#course-select-alert" hx-swap="innerHTML">
+          <button type="submit" class="btn btn-sm btn-primary">Use this course</button>
+        </form>
+        <details class="dropdown dropdown-end">
+          <summary class="btn btn-sm">Edit</summary>
+          <div class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-64">
+            <form method="post" action="/courses/{{ course.code or course.id }}/update" class="flex flex-col gap-2">
+              <label class="form-control">
+                <span class="label-text text-xs">Name</span>
+                <input name="name" class="input input-bordered input-sm" value="{{ course.name }}" required />
+              </label>
+              <label class="form-control">
+                <span class="label-text text-xs">Code</span>
+                <input name="code" class="input input-bordered input-sm" value="{{ course.code }}" required />
+              </label>
+              <button class="btn btn-sm btn-secondary" type="submit">Save</button>
+            </form>
+            <form method="post" action="/courses/{{ course.code or course.id }}/delete" onsubmit="return confirm('Delete this course? Semesters will be unassigned.');" class="mt-2">
+              <button class="btn btn-sm btn-error btn-outline" type="submit">Delete Course</button>
+            </form>
+          </div>
+        </details>
+        <a href="/courses" class="btn btn-sm btn-ghost">← Back to Courses</a>
+      </div>
+    </div>
+    {% if course.semesters and course.semesters|length > 0 %}
+      <div class="mt-3 text-sm flex items-center gap-2 flex-wrap">
+        <span class="font-semibold">Associated Semesters:</span>
+        {% for sem in course.semesters %}
+          <span class="badge badge-primary">{{ sem.name }} {{ sem.year }}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+
+  <!-- Browse Semesters for this Course -->
+  <section>
+  <h2 class="text-xl font-semibold mb-3">Semesters in this Course</h2>
+    {% if assigned_semesters and assigned_semesters|length > 0 %}
+      <div class="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+        {% for sem in assigned_semesters %}
+          <div class="p-4 rounded-lg bg-base-100 border border-base-300 card-glow flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-semibold">{{ sem.name }}</div>
+                <div class="text-xs opacity-70">{{ sem.year }}</div>
+              </div>
+              <form method="post" action="/courses/{{ course.code or course.id }}/unassign-semester" hx-post="/courses/{{ course.code or course.id }}/unassign-semester" hx-target="body" hx-swap="outerHTML">
+                <input type="hidden" name="semester_name" value="{{ sem.name }}" />
+                <input type="hidden" name="year" value="{{ sem.year }}" />
+                <button class="btn btn-xs btn-outline" type="submit" title="Remove from course">Remove</button>
+              </form>
+            </div>
+            <div class="text-xs">
+              <a href="/semester/{{ sem.name }}?year={{ sem.year }}" class="link link-hover">Open semester</a>
+            </div>
+            {% set subs = subjects_by_semester.get(sem.id) %}
+            {% if subs and subs|length > 0 %}
+              <details class="mt-1">
+                <summary class="cursor-pointer text-xs opacity-70">Show subjects ({{ subs|length }})</summary>
+                <ul class="mt-2 space-y-1 text-xs">
+                  {% for s in subs %}
+                    <li>
+                      <a class="link link-hover" href="/semester/{{ s.semester_name }}/subject/{{ s.subject_code }}?year={{ s.year }}">
+                        {{ s.subject_code }} — {{ s.subject_name }}
+                      </a>
+                    </li>
+                  {% endfor %}
+                </ul>
+              </details>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="p-8 rounded-xl border-dashed border-2 text-center opacity-70">
+        No semesters are linked to this course yet. Assign one below to get started.
+      </div>
+    {% endif %}
+  </section>
+
+  <!-- Management Panels -->
+  <div class="grid md:grid-cols-2 gap-6">
+    <!-- Assign Semester to Course (only unassigned) -->
+    <section class="p-5 rounded-xl bg-base-100 shadow card-glow">
+      <h3 class="text-lg font-semibold mb-3">Assign Semester (only those not already assigned)</h3>
+      <form
+        hx-post="/courses/{{ course.code or course.id }}/assign-semester"
+        hx-target="body"
+        hx-swap="outerHTML"
+        class="flex items-end gap-4"
+      >
+        <label class="form-control w-full max-w-xs">
+          <span class="label-text">Available Semesters</span>
+          <select name="semester_key" class="select select-bordered select-sm" required>
+            <option disabled selected value="">Select a semester</option>
+            {% for semester in unassigned_semesters %}
+              <option value="{{ semester.name }}|{{ semester.year }}">{{ semester.name }} {{ semester.year }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button class="btn btn-sm btn-secondary" type="submit">Assign Semester</button>
+      </form>
+    </section>
+
+    <!-- Assign by Year (only unassigned) -->
+    <section class="p-5 rounded-xl bg-base-100 shadow card-glow">
+      <h3 class="text-lg font-semibold mb-3">Assign all unassigned semesters in a year</h3>
+      <form
+        hx-post="/courses/{{ course.code or course.id }}/assign-year"
+        hx-target="body"
+        hx-swap="outerHTML"
+        class="flex items-end gap-4"
+      >
+        <label class="form-control w-full max-w-xs">
+          <span class="label-text">Available Years</span>
+          <select name="year" class="select select-bordered select-sm" required>
+            <option disabled selected value="">Select a year</option>
+            {% for y in unassigned_years %}
+              <option value="{{ y }}">{{ y }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button class="btn btn-sm btn-secondary" type="submit">Assign Year</button>
+      </form>
+    </section>
+
+    <!-- Assign ALL unassigned Semesters -->
+    <section class="p-5 rounded-xl bg-base-100 shadow card-glow">
+      <h3 class="text-lg font-semibold mb-3">Assign ALL unassigned semesters</h3>
+      <form
+        hx-post="/courses/{{ course.code or course.id }}/assign-all"
+        hx-target="body"
+        hx-swap="outerHTML"
+      >
+        <button class="btn btn-sm btn-error" type="submit">Assign All Unassigned</button>
+      </form>
+    </section>
+
+    <!-- Unassign by Year -->
+    <section class="p-5 rounded-xl bg-base-100 shadow card-glow">
+      <h3 class="text-lg font-semibold mb-3">Remove all semesters in a year from this course</h3>
+      <form
+        hx-post="/courses/{{ course.code or course.id }}/unassign-year"
+        hx-target="body"
+        hx-swap="outerHTML"
+        class="flex items-end gap-4"
+      >
+        <label class="form-control w-full max-w-xs">
+          <span class="label-text">Year</span>
+          <select name="year" class="select select-bordered select-sm" required>
+            <option disabled selected value="">Select a year</option>
+            {% set assigned_years = (assigned_semesters | map(attribute='year') | list | unique) %}
+            {% for y in assigned_years %}
+              <option value="{{ y }}">{{ y }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button class="btn btn-sm btn-outline btn-error" type="submit">Remove Year</button>
+      </form>
+    </section>
+  </div>
+
+</div>
+{% endblock %}

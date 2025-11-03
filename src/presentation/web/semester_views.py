@@ -10,8 +10,10 @@ from .types import SemesterSummary, SemesterContext
 
 @semester_router.api_route("/create", methods=["POST"])
 def create_semester(
+    request: Request,
     name: str = Form(...),
     year: str = Form(...),
+    return_year: str | None = Form(default=None),
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
     """
@@ -26,17 +28,47 @@ def create_semester(
         RedirectResponse: Redirect to home page.
     """
 
+    # Ensure year is an int for comparisons and creation
+    try:
+        year_int = int(year)
+    except Exception:
+        year_int = int(str(year).strip())
+
     exists = session.exec(
-        select(Semester).where(Semester.name == name, Semester.year == year)
+        select(Semester).where(Semester.name == name, Semester.year == year_int)
     ).first()
     if not exists:
-        session.add(Semester(name=name, year=year))
+        # If a course is active, auto-link the new semester to that course
+        course_id = request.session.get("current_course_id")
+        try:
+            cid = int(course_id) if course_id is not None else None
+        except Exception:
+            cid = None
+        session.add(Semester(name=name, year=year_int, course_id=cid))
         session.commit()
-    return RedirectResponse("/", status_code=303)
+    else:
+        # If the semester exists but is unassigned, and a course is active, link it
+        if getattr(exists, "course_id", None) is None:
+            course_id = request.session.get("current_course_id")
+            try:
+                cid = int(course_id) if course_id is not None else None
+            except Exception:
+                cid = None
+            if cid is not None:
+                exists.course_id = cid
+                session.commit()
+    # Redirect back to the filtered year if provided; otherwise use the semester's year
+    target_year = (return_year or str(year_int)).strip() if str(return_year or "").strip() else str(year_int)
+    return RedirectResponse(f"/?year={target_year}", status_code=303)
 
 
 @semester_router.api_route("/{semester}/delete", methods=["POST"])
-def delete_semester(semester: str, year: str = Form(...), session: Session = Depends(get_session)):
+def delete_semester(
+    semester: str,
+    year: str = Form(...),
+    return_year: str | None = Form(default=None),
+    session: Session = Depends(get_session),
+):
     """Delete a semester and all related data."""
     # Delete assignments, exams, settings, subjects for that semester/year
     subs = session.exec(select(Subject).where(Subject.semester_name == semester, Subject.year == year)).all()
@@ -46,7 +78,7 @@ def delete_semester(semester: str, year: str = Form(...), session: Session = Dep
                 Assignment.semester_name == semester,
                 Assignment.year == year,
                 Assignment.subject_code == sub.subject_code,
-            )
+            ).order_by(Assignment.assessment)
         )  # placeholder retrieval (deletion with ORM objects below)
     # Direct delete via ORM load (simpler for small dataset)
     assignments = session.exec(select(Assignment).where(Assignment.semester_name == semester, Assignment.year == year)).all()
@@ -65,16 +97,30 @@ def delete_semester(semester: str, year: str = Form(...), session: Session = Dep
     if sem:
         session.delete(sem)
     session.commit()
-    return RedirectResponse("/", status_code=303)
+    # Preserve selected filter year if provided
+    target_year = (return_year or year).strip() if str(return_year or "").strip() else str(year)
+    return RedirectResponse(f"/?year={target_year}", status_code=303)
 
 
 @semester_router.api_route("/{semester}/update", methods=["POST"])
-def update_semester(semester: str, year: str = Form(...), new_name: str = Form(...), session: Session = Depends(get_session)):
+def update_semester(
+    semester: str,
+    year: str = Form(...),
+    new_name: str = Form(...),
+    return_year: str | None = Form(default=None),
+    session: Session = Depends(get_session),
+):
+    """Rename a semester and preserve the current year filter on redirect.
+
+    Redirects back to Home with ?year=<year> so the filtered view remains active.
+    """
     sem = session.exec(select(Semester).where(Semester.name == semester, Semester.year == year)).first()
     if sem:
         sem.name = new_name
         session.commit()
-    return RedirectResponse("/", status_code=303)
+    # Preserve the filtered year the user was viewing if provided (fallback to the semester's year)
+    target_year = (return_year or year).strip() if str(return_year or "").strip() else str(year)
+    return RedirectResponse(f"/?year={target_year}", status_code=303)
 
 
 @semester_router.api_route("/{semester}", response_class=HTMLResponse, methods=["GET", "HEAD"])
@@ -112,7 +158,7 @@ def semester_detail(
                 Assignment.semester_name == sub.semester_name,
                 Assignment.year == year,
                 Assignment.subject_code == sub.subject_code,
-            )
+            ).order_by(Assignment.assessment)
         ).all()
         exam = session.exec(
             select(Examination).where(

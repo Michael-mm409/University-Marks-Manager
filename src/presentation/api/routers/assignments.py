@@ -1,7 +1,7 @@
 """Assignment API endpoints."""
 from __future__ import annotations
 
-from typing import List, Optional, Sequence
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.responses import HTMLResponse
@@ -16,11 +16,11 @@ router = APIRouter()
 
 @router.api_route("/", response_model=List[AssignmentRead], methods=["GET", "HEAD"], response_class=HTMLResponse)
 def list_assignments(
-	session: Session = Depends(get_session),
-	subject_code: Optional[str] = None,
-	semester_name: Optional[str] = None,
-	year: Optional[str] = None,
-) -> Sequence[Assignment]:
+    session: Session = Depends(get_session),
+    subject_code: Optional[str] = None,
+    semester_name: Optional[str] = None,
+    year: Optional[str] = None,
+):
     """
     List all assignments, optionally filtered by subject code, semester name, and year.
 
@@ -33,7 +33,7 @@ def list_assignments(
     Returns:
         Sequence[Assignment]: List of assignments.
     """
-    stmt = select(Assignment)
+    stmt = select(Assignment).order_by(Assignment.assessment)
     if subject_code:
         stmt = stmt.where(Assignment.subject_code == subject_code)
     if semester_name:
@@ -44,7 +44,7 @@ def list_assignments(
 
 
 @router.api_route("/", response_model=AssignmentRead, status_code=status.HTTP_201_CREATED, methods=["POST"], response_class=HTMLResponse)
-def create_assignment(data: AssignmentCreate, session: Session = Depends(get_session)) -> Assignment:
+def create_assignment(data: AssignmentCreate, session: Session = Depends(get_session)):
     """
     Create a new assignment.
 
@@ -64,7 +64,20 @@ def create_assignment(data: AssignmentCreate, session: Session = Depends(get_ses
                 data.unweighted_mark = round(weighted_val / weight, 4)
         except ValueError:
             pass
-    assignment = Assignment(**data.model_dump(exclude={"id"}))
+    # Safely obtain a dict payload from the SQLModel/Pydantic object. Some language servers
+    # may not recognize `model_dump` (pydantic v2). Fall back to `dict` when needed.
+    if hasattr(data, "model_dump"):
+        payload = data.model_dump(exclude={"id"})
+    else:
+        payload = data.dict(exclude={"id"})
+    # Ensure weighted_mark is numeric (float) when provided. The schema uses Optional[float].
+    if payload.get("weighted_mark") is not None:
+        try:
+            payload["weighted_mark"] = float(payload["weighted_mark"])
+        except Exception:
+            # If conversion fails, leave as-is and let the ORM/DB raise if invalid
+            pass
+    assignment = Assignment(**payload)
     session.add(assignment)
     session.commit()
     session.refresh(assignment)
@@ -72,7 +85,7 @@ def create_assignment(data: AssignmentCreate, session: Session = Depends(get_ses
 
 
 @router.api_route("/{assignment_id}", response_model=AssignmentRead, methods=["GET", "HEAD"], response_class=HTMLResponse)
-def get_assignment(assignment_id: int, session: Session = Depends(get_session)) -> Assignment:
+def get_assignment(assignment_id: int, session: Session = Depends(get_session)):
     """
     Retrieve an assignment by its ID.
 
@@ -93,8 +106,8 @@ def get_assignment(assignment_id: int, session: Session = Depends(get_session)) 
 
 
 @router.api_route("/{assignment_id}", response_model=AssignmentRead, methods=["PUT"], response_class=HTMLResponse)
-def update_assignment(assignment_id: int, data: AssignmentCreate, 
-                      session: Session = Depends(get_session)) -> Assignment:
+def update_assignment(assignment_id: int, data: AssignmentCreate,
+                      session: Session = Depends(get_session)):
     """
     Update an existing assignment's details.
     
@@ -112,7 +125,18 @@ def update_assignment(assignment_id: int, data: AssignmentCreate,
     a = session.get(Assignment, assignment_id)
     if not a:
         raise HTTPException(status_code=404, detail="Not found")
-    for field, value in data.model_dump(exclude={"id"}).items():
+    # Safely obtain payload dict (see create_assignment note)
+    if hasattr(data, "model_dump"):
+        payload = data.model_dump(exclude={"id"})
+    else:
+        payload = data.dict(exclude={"id"})
+    # Ensure weighted_mark is numeric (float) when provided
+    if payload.get("weighted_mark") is not None:
+        try:
+            payload["weighted_mark"] = float(payload["weighted_mark"])
+        except Exception:
+            pass
+    for field, value in payload.items():
         setattr(a, field, value)
     # recompute unweighted if numeric
     if a.grade_type == GradeType.NUMERIC.value and a.weighted_mark and a.mark_weight:
