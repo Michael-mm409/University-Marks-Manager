@@ -1,4 +1,5 @@
 from fastapi import Form, Request
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -7,6 +8,7 @@ from src.infrastructure.db.models import Assignment, ExamSettings, Examination, 
 from src.presentation.api.deps import get_session
 
 assignment_router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @assignment_router.api_route("/assignment/create", methods=["POST"], response_class=HTMLResponse)
 def create_assignment(
@@ -387,7 +389,6 @@ def update_assignment_ajax(
             f"</td>"
         )
         return JSONResponse({"success": True, "row_html": row_html})
-    except Exception as e:
-        import traceback
-        tb = traceback.format_exc()
-        return JSONResponse({"success": False, "error": f"Server error: {str(e)}\n{tb}"}, status_code=500)
+    except Exception:
+        logger.exception("update_assignment_ajax failed")
+        return JSONResponse({"success": False, "error": "Internal server error"}, status_code=500)

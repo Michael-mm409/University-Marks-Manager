@@ -56,7 +56,24 @@ Visit: http://127.0.0.1:8000
 Notes:
 
 - SQLite DB file lives at `data/marks.db` and is auto-created on startup.
-- On Windows, `StartMarkManager.bat` is a convenience wrapper (uses your own Conda env).
+- On Windows, `StartMarkManager.bat` is a convenience wrapper for uvicorn. It uses a Conda
+  environment named via the `CONDA_ENV` variable, falling back to `umm` if unset.
+
+#### Windows (Conda) quickstart
+
+Create and use a dedicated Conda environment (PowerShell):
+
+```powershell
+conda create -n umm python=3.11 -y
+conda activate umm
+pip install -r requirements.txt
+
+# Optional: set for this session; StartMarkManager.bat will default to 'umm' if not set
+$env:CONDA_ENV = "umm"
+
+# Run the app via the helper script
+./StartMarkManager.bat
+```
 
 ### Option B — Docker Compose (Postgres + Nginx)
 

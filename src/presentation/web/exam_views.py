@@ -49,8 +49,8 @@ def save_total_mark(
     for a in assignments:
         if a.grade_type == GradeType.NUMERIC.value and a.mark_weight and a.weighted_mark:
             try:
-                assignment_weight_percent += float(a.mark_weight)
-                assignment_weighted_sum += float(a.weighted_mark)
+                assignment_weight_percent = float(a.mark_weight)
+                assignment_weighted_sum = float(a.weighted_mark)
             except ValueError:
                 pass
 
@@ -66,16 +66,28 @@ def save_total_mark(
             factor_val = float(ps_factor)
         except ValueError:
             factor_val = 40.0
-    if ps_enabled:
-        scaling = factor_val / 100.0
-        derived_exam_mark = current_exam_weight * scaling
-    else:
-        # For non-PS exams, required exam mark is total_mark - assignment_weighted_sum
+    scaling = factor_val / 100.0 if ps_enabled else 1.0
+    effective_exam_weight = current_exam_weight * scaling if ps_enabled else current_exam_weight
+
+    goal = None
+    if total_mark not in (None, ""):
         try:
-            goal = float(total_mark) if total_mark else 0.0
+            goal = float(total_mark)
         except ValueError:
-            goal = 0.0
-        derived_exam_mark = goal - assignment_weighted_sum
+            goal = None
+
+    derived_exam_mark = None
+    if goal is not None and effective_exam_weight:
+        needed_weighted = (goal / 100.0) * (assignment_weight_percent + effective_exam_weight) - assignment_weighted_sum
+        derived_exam_mark = (needed_weighted * 100.0) / effective_exam_weight
+    elif exam_mark not in (None, ""):
+        try:
+            derived_exam_mark = float(exam_mark)
+        except ValueError:
+            derived_exam_mark = None
+
+    if derived_exam_mark is None:
+        derived_exam_mark = existing.exam_mark if existing else 0.0
 
     # Always set exam_mark and exam_weight, regardless of whether it affects total_mark
     print(f"[DEBUG] Saving exam_mark for subject {code}: derived_exam_mark={derived_exam_mark}, exam_weight={current_exam_weight}, total_mark={total_mark}, assignment_weighted_sum={assignment_weighted_sum}, assignment_weight_percent={assignment_weight_percent}, ps_exam={ps_exam}, ps_factor={ps_factor}")
@@ -193,8 +205,18 @@ def delete_exam(
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
     """Delete the examination record for a subject (single exam model)."""
-    existing = session.get(Examination, exam_id)
-    if existing and existing.subject_code == code and existing.semester_name == semester and existing.year == year:
+    # Examination has a composite primary key (subject_code, semester_name, year)
+    # Lookup by natural key rather than a scalar id
+    existing = session.get(Examination, (code, semester, year))
+    if not existing:
+        existing = session.exec(
+            select(Examination).where(
+                Examination.subject_code == code,
+                Examination.semester_name == semester,
+                Examination.year == year,
+            )
+        ).first()
+    if existing:
         session.delete(existing)
         session.commit()
     return RedirectResponse(
