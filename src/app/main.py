@@ -6,6 +6,7 @@ Run with:
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import datetime
 import os
 from contextlib import asynccontextmanager
 
@@ -42,6 +43,8 @@ async def lifespan(fastapi_app: FastAPI):
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
         autoescape=select_autoescape(["html", "xml"]),
     )
+    # Provide a global current_year for all templates (used for Home link building)
+    fastapi_app.state.jinja_env.globals.update(current_year=str(datetime.now().year))
     # Debug routes gating (off by default). Enable by setting ENABLE_DEBUG_ROUTES to a truthy value.
     fastapi_app.state.enable_debug_routes = str(os.getenv("ENABLE_DEBUG_ROUTES", "")).lower() in {
         "1",

@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlmodel import Session, select
+from fastapi.responses import RedirectResponse
+from sqlmodel import Session, select, desc
 from typing import Optional
 from fastapi import Request
 from src.presentation.api.deps import get_session
 from src.infrastructure.db.models import Subject, Assignment, Examination, ExamSettings, GradeType
-from src.presentation.web.template_helpers import _render
 from .types import SubjectContext
 
 subject_router = APIRouter()
@@ -54,19 +53,17 @@ def create_subject(
     return RedirectResponse(f"?year={year}", status_code=303)
 
 
-@subject_router.api_route("/subject/{code}", methods=["GET", "HEAD"], response_class=HTMLResponse)
-def subject_detail(
-    request: Request,
+def build_subject_context(
+    session: Session,
     semester: str,
-    code: str,
     year: str,
+    code: str,
     exam_weight: Optional[float] = None,
     final_total: Optional[str] = None,
     total_mark: Optional[str] = None,
-    session: Session = Depends(get_session),
-):
-    """Render the subject detail page showing assignments, exams, and computed averages."""
-    # Fetch the main subject
+    return_to: Optional[str] = None,
+) -> Optional[SubjectContext]:
+    """Build the SubjectContext for rendering the subject detail page."""
     subject = session.exec(
         select(Subject).where(
             Subject.semester_name == semester,
@@ -75,14 +72,13 @@ def subject_detail(
         )
     ).first()
     if not subject:
-        return HTMLResponse("Subject not found", status_code=404)
+        return None
 
-    # Only get assignments and exams for the current subject (ordered alphabetically)
     assignments = session.exec(
         select(Assignment).where(
             Assignment.year == year,
             Assignment.subject_code == code,
-        ).order_by(Assignment.assessment)
+        ).order_by(Assignment.id) # type: ignore
     ).all()
     examinations = session.exec(
         select(Examination).where(
@@ -119,13 +115,10 @@ def subject_detail(
     if not examinations:
         inferred_remaining = max(0.0, 100.0 - assignment_weight_percent)
 
-    # Determine which exam weight to use for requirement calculations
     effective_exam_weight = (
         existing_exam_weight
         or (exam_weight if (exam_weight and not examinations) else inferred_remaining)
     )
-    # PS exam scaling: user-defined factor (default 40%), expressed as percentage of exam weight contributing
-    # Load persisted PS settings
     setting = session.exec(
         select(ExamSettings).where(
             ExamSettings.semester_name == semester,
@@ -155,7 +148,6 @@ def subject_detail(
     requirement_status: Optional[str] = None
     projected_total_weighted: Optional[float] = None
 
-    # Allow user to pass either final_total (desired final percentage) or total_mark (alias)
     desired_goal = None
     if final_total not in (None, ""):
         desired_goal = final_total
@@ -167,7 +159,6 @@ def subject_detail(
             if goal <= 0 or goal > 100:
                 requirement_status = "invalid"
             else:
-                # If we already have an exam mark and achieved goal
                 if average is not None and exam_raw_percent is not None and average >= goal:
                     requirement_status = "achieved"
                 else:
@@ -175,7 +166,6 @@ def subject_detail(
                     if effective_exam_score <= 0:
                         requirement_status = "impossible"
                     else:
-                        # Equation: (assign_sum + exam_required/100 * effective_exam_score) / (total_assignment_weight + effective_exam_score) * 100 = goal
                         required_exam_mark = (
                             (goal / 100.0) * (assignment_weight_percent + effective_exam_score) - assignment_weighted_sum
                         ) * 100.0 / effective_exam_score
@@ -189,8 +179,6 @@ def subject_detail(
                             projected_total_weighted = round(goal, 2)
         except ValueError:
             requirement_status = "invalid"
-
-    return_to = request.query_params.get("return_to")
 
     ctx: SubjectContext = {
         "semester": semester,
@@ -217,5 +205,21 @@ def subject_detail(
         "effective_scoring_exam_weight": round(effective_scoring_exam_weight, 2),
         "return_to": return_to,
     }
+    return ctx
 
-    return _render(request, "subject.html", ctx)
+
+@subject_router.api_route("/subject/{code}", methods=["GET", "HEAD"], response_class=RedirectResponse)
+def subject_detail(
+    request: Request,
+    semester: str,
+    code: str,
+    year: str,
+    exam_weight: Optional[float] = None,
+    final_total: Optional[str] = None,
+    total_mark: Optional[str] = None,
+    session: Session = Depends(get_session),
+) -> RedirectResponse:
+    """Legacy path: redirect to /year/{year}/semester/{semester}/subject/{code}."""
+    return RedirectResponse(
+        url=f"/year/{year}/semester/{semester}/subject/{code}", status_code=303
+    )

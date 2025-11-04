@@ -77,12 +77,12 @@ def debug_course_codes(
         trimmed = code.strip()
         rows.append(
             f"<tr>"
-            f"<td class='px-2 py-1'>{c.id}</td>"
-            f"<td class='px-2 py-1'>{esc(c.name)}</td>"
-            f"<td class='px-2 py-1'><code>{esc(repr(code))}</code></td>"
-            f"<td class='px-2 py-1 text-right'>{len(code)}</td>"
-            f"<td class='px-2 py-1'><code>{esc(repr(trimmed))}</code></td>"
-            f"<td class='px-2 py-1 text-right'>{len(trimmed)}</td>"
+            f"<td>{c.id}</td>"
+            f"<td>{esc(c.name)}</td>"
+            f"<td class='codecell'><code>{esc(repr(code))}</code></td>"
+            f"<td style='text-align:right'>{len(code)}</td>"
+            f"<td class='codecell'><code>{esc(repr(trimmed))}</code></td>"
+            f"<td style='text-align:right'>{len(trimmed)}</td>"
             f"</tr>"
         )
     # Detect potential collisions after TRIM+lower()
@@ -97,37 +97,61 @@ def debug_course_codes(
     html = [
         "<html><head><title>Course Codes Debug</title>",
         "<meta name=\"robots\" content=\"noindex,nofollow\">",
+        # Tailwind may or may not be present; add inline CSS fallback for readability
         "<link rel=\"stylesheet\" href=\"/static/css/tailwind.css\">",
-        "</head><body class='p-4'>",
-        "<h1 class='text-xl font-semibold mb-4'>Course Codes (raw vs trimmed)</h1>",
-        "<p class='opacity-70 mb-4'>This debug page helps identify trailing spaces or case inconsistencies. Raw values are shown using Python repr().</p>",
-        "<div class='overflow-x-auto'>",
-        "<table class='table table-zebra table-sm'>",
+        "<style>",
+        ":root{color-scheme:light dark;}\n",
+    "body{margin:16px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,\"Apple Color Emoji\",\"Segoe UI Emoji\";color:#111;background:#ffffff;}\n",
+        ".container{max-width:1200px;margin:0 auto;}\n",
+        "table{border-collapse:collapse;width:100%;table-layout:fixed;}\n",
+    "thead th{background:#f3f4f6;color:#111;text-align:left;}\n",
+        "th,td{border:1px solid #e5e7eb;padding:8px 10px;vertical-align:top;}\n",
+        "col.id{width:64px;}col.name{width:320px;}col.code{width:300px;}col.len{width:80px;}col.trim{width:300px;}col.trimlen{width:100px;}\n",
+        "code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,\"Liberation Mono\",monospace;font-size:12px;}\n",
+        ".codecell{white-space:pre-wrap;word-break:break-word;}\n",
+        ".muted{opacity:.75;}\n",
+    "@media (prefers-color-scheme: dark){\n",
+    "  body{background:#111827;color:#e5e7eb;}\n",
+    "  thead th{background:#374151;color:#e5e7eb;}\n",
+    "  th,td{border-color:#374151;}\n",
+    "}\n",
+        "</style>",
+        "</head><body>",
+        "<div class='container'>",
+        "<h1 style='font-size:1.25rem;font-weight:600;margin:0 0 0.5rem;'>Course Codes (raw vs trimmed)</h1>",
+        "<p class='muted' style='margin:0 0 1rem;'>This debug page helps identify trailing spaces or case inconsistencies. Raw values are shown using Python repr().</p>",
+        "<div style='overflow-x:auto;'>",
+        "<table>",
+        "<colgroup>",
+        "<col class='id'/><col class='name'/><col class='code'/><col class='len'/><col class='trim'/><col class='trimlen'/>",
+        "</colgroup>",
         "<thead><tr>",
-        "<th class='px-2 py-1'>id</th>",
-        "<th class='px-2 py-1'>name</th>",
-        "<th class='px-2 py-1'>code (raw)</th>",
-        "<th class='px-2 py-1 text-right'>len</th>",
-        "<th class='px-2 py-1'>trimmed</th>",
-        "<th class='px-2 py-1 text-right'>trim_len</th>",
+        "<th>id</th>",
+        "<th>name</th>",
+        "<th>code (raw)</th>",
+        "<th>len</th>",
+        "<th>trimmed</th>",
+        "<th>trim_len</th>",
         "</tr></thead>",
         "<tbody>",
         *rows,
         "</tbody></table></div>",
+        "</div>",
+        "</body></html>",
     ]
     if collisions:
         html += [
-            "<h2 class='text-lg font-semibold mt-6'>Potential collisions after TRIM+lower()</h2>",
-            "<ul class='list-disc ml-6 mt-2'>",
+            "<div class='container' style='margin-top:1rem'>",
+            "<h2 style='font-size:1.125rem;font-weight:600'>Potential collisions after TRIM+lower()</h2>",
+            "<ul style='margin-top:.5rem;padding-left:1.25rem;list-style:disc'>",
         ]
         for k, vs in collisions.items():
             ids = ", ".join(str(v.id) for v in vs)
             codes = ", ".join(esc(v.code or "") for v in vs)
             html.append(f"<li><code>{esc(k)}</code> -> ids [{ids}], codes [{codes}]</li>")
-        html.append("</ul>")
+        html.append("</ul></div>")
     else:
-        html.append("<p class='mt-6 opacity-70'>No collisions detected after TRIM+lower().</p>")
-    html.append("</body></html>")
+        html.append("<p class='container muted' style='margin-top:1rem'>No collisions detected after TRIM+lower().</p>")
     return HTMLResponse("".join(html))
 
 
@@ -303,18 +327,11 @@ def select_current_course(
         sess["flash_message"] = f"Active course changed to {course.name}{' (' + course.code + ')' if getattr(course, 'code', None) else ''}."
     # If HTMX requested, return an inline success alert instead of redirect
     if request.headers.get("HX-Request"):
-        cname = sess.get("current_course_name")
-        ccode = sess.get("current_course_code")
-        msg = (
-            f"Active course set to {cname} ({ccode})." if (cname and ccode)
-            else (f"Active course set to {cname}." if cname else "Active course changed.")
-        )
-        html = (
-            f"<div class=\"alert alert-success mb-2\"><span>{msg}</span>"
-            f" <a class=\"btn btn-xs btn-outline ml-2\" href=\"/\">Go to Home</a>"
-            f"</div>"
-        )
-        return HTMLResponse(html)
+        # For HTMX, instruct the browser to navigate to Home (which will default to current year)
+        redirect_url = "/?selected=1"
+        resp = HTMLResponse("")
+        resp.headers["HX-Redirect"] = redirect_url
+        return resp
 
     # Otherwise, return a redirect response to home with a hint for UI to show alert
     redirect_url = "/?selected=1"

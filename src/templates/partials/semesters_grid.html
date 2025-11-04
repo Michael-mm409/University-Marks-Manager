@@ -1,16 +1,20 @@
 {# Partial fragment: semesters grid for AJAX replacement #}
 {% if semesters %}
-<div class="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+{# Determine an appropriate column count based on number of semesters (max 3) #}
+{% set n = semesters|length %}
+{% set cols = 1 if n <= 1 else (2 if n == 2 else 3) %}
+<div class="sem-grid grid gap-5 md:gap-6 sm:grid-cols-2 md:grid-cols-3"
+     style="grid-template-columns: repeat({{ cols }}, minmax(0, 1fr));">
   {% for s in semesters %}
-  <div class="p-4 rounded-lg bg-base-100 border border-base-300 hover:border-primary/70 transition card-glow flex flex-col gap-3 group">
+  <div class="sem-card p-5 rounded-lg bg-base-100 border border-base-300 hover:border-primary/70 transition-shadow shadow-sm hover:shadow-md card-glow flex flex-col gap-3 group">
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <h3 class="font-semibold"><a class="link link-hover" href="/semester/{{s.name}}?year={{s.year}}">{{s.name}}</a></h3>
+  <h3 class="font-semibold"><a class="link link-hover" href="/year/{{s.year}}/semester/{{s.name}}">{{s.name}}</a></h3>
         <span class="badge badge-outline">{{s.year}}</span>
       </div>
       <button class="btn btn-ghost btn-xs" onclick="this.closest('.p-4').querySelector('.manage-panel').classList.toggle('hidden');" title="Manage">⚙️</button>
     </div>
-    <p class="text-xs opacity-70">View subjects & assignments</p>
+  <p class="text-xs opacity-70">View subjects & assignments</p>
     <div class="manage-panel hidden mt-1 animate-fade-in text-xs space-y-2">
       <form method="post" action="/semester/{{s.name}}/update" class="flex gap-1 items-end flex-wrap">
         <input type="hidden" name="year" value="{{s.year}}" />

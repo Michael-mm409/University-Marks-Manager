@@ -67,7 +67,7 @@
               </form>
             </div>
             <div class="text-xs">
-              <a href="/semester/{{ sem.name }}?year={{ sem.year }}" class="link link-hover">Open semester</a>
+              <a href="/year/{{ sem.year }}/semester/{{ sem.name }}" class="link link-hover">Open semester</a>
             </div>
             {% set subs = subjects_by_semester.get(sem.id) %}
             {% if subs and subs|length > 0 %}
@@ -76,7 +76,7 @@
                 <ul class="mt-2 space-y-1 text-xs">
                   {% for s in subs %}
                     <li>
-                      <a class="link link-hover" href="/semester/{{ s.semester_name }}/subject/{{ s.subject_code }}?year={{ s.year }}">
+                      <a class="link link-hover" href="/year/{{ s.year }}/semester/{{ s.semester_name }}/subject/{{ s.subject_code }}">
                         {{ s.subject_code }} — {{ s.subject_name }}
                       </a>
                     </li>

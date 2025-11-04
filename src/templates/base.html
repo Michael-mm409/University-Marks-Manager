@@ -7,7 +7,14 @@
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet" />
   <!-- <script src="https://cdn.tailwindcss.com"></script> -->
-  <link rel="stylesheet" href="/static/css/tailwind.css" />
+  <link rel="stylesheet" href="/static/css/tailwind.css?v={{ current_year or 'v1' }}" />
+  <style>
+    /* Minimal fallback styles in case Tailwind utilities aren't available/cached */
+    .sem-grid { display: grid; gap: 1rem; }
+    @media (min-width: 640px) { .sem-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (min-width: 768px) { .sem-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    .sem-card { padding: 1rem; border: 1px solid rgba(0,0,0,0.12); border-radius: .5rem; background: var(--b1, #fff); }
+  </style>
   <link rel="icon" href="/static/images/favicon.ico" type="image/x-icon" />
 </head>
 <body class="min-h-screen bg-base-200">
@@ -18,10 +25,6 @@
         <p class="text-sm opacity-70">FastAPI · SQLModel · HTMX · Jinja2</p>
       </div>
       <div class="flex items-center gap-4 self-start md:self-center">
-        <nav class="flex gap-4 text-sm font-medium">
-          <a href="/" class="link link-hover">Home</a>
-          <a href="/courses" class="link link-hover">Courses</a>
-        </nav>
         <label class="swap swap-rotate theme-toggle">
           <input type="checkbox" id="themeToggle" />
           <svg class="swap-on fill-current w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.64 17l-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0L7 18.37A8 8 0 0 0 17 7l1.29-1.29a1 1 0 1 0-1.41-1.41L15.59 5A8 8 0 0 0 5.64 17z"/></svg>

@@ -66,7 +66,37 @@ docker compose up -d
 
 Visit: http://localhost:18000
 
-Helpful:
+## 📅 Year filter and canonical URLs
+
+Home supports a year filter with clean, pretty URLs:
+
+- `GET /year/{YYYY}` — Home scoped to a single year (e.g., `/year/2025`)
+- `GET /all` — Home across all years
+
+Legacy query params are redirected to the canonical paths for consistency:
+
+- `/?year=2025` → 303 redirect to `/year/2025`
+- `/?year=` or `/?year=all` → 303 redirect to `/all`
+
+The Home link preserves your current selection and points to `/year/{YYYY}` or `/all` accordingly. The Courses tab remains a separate section.
+
+Semester pages also have a canonical pretty URL:
+
+- `GET /year/{YYYY}/semester/{SEMESTER}` — Semester detail for a year
+
+Legacy `GET /semester/{SEMESTER}?year={YYYY}` will 303 redirect to the canonical path above.
+
+Notes on Docker deployment:
+
+- This stack is now image-driven (no live bind-mount of app code into the web container) to avoid drift between local files and what Nginx serves.
+- After code changes, rebuild the image to pick up template/route updates:
+
+```powershell
+docker compose build web; docker compose up -d
+```
+
+- Nginx is configured with conservative timeouts and `no-store` headers for dynamic HTML. If you still see stale pages, do a hard refresh in your browser (Ctrl+F5 on Windows).
+- The `web` service exposes a healthcheck (`GET /healthz`) and Nginx waits for it to be healthy before proxying.
 
 - Stop containers: `docker compose down`
 - View logs (follow): `docker compose logs -f`
@@ -194,6 +224,41 @@ environment:
   - DEBUG_TOKEN=secret123
 ```
 
+## 🧯 Troubleshooting: 502 Bad Gateway (nginx)
+
+If you see an nginx “502 Bad Gateway” page (instead of a JSON/HTML response from the app), the proxy could not reach the FastAPI backend.
+
+Quick checks (PowerShell):
+
+```powershell
+# Are containers up?
+docker compose ps
+
+# Any errors during startup (DB connection, stack traces)?
+docker compose logs -n 200 web
+docker compose logs -n 100 nginx
+
+# Can nginx reach the app inside the compose network?
+# Use curl; if it's not installed in the nginx image, the next line installs it temporarily
+docker compose exec nginx sh -lc "curl -fsS http://web:8000/healthz || echo FAIL"
+# If curl is missing (Debian-based nginx):
+docker compose exec nginx sh -lc "apt-get update && apt-get install -y curl >/dev/null && curl -fsS http://web:8000/healthz || echo FAIL"
+# If Alpine-based nginx:
+# docker compose exec nginx sh -lc "apk add --no-cache curl >/dev/null && curl -fsS http://web:8000/healthz || echo FAIL"
+```
+
+Also try these URLs via your browser/domain:
+
+- `/healthz` → Should return 200 JSON if the backend is up
+- `/api/_health` → Should return 200 JSON if the API router is mounted
+
+Notes:
+
+- If debug routes are disabled, debug URLs return 404 (from the app). They do not cause a 502 by themselves.
+- 502 typically indicates the backend wasn’t listening yet, crashed during startup (e.g., DB not ready), or the proxy can’t resolve/reach `web:8000`.
+
+Optional (compose hardening): add healthchecks and wait-for-DB to reduce boot race conditions.
+
 ## 🔎 Utilities: course code audit & normalization
 
 Two scripts help audit and normalize existing `Course.code` values.
@@ -294,3 +359,7 @@ Open an issue with reproduction steps and environment details.
 ---
 
 Generated README reflects current FastAPI-based implementation (replacing legacy Streamlit description).
+
+```
+
+```
