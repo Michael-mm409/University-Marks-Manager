@@ -63,7 +63,6 @@ To exit the virtual environment: `deactivate`
 - Ensure you are using Python 3.11 or higher: `python --version`
 - For Docker issues, ensure the Docker daemon is running and you have sufficient permissions
 - If you encounter database connection errors, check your `DATABASE_URL` environment variable
-- If testing instructions are required and no TESTING.md exists, refer to the repository's tests/ directory or add a TESTING.md with project-specific testing steps
 - For framework or deployment questions, refer to FastAPI docs: https://fastapi.tiangolo.com/
 - If you encounter missing module errors, confirm dependencies are installed in the active environment
 
