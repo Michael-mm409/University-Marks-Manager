@@ -66,9 +66,12 @@ APPLICATION.include_router(views)
 
 # Enable server-side sessions for lightweight state (e.g., selected course)
 # NOTE: Replace the secret key with an environment variable for production use.
+session_secret = os.getenv("SESSION_SECRET_KEY")
+if not session_secret:
+    raise RuntimeError("SESSION_SECRET_KEY environment variable is required for SessionMiddleware")
 APPLICATION.add_middleware(
     SessionMiddleware,
-    secret_key="dev-secret-change-me",
+    secret_key=session_secret,
     same_site="lax",
 )
 

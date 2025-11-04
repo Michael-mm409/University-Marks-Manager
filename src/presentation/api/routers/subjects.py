@@ -15,10 +15,10 @@ router = APIRouter()
 
 @router.get("/", response_model=List[SubjectRead])
 def list_subjects(
-	session: Session = Depends(get_session),
-	semester_name: Optional[str] = None,
-	year: Optional[str] = None,
-	code: Optional[str] = None,
+    session: Session = Depends(get_session),
+    semester_name: Optional[str] = None,
+    year: Optional[str] = None,
+    code: Optional[str] = None,
 ) -> Sequence[Subject]:
     """
     List all subjects, optionally filtered by semester name, year, and subject code.
@@ -28,7 +28,7 @@ def list_subjects(
         year (Optional[str]): Year to filter subjects by.
         code (Optional[str]): Subject code to filter subjects by.
     
-	Returns:
+    Returns:
         Sequence[Subject]: List of subjects.
     """
     stmt = select(Subject)
@@ -48,14 +48,14 @@ def create_subject(data: SubjectCreate, session: Session = Depends(get_session))
 	
 	Args:
         data (Subject): Subject data to create.
-		session (Session): Database session dependency.
+        session (Session): Database session dependency.
     
     Raises:
         HTTPException: If the subject already exists in the specified semester and year (409).
     
     Returns:
         Subject: The created subject.
-	"""
+    """
     exists = session.exec(
         select(Subject).where(
             Subject.subject_code == data.subject_code,
@@ -112,6 +112,7 @@ def update_subject(subject_id: int, data: SubjectCreate, session: Session = Depe
     
     Raises:
         HTTPException: If the subject is not found (404).
+        HTTPException: If another subject with same code/semester/year exists (409).
     
     Returns:
         Subject: The updated subject.
@@ -119,6 +120,20 @@ def update_subject(subject_id: int, data: SubjectCreate, session: Session = Depe
     subj = session.get(Subject, subject_id)
     if not subj:
         raise HTTPException(status_code=404, detail="Not found")
+
+    # Check if another subject with the same identifiers exists
+    exists = session.exec(
+        select(Subject).where(
+            Subject.subject_code == data.subject_code,
+            Subject.semester_name == data.semester_name,
+            Subject.year == data.year,
+            Subject.id != subject_id,
+        )
+    ).first()
+    
+    if exists:
+        raise HTTPException(status_code=409, detail="Another subject with same code/semester/year exists")
+
     subj.subject_code = data.subject_code
     subj.subject_name = data.subject_name
     subj.semester_name = data.semester_name

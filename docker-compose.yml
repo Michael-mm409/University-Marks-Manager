@@ -19,9 +19,11 @@ services:
     image: university-marks-manager:fastapi
     command: uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --workers 2
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql://user:password@db/mydatabase
-      - ENABLE_DEBUG_ROUTES=0
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}
+      - ENABLE_DEBUG_ROUTES=${ENABLE_DEBUG_ROUTES}
     # Mark the web app healthy only when /healthz responds OK; helps avoid transient 502s on restart
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz').getcode()==200 else 1)\""]
@@ -38,10 +40,12 @@ services:
     restart: unless-stopped
     volumes:
       - postgres_data_nas:/var/lib/postgresql/data/
+    env_file:
+      - .env
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=mydatabase
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
 
 volumes:
   postgres_data_nas:

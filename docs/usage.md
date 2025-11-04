@@ -1,93 +1,148 @@
-# Usage Guide
+# Usage Guide (FastAPI)
 
-## Starting the Application
+## Starting the server
 
-1. Complete the [Installation](INSTALLATION.md) steps.
-2. Activate your Python virtual environment (if used).
-3. Run the application from the `src` directory:
-   ```sh
-   python main.py
-   ```
+- Install dependencies:
+  - Python: use the project's supported version (see pyproject.toml or README).
+  - pip: pip install -r requirements.txt
+- Using Uvicorn (typical):
+  - uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+  - If your entrypoint differs, replace `app.main:app` with the module that exposes the FastAPI `app`.
+- If a frontend or npm assets are included, follow its README (e.g., npm install && npm start).
 
-## Main Window Overview
+## Accessing the web UI and API docs
 
-When the application starts, you will see the main window with the following components:
+- Open the application in a browser:
+  - Main UI: http://localhost:8000/ (if provided)
+  - Swagger UI: http://localhost:8000/docs
+  - ReDoc: http://localhost:8000/redoc
 
-- **Year and Semester Selection:**  
-  Use the dropdowns at the top to select the academic year and semester. If a year is selected for the first time, you will be prompted to choose which semesters to create (Autumn, Spring, Annual, or custom).
+## Key API endpoints (examples)
 
-- **Subjects Table:**  
-  The central table displays all subjects and their assessments for the selected semester. Each row shows:
-  - Subject Code
-  - Subject Name
-  - Assessment Name
-  - Unweighted Mark
-  - Weighted Mark
-  - Mark Weight
-  - Total Mark
+Note: adapt paths to the actual API prefix in your code (e.g., /api/...). Replace host/port as needed.
 
-- **Entry Fields:**  
-  Below the table, use the entry fields to input or edit:
-  - Subject Code
-  - Assessment Name
-  - Weighted Mark (numeric or "S"/"U" for Satisfactory/Unsatisfactory)
-  - Mark Weight (as a percentage)
+- List subjects
 
-- **Action Buttons:**  
-  - **Add Subject:** Add a new subject to the current semester.
-  - **Delete Subject:** Remove selected subjects from the semester.
-  - **Add Entry:** Add or update an assessment entry for a subject.
-  - **Delete Entry:** Remove the selected assessment entry.
-  - **Calculate Exam Mark:** Calculate the exam mark for the selected subject.
-  - **Set Total Mark:** Set or update the total mark for a subject.
+  - GET /subjects
+  - curl: curl -sS http://localhost:8000/subjects
 
-## Example Workflows
+- Create a subject
 
-### Adding a Subject
+  - POST /subjects
+  - curl:
+    curl -X POST http://localhost:8000/subjects \
+     -H "Content-Type: application/json" \
+     -d '{"code":"COMP101","name":"Intro to Programming","sync":false}'
 
-1. Click **Add Subject**.
-2. Enter the subject code and name in the dialog.
-3. (Optional) Check "Sync Subject" if you want this subject to be synchronized.
-4. Click **OK** to add.
+- Get subject by id
 
-### Adding an Assessment Entry
+  - GET /subjects/{subject_id}
+  - curl: curl http://localhost:8000/subjects/1
 
-1. Select the subject in the table or enter its code in the entry field.
-2. Enter the assessment name, weighted mark, and mark weight.
-3. Click **Add Entry**.
+- Update subject
 
-### Deleting an Entry
+  - PUT or PATCH /subjects/{subject_id}
+  - curl:
+    curl -X PATCH http://localhost:8000/subjects/1 \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Programming I"}'
 
-1. Select the row in the table corresponding to the entry you want to delete.
-2. Click **Delete Entry**.
+- Delete subject
 
-### Calculating Exam Mark
+  - DELETE /subjects/{subject_id}
+  - curl: curl -X DELETE http://localhost:8000/subjects/1
 
-1. Enter or select the subject code.
-2. Click **Calculate Exam Mark** to update the exam mark for that subject.
+- List assessments for a subject
 
-### Setting Total Mark
+  - GET /subjects/{subject_id}/assessments
+  - curl: curl http://localhost:8000/subjects/1/assessments
 
-1. Enter or select the subject code.
-2. Click **Set Total Mark** and enter the desired total mark in the dialog.
+- Add assessment entry
 
-### Deleting a Subject
+  - POST /subjects/{subject_id}/assessments
+  - curl:
+    curl -X POST http://localhost:8000/subjects/1/assessments \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Assignment 1","weighted_mark":85,"weight":10}'
 
-1. Click **Delete Subject**.
-2. Select one or more subjects to remove in the dialog.
-3. Confirm deletion.
+- Update/delete assessment
 
-## Tips
+  - PATCH /assessments/{assessment_id} DELETE /assessments/{assessment_id}
 
-- **Switching Years/Semesters:**  
-  Use the dropdowns to view or manage marks for different years and semesters. New years require semester selection.
-- **Data Persistence:**  
-  All data is saved automatically to a JSON file in the `data/` directory for each year.
-- **S/U Grades:**  
-  Enter "S" or "U" in the Weighted Mark field for Satisfactory/Unsatisfactory assessments.
+- Calculate exam mark / set total (if provided by API)
+  - POST /subjects/{subject_id}/calculate_exam
+  - POST /subjects/{subject_id}/set_total
+  - Check /docs for exact payloads.
+
+Always inspect /docs for precise request/response schemas and available endpoints.
+
+## Example workflows
+
+- Create subject → add assessment:
+
+  1. POST /subjects
+  2. POST /subjects/{id}/assessments
+
+- Update marks or set totals:
+  1. PATCH /assessments/{id} or POST /subjects/{id}/set_total
+
+Refer to interactive docs for example bodies.
+
+## Configuration
+
+- Primary environment variables
+
+  - DATABASE_URL — e.g. sqlite: sqlite:///data/app.db or PostgreSQL: postgresql+asyncpg://user:pass@host/db
+  - HOST — hostname to bind (default 0.0.0.0)
+  - PORT — port to bind (default 8000)
+  - SECRET_KEY — app secret for any signed data
+  - DEBUG — enable debug behavior
+
+- Example .env
+  DATABASE_URL=sqlite:///data/app.db
+  HOST=0.0.0.0
+  PORT=8000
+  SECRET_KEY=change-me
+  DEBUG=true
+
+- Load .env using python-dotenv or the project's configuration loader.
+
+## Database setup & migrations (SQLModel/SQLAlchemy)
+
+- If using migrations (Alembic):
+  - Initialize (one-time): alembic init alembic (if not present)
+  - Generate migration: alembic revision --autogenerate -m "init"
+  - Apply migrations: alembic upgrade head
+- If no migrations and the app auto-creates tables:
+  - Start the app; on first run it may create tables based on SQLModel models.
+  - Or run a small init script if provided, e.g. python -m app.db.init (check repo).
+- Connection strings:
+  - SQLite local file: sqlite:///data/app.db
+  - Postgres: postgresql+asyncpg://user:pass@host:port/dbname
+
+## Persistence & backups
+
+- For SQLite: the DB is the single file (e.g., data/app.db). Backup by copying the file:
+  - cp data/app.db backups/app-$(date +%F-%T).db
+- For Postgres/MySQL: use pg_dump / mysqldump or managed DB backups.
+- Keep regular backups and store them off-instance (S3, network storage, etc.).
+- Consider migration/version control (Alembic) to safely evolve schema.
 
 ## Troubleshooting
 
-- If the application window does not appear, check for errors in your terminal.
+- Server does not start / port conflict:
+  - Check if another process uses the port (lsof -i :8000) or change PORT.
+- Missing env vars:
+  - Ensure DATABASE_URL and SECRET_KEY are set; the app will error on missing critical config.
+- DB connection errors:
+  - Verify DATABASE_URL and DB is reachable. For remote DBs, check firewall and credentials.
+- Migrations not applied:
+  - Run alembic upgrade head or the project-specific migration command.
+- CORS issues (frontend cannot access API):
+  - Ensure CORS middleware is configured with the correct origins in the FastAPI app.
+- Check logs (console) and the interactive /docs endpoint for schema and validation errors.
+
+If further detail or repo-specific commands are needed, point to the project README or share the relevant files (entrypoint path, migration setup, and configuration loader).
+
 - Ensure all dependencies are installed and you are using the correct Python version.
-- For missing features or bugs, see [FAQ](FAQ.md) or report an issue.
+- For missing features or bugs, see [FAQ](faq.md) or report an issue.

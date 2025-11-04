@@ -144,102 +144,91 @@ def home_year(request: Request, year: int, session: Session = Depends(get_sessio
 
 @views.get("/all", response_class=HTMLResponse)
 def home_all(request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
-    """
-    Short description.
-
-    Args:
-        request: Description.
-        session: Description.
-
-    Returns:
-        Description.
-
-    Raises:
-        Description.
-    """
+    """Render the All years page."""
     return _render_home_body(request, session, None)
-
-
-@views.get("/year/{year}/semester/{semester}", response_class=HTMLResponse)
-def semester_detail_pretty(
-    request: Request,
-    year: str,
-    semester: str,
-    session: Session = Depends(get_session),
-) -> HTMLResponse:
-    """
-    Short description.
-
-    Args:
-        request: Description.
-        year: Description.
-        semester: Description.
-        session: Description.
-
-    Returns:
-        Description.
-
-    Raises:
-        Description.
-    """
-    ctx = build_semester_context(session, semester=semester, year=year)
-    return _render(request, "semester.html", ctx)
 
 
 @views.get("/year/{year}/semester/{semester}/subject/{code}", response_class=HTMLResponse)
 def subject_detail_pretty(
-    request: Request,
-    year: str,
-    semester: str,
-    code: str,
-    session: Session = Depends(get_session),
+        request: Request,
+        year: str,
+        semester: str,
+        code: str,
+        session: Session = Depends(get_session),
 ) -> HTMLResponse:
-    # Support optional query params for projections
-    """
-    Short description.
+        """
+        Render a subject detail HTML page with optional projected-mark query parameters.
 
-    Args:
-        request: Description.
-        year: Description.
-        semester: Description.
-        code: Description.
-        session: Description.
+        This view reads optional query parameters from the incoming request to support
+        on-the-fly projections and then builds a rendering context for the subject page.
 
-    Returns:
-        Description.
+        Behavior:
+        - Reads the following optional query parameters from request.query_params:
+                - "exam_weight": parsed to float when present and non-empty; invalid values
+                    are ignored and cause a one-time flash message to be written to the session
+                    (if possible).
+                - "final_total": forwarded as-is (string) to the context builder.
+                - "total_mark": forwarded as-is (string) to the context builder.
+                - "return_to": forwarded as-is to the context builder.
+        - If "exam_weight" is missing or empty, it is treated as None.
+        - Any ValueError during float parsing of exam_weight is caught; parsed_exam_weight
+            becomes None and an attempt is made to set request.session["flash_message"]
+            with an explanatory message. Errors while writing the flash message are ignored.
+        - Calls build_subject_context(session, semester, year, code, exam_weight=..., final_total=..., total_mark=..., return_to=...)
+            to construct the context used to render the page.
+        - If the context builder returns None, the view returns an HTMLResponse with
+            a 404 status ("Subject not found").
+        - Otherwise the view renders and returns the "subject.html" template using _render.
 
-    Raises:
-        Description.
-    """
-    qp = request.query_params
-    exam_weight = qp.get("exam_weight")
-    final_total = qp.get("final_total")
-    total_mark = qp.get("total_mark")
-    # Defensive parse for exam_weight
-    parsed_exam_weight: Optional[float] = None
-    if exam_weight not in (None, ""):
-        try:
-            parsed_exam_weight = float(exam_weight)  # type: ignore[arg-type]
-        except ValueError:
-            parsed_exam_weight = None
-            # Optional: set a one-time message (shown on pages that render flash_message)
-            try:
-                request.session["flash_message"] = "Ignored invalid exam_weight query parameter."
-            except Exception:
-                pass
-    ctx = build_subject_context(
-        session,
-        semester=semester,
-        year=year,
-        code=code,
-        exam_weight=parsed_exam_weight,
-        final_total=final_total,
-        total_mark=total_mark,
-        return_to=qp.get("return_to"),
-    )
-    if ctx is None:
-        return HTMLResponse("Subject not found", status_code=404)
-    return _render(request, "subject.html", ctx)
+        Parameters:
+        - request (Request): the incoming HTTP request (used for query params and session).
+        - year (str): academic year identifier for the subject lookup.
+        - semester (str): semester identifier for the subject lookup.
+        - code (str): subject/code identifier for the subject lookup.
+        - session (Session): database/session dependency (defaults to Depends(get_session)).
+
+        Returns:
+        - HTMLResponse: either the rendered subject page (200) or a 404 response when the
+            subject is not found.
+
+        Side effects:
+        - May set request.session["flash_message"] once when an invalid exam_weight is supplied.
+        - Uses dependency injection to acquire a session (get_session).
+
+        Notes:
+        - final_total and total_mark are forwarded as provided (no parsing/validation).
+        - exam_weight accepts numeric input and is resilient to invalid formats.
+        """
+        # Support optional query params for projections
+        qp = request.query_params
+        exam_weight = qp.get("exam_weight")
+        final_total = qp.get("final_total")
+        total_mark = qp.get("total_mark")
+        # Defensive parse for exam_weight
+        parsed_exam_weight: Optional[float] = None
+        if exam_weight not in (None, ""):
+                try:
+                        parsed_exam_weight = float(exam_weight)  # type: ignore[arg-type]
+                except ValueError:
+                        parsed_exam_weight = None
+                        # Optional: set a one-time message (shown on pages that render flash_message)
+                        try:
+                                request.session["flash_message"] = "Ignored invalid exam_weight query parameter."
+                        except Exception:
+                                pass
+        ctx = build_subject_context(
+                session,
+                semester=semester,
+                year=year,
+                code=code,
+                exam_weight=parsed_exam_weight,
+                final_total=final_total,
+                total_mark=total_mark,
+                return_to=qp.get("return_to"),
+        )
+        if ctx is None:
+                return HTMLResponse("Subject not found", status_code=404)
+        return _render(request, "subject.html", ctx)
 
 
 __all__ = ["views"]

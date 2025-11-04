@@ -69,7 +69,8 @@
     // Dynamically set the default year to the current year
     document.addEventListener('DOMContentLoaded', function() {
       var yearInput = document.getElementById('add-semester-year');
-      if (yearInput) {
+      // Only set if the input is empty to avoid overriding server-provided value
+      if (yearInput && (!yearInput.value || yearInput.value.toString().trim() === '')) {
         yearInput.value = new Date().getFullYear();
       }
     });
