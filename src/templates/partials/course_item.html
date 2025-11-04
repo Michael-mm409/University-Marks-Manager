@@ -1,6 +1,6 @@
 <div class="p-4 rounded-lg bg-base-200 border border-base-300 hover:border-primary/70 transition card-glow flex flex-col gap-2 group animate-fade-in">
   <div class="flex items-center justify-between">
-    <a href="/courses/{{ course.code or course.id }}" class="flex-grow">
+  <a href="/courses/{{ course.code if course.code is defined and course.code|trim != '' else course.id }}" class="flex-grow">
       <h3 class="font-semibold link link-hover">{{ course.name }}</h3>
       {% if course.code %}
         <p class="text-xs opacity-70">{{ course.code }}</p>
@@ -24,7 +24,7 @@
 
   <!-- Inline manage panel: update name/code or delete course -->
   <div class="manage-panel hidden mt-2 border-t border-base-300 pt-2">
-    <form method="post" action="/courses/{{ course.code or course.id }}/update" class="flex gap-2 items-end flex-wrap mb-2">
+  <form method="post" action="/courses/{{ course.code if course.code is defined and course.code|trim != '' else course.id }}/update" class="flex gap-2 items-end flex-wrap mb-2">
       <label class="form-control w-48">
         <span class="label-text text-xs">Name</span>
         <input name="name" class="input input-bordered input-xs" value="{{ course.name }}" required />
@@ -34,9 +34,9 @@
         <input name="code" class="input input-bordered input-xs" value="{{ course.code }}" required />
       </label>
       <button class="btn btn-xs btn-primary mt-4" type="submit">Save</button>
-      <a class="btn btn-xs btn-ghost mt-4" href="/courses/{{ course.code or course.id }}">Open</a>
+  <a class="btn btn-xs btn-ghost mt-4" href="/courses/{{ course.code if course.code is defined and course.code|trim != '' else course.id }}">Open</a>
     </form>
-    <form method="post" action="/courses/{{ course.code or course.id }}/delete" onsubmit="return confirm('Delete this course? Semesters will be unassigned.');">
+  <form method="post" action="/courses/{{ course.code if course.code is defined and course.code|trim != '' else course.id }}/delete" onsubmit="return confirm('Delete this course? Semesters will be unassigned.');">
       <button class="btn btn-xs btn-error btn-outline">Delete Course</button>
     </form>
   </div>

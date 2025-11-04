@@ -215,12 +215,24 @@ def subject_detail_pretty(
     exam_weight = qp.get("exam_weight")
     final_total = qp.get("final_total")
     total_mark = qp.get("total_mark")
+    # Defensive parse for exam_weight
+    parsed_exam_weight: Optional[float] = None
+    if exam_weight not in (None, ""):
+        try:
+            parsed_exam_weight = float(exam_weight)  # type: ignore[arg-type]
+        except ValueError:
+            parsed_exam_weight = None
+            # Optional: set a one-time message (shown on pages that render flash_message)
+            try:
+                request.session["flash_message"] = "Ignored invalid exam_weight query parameter."
+            except Exception:
+                pass
     ctx = build_subject_context(
         session,
         semester=semester,
         year=year,
         code=code,
-        exam_weight=float(exam_weight) if (exam_weight not in (None, "")) else None,
+        exam_weight=parsed_exam_weight,
         final_total=final_total,
         total_mark=total_mark,
         return_to=qp.get("return_to"),
