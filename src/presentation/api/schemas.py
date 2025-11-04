@@ -4,6 +4,12 @@ from sqlmodel import SQLModel
 
 
 class SubjectCreate(SQLModel, table=False):
+    """
+    Short description of the class.
+
+    Attributes:
+        attr1: Description.
+    """
     subject_code: str
     subject_name: str
     semester_name: str
@@ -13,6 +19,12 @@ class SubjectCreate(SQLModel, table=False):
 
 
 class SubjectRead(SQLModel):
+    """
+    Short description of the class.
+
+    Attributes:
+        attr1: Description.
+    """
     subject_code: str
     subject_name: str
     semester_name: str
@@ -25,6 +37,12 @@ class SubjectRead(SQLModel):
 
 
 class AssignmentCreate(SQLModel, table=False):
+    """
+    Short description of the class.
+
+    Attributes:
+        attr1: Description.
+    """
     assessment: str
     subject_code: str
     semester_name: str
@@ -36,6 +54,12 @@ class AssignmentCreate(SQLModel, table=False):
 
 
 class AssignmentRead(SQLModel):
+    """
+    Short description of the class.
+
+    Attributes:
+        attr1: Description.
+    """
     assessment: str
     subject_code: str
     semester_name: str
@@ -50,6 +74,12 @@ class AssignmentRead(SQLModel):
 
 
 class ExaminationCreate(SQLModel, table=False):
+    """
+    Short description of the class.
+
+    Attributes:
+        attr1: Description.
+    """
     subject_code: str
     semester_name: str
     year: str
@@ -58,6 +88,12 @@ class ExaminationCreate(SQLModel, table=False):
 
 
 class ExaminationRead(SQLModel):
+    """
+    Short description of the class.
+
+    Attributes:
+        attr1: Description.
+    """
     subject_code: str
     semester_name: str
     year: str
@@ -69,11 +105,23 @@ class ExaminationRead(SQLModel):
 
 
 class SemesterCreate(SQLModel, table=False):
+    """
+    Short description of the class.
+
+    Attributes:
+        attr1: Description.
+    """
     name: str
     year: int
 
 
 class SemesterRead(SQLModel):
+    """
+    Short description of the class.
+
+    Attributes:
+        attr1: Description.
+    """
     name: str
     year: int
     # pydantic v2: enable attribute population from ORM objects

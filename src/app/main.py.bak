@@ -90,12 +90,6 @@ assets_favicon = assets_dir / "favicon.ico"
 if static_favicon.exists() or assets_favicon.exists():
     @APPLICATION.get("/favicon.ico")
     def favicon():
-        """
-        Short description.
-
-        Raises:
-            Description.
-        """
         path = str(static_favicon if static_favicon.exists() else assets_favicon)
         return FileResponse(path)
 app = APPLICATION  # backwards compatible name for uvicorn target
@@ -105,10 +99,4 @@ __all__ = ["app", "APPLICATION"]
 # Root-level health endpoint (does not depend on API router mounting)
 @APPLICATION.get("/healthz")
 def healthz():
-    """
-    Short description.
-
-    Raises:
-        Description.
-    """
     return {"status": "ok"}

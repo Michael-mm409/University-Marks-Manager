@@ -6,12 +6,6 @@ from src.infrastructure.db.models import Semester, Subject, Assignment, Examinat
 
 
 class IndexContext(TypedDict):
-    """
-    Short description of the class.
-
-    Attributes:
-        attr1: Description.
-    """
     semesters: Sequence[Semester]
     years: List[int]
     selected_year: Optional[int]
@@ -21,12 +15,6 @@ class IndexContext(TypedDict):
 
 
 class SemesterSummary(TypedDict):
-    """
-    Short description of the class.
-
-    Attributes:
-        attr1: Description.
-    """
     code: str
     name: str
     semester_name: str
@@ -39,12 +27,6 @@ class SemesterSummary(TypedDict):
 
 
 class SemesterContext(TypedDict):
-    """
-    Short description of the class.
-
-    Attributes:
-        attr1: Description.
-    """
     semester: str
     year: str
     subjects: Sequence[Subject]
@@ -52,12 +34,6 @@ class SemesterContext(TypedDict):
 
 
 class SubjectContext(TypedDict):
-    """
-    Short description of the class.
-
-    Attributes:
-        attr1: Description.
-    """
     semester: str
     year: str
     subject: Subject

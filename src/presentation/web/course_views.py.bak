@@ -65,18 +65,6 @@ def debug_course_codes(
     courses = cm.get_all_courses()
     # Build a simple HTML table (no separate template needed)
     def esc(s: str) -> str:
-        """
-        Short description.
-
-        Args:
-            s: Description.
-
-        Returns:
-            Description.
-
-        Raises:
-            Description.
-        """
         return (
             str(s)
             .replace("&", "&amp;")

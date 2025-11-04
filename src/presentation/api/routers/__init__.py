@@ -49,6 +49,18 @@ def api_debug(request: Request) -> dict:
 		if isinstance(p, str):
 			paths.append(p)
 	def present(path: str) -> bool:
+     """
+     Short description.
+
+     Args:
+         path: Description.
+
+     Returns:
+         Description.
+
+     Raises:
+         Description.
+     """
 		return path in paths
 	return {
 		"routes_present": {

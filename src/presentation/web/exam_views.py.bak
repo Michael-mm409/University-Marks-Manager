@@ -114,15 +114,6 @@ def save_total_mark(
 
     # Return JSON if AJAX, else redirect
     def is_ajax(request):
-        """
-        Short description.
-
-        Args:
-            request: Description.
-
-        Raises:
-            Description.
-        """
         try:
             return request.headers.get("X-Requested-With") == "XMLHttpRequest"
         except Exception:
@@ -163,15 +154,6 @@ def reset_total_mark(
         session.commit()
 
     def is_ajax(req: Request):
-        """
-        Short description.
-
-        Args:
-            req: Description.
-
-        Raises:
-            Description.
-        """
         try:
             return req.headers.get("X-Requested-With") == "XMLHttpRequest"
         except Exception:
