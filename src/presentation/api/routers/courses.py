@@ -33,16 +33,19 @@ courses_router = APIRouter(prefix="/courses", tags=["Courses"])
 @courses_router.post("/", response_model=CourseRead, status_code=status.HTTP_201_CREATED)
 def create_course(
     course_data: CourseCreate,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_session),  # noqa: B008 - FastAPI dependency injection is intended here
 ) -> Course:
     """Create a new course."""
+    normalized_code = (course_data.code or "").strip()
+    if not normalized_code:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="course code is required")
     course_manager = CourseManager(session)
-    course = course_manager.create_course(name=course_data.name, code=course_data.code or "")
+    course = course_manager.create_course(name=course_data.name, code=normalized_code)
     return course
 
 
 @courses_router.get("/", response_model=List[CourseRead])
-def get_all_courses(session: Session = Depends(get_session)) -> List[Course]:
+def get_all_courses(session: Session = Depends(get_session)) -> List[Course]:  # noqa: B008
     """Get a list of all courses."""
     course_manager = CourseManager(session)
     courses = course_manager.get_all_courses()
@@ -50,6 +53,12 @@ def get_all_courses(session: Session = Depends(get_session)) -> List[Course]:
 
 
 class CourseCodeDebug(BaseModel):
+    """
+    Short description of the class.
+
+    Attributes:
+        attr1: Description.
+    """
     id: int
     name: str
     code_raw: str | None
@@ -59,7 +68,7 @@ class CourseCodeDebug(BaseModel):
 
 
 @courses_router.get("/_codes")
-def list_course_codes(request: Request, session: Session = Depends(get_session)):
+def list_course_codes(request: Request, session: Session = Depends(get_session)):  # noqa: B008
     """List raw and trimmed course codes, plus potential TRIM+lower collisions (JSON)."""
     # Gate via app state flag and optional debug token
     enabled = getattr(request.app.state, "enable_debug_routes", False)
@@ -110,7 +119,7 @@ def list_course_codes(request: Request, session: Session = Depends(get_session))
 
 
 @courses_router.get("/by-code/{code}", response_model=CourseRead)
-def get_course_by_code_api(code: str, session: Session = Depends(get_session)) -> Course:
+def get_course_by_code_api(code: str, session: Session = Depends(get_session)) -> Course:  # noqa: B008
     """Resolve a course by its code (case-insensitive, trimmed)."""
     cm = CourseManager(session)
     course = cm.get_course_by_code(code)

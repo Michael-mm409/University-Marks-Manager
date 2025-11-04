@@ -74,15 +74,18 @@ def build_subject_context(
     if not subject:
         return None
 
+    # Scope to this specific semester + year to avoid cross-term leakage
     assignments = session.exec(
         select(Assignment).where(
             Assignment.year == year,
+            Assignment.semester_name == semester,
             Assignment.subject_code == code,
-        ).order_by(Assignment.id) # type: ignore
+        ).order_by(Assignment.id)  # type: ignore
     ).all()
     examinations = session.exec(
         select(Examination).where(
             Examination.year == year,
+            Examination.semester_name == semester,
             Examination.subject_code == code,
         )
     ).all()

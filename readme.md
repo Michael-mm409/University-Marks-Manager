@@ -149,6 +149,55 @@ docs/
    architecture.md
 ```
 
+## Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant FastAPI
+    participant Jinja2
+    participant SQLModel
+    participant Database
+
+    rect rgb(200, 220, 255)
+        Note over Browser,Database: Home Page Load
+        Browser->>FastAPI: GET /
+        FastAPI->>SQLModel: Select Semesters, Years
+        SQLModel->>Database: Query semesters, years
+        Database-->>SQLModel: Rows
+        SQLModel-->>FastAPI: ORM Objects
+        FastAPI->>Jinja2: Render index.html
+        Jinja2-->>FastAPI: HTML
+        FastAPI-->>Browser: HTML Response
+    end
+
+    rect rgb(200, 255, 220)
+        Note over Browser,Database: Subject Inline Edit (AJAX)
+        Browser->>FastAPI: POST /assignment/{id}/update
+        FastAPI->>SQLModel: Update Assignment
+        SQLModel->>Database: UPDATE assignment
+        Database-->>SQLModel: Success
+        SQLModel-->>FastAPI: Updated ORM Object
+        FastAPI->>Jinja2: Render row partial
+        Jinja2-->>FastAPI: HTML Fragment
+        FastAPI-->>Browser: JSON {row_html, ...}
+        Browser->>Browser: Update DOM
+    end
+
+    rect rgb(255, 220, 200)
+        Note over Browser,Database: Course Assignment
+        Browser->>FastAPI: POST /courses/{code}/assign-semester
+        FastAPI->>SQLModel: Link Course ↔ Semester
+        SQLModel->>Database: INSERT course_semester_link
+        Database-->>SQLModel: Success
+        SQLModel-->>FastAPI: Linked Entities
+        FastAPI->>Jinja2: Render updated course_detail
+        Jinja2-->>FastAPI: HTML
+        FastAPI-->>Browser: Redirect/HTML
+    end
+
+```
+
 ## 🧭 Active Course workflow (banner + filtering)
 
 - Select a course on the Courses page and click “Use this course” to set the active course.

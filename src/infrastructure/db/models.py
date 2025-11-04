@@ -4,7 +4,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import ClassVar, Optional
 
-from sqlmodel import Field, SQLModel, Relationship
+from sqlmodel import Field, SQLModel
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import relationship as sa_relationship
 
@@ -27,6 +27,8 @@ class CourseSubjectLink(SQLModel, table=True):
     subject_id: Optional[int] = Field(
         default=None, foreign_key="subjects.id", primary_key=True
     )
+    # NOTE: Consider adding DB-level ON DELETE CASCADE on both foreign keys via a migration
+    # so that removing a Course or Subject cleans up association rows automatically.
     
 
 class Semester(SQLModel, table=True):
@@ -57,6 +59,12 @@ class Subject(SQLModel, table=True):
     total_mark: Optional[float] = 0.0
     sync_subject: bool = False
 
+    # NOTE:
+    # 1) The (subject_code, semester_name, year) triple behaves like a natural key across the app.
+    #    Consider adding a UniqueConstraint on these three columns in a schema migration to prevent duplicates.
+    # 2) `year` here (and in related tables) is typed as str whereas `Semester.year` is int.
+    #    Aligning these to int would reduce subtle bugs but requires a data migration.
+
     # Define many-to-many only on Course side to avoid forward-ref generic issues here
     # If needed later, reintroduce with list[Course] once mapping is stable
     # courses: list["Course"] = Relationship(back_populates="subjects", link_model=CourseSubjectLink)
@@ -73,6 +81,9 @@ class Course(SQLModel, table=True):
         UniqueConstraint("code", name="uq_course_code"),
         UniqueConstraint("name", "code", name="uq_course_name_code"),
     )
+
+    # NOTE: The unique constraint on (name, code) is redundant if `code` is globally unique.
+    # It can be dropped in a future migration to simplify the schema.
 
     # Relationships are attached after class definitions to avoid forward-ref issues
     # semesters: list[Semester] = Relationship(back_populates="course")
@@ -139,9 +150,9 @@ __all__ = [
 # SQLAlchemy trying to resolve generic strings like "Optional['Course']" or "list['Semester']".
 Semester.course = sa_relationship("Course", back_populates="semesters")
 Course.semesters = sa_relationship("Semester", back_populates="course")
-# Many-to-many: define unidirectional relationship on Course to list subjects via association table
-# Use table name string to avoid Pylance attribute access issues on __table__
-Course.subjects = sa_relationship("Subject", secondary="course_subject_link")
+# Many-to-many: expose a bidirectional convenience relationship between Course and Subject via link table
+Course.subjects = sa_relationship("Subject", secondary="course_subject_link", back_populates="courses")
+Subject.courses = sa_relationship("Course", secondary="course_subject_link", back_populates="subjects")
 
 # Manually update forward references to resolve circular dependencies
 Course.model_rebuild()

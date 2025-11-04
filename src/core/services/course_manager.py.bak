@@ -66,18 +66,6 @@ class CourseManager:
 
     # Legacy subject-link helper retained for compatibility but unused now
     def get_unlinked_subjects(self, course_id: int) -> list[Subject]:
-        """
-        Short description.
-
-        Args:
-            course_id: Description.
-
-        Returns:
-            Description.
-
-        Raises:
-            Description.
-        """
         return []
 
     def add_subject_to_course(self, course_id: int, subject_id: int) -> Optional[Course]:

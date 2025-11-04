@@ -17,8 +17,8 @@ def create_assignment(
     weighted_mark: Optional[float] = Form(None),
     mark_weight: Optional[float] = Form(None),
     grade_type: str = Form("numeric"),
-    total_mark: Optional[int] = Form(0),  # propagate desired final total to trigger recompute
-    session: Session = Depends(get_session),
+    total_mark: Optional[str] = Form(""),  # propagate desired final total to trigger recompute
+    session: Session = Depends(get_session),  # noqa: B008 - FastAPI dependency injection is intended here
 ):
     """
     Create a new assignment for the subject.
@@ -84,7 +84,7 @@ def create_assignment(
     session.commit()
 
     # If total_mark is not provided or is empty, use the subject's stored total_mark
-    if total_mark == "" or total_mark is None:
+    if total_mark in (None, ""):
         subject = session.exec(
             select(Subject).where(
                 Subject.semester_name == semester,
@@ -99,7 +99,7 @@ def create_assignment(
     # Only parse and use target_val if it is not empty or None
     if target_val not in (None, ""):
         try:
-            goal = float(target_val)
+            goal = float(str(target_val))
         except ValueError:
             goal = None
         if goal is not None and 0 < goal <= 100:
@@ -212,6 +212,20 @@ def edit_assignment_form(
     semester: str,
     session: Session = Depends(get_session),
 ):
+    """
+    Short description.
+
+    Args:
+        request: Description.
+        assessment: Description.
+        year: Description.
+        code: Description.
+        semester: Description.
+        session: Description.
+
+    Raises:
+        Description.
+    """
     assignment = session.exec(
         select(Assignment).where(
             Assignment.assessment == assessment,
@@ -250,6 +264,22 @@ def update_assignment_ajax(
     grade_type: str = Form("numeric"),
     session: Session = Depends(get_session),
 ):
+    """
+    Short description.
+
+    Args:
+        assessment: Description.
+        code: Description.
+        semester: Description.
+        year: Description.
+        weighted_mark: Description.
+        mark_weight: Description.
+        grade_type: Description.
+        session: Description.
+
+    Raises:
+        Description.
+    """
     try:
         assignment = session.exec(
             select(Assignment).where(
