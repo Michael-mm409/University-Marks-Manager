@@ -1,0 +1,28 @@
+{
+  "name": "Python 3",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bullseye",
+  "customizations": {
+    "codespaces": {
+      "openFiles": ["README.md", "src/app/main.py"]
+    },
+    "vscode": {
+      "settings": {},
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter"
+      ]
+    }
+  },
+  "updateContentCommand": "[ -f packages.txt ] && sudo apt update && sudo apt upgrade -y && sudo xargs apt install -y <packages.txt; [ -f requirements.txt ] && pip3 install --user -r requirements.txt; echo '✅ Packages installed and Requirements met'",
+  "postAttachCommand": {
+    "server": "uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000"
+  },
+  "portsAttributes": {
+    "8000": {
+      "label": "Application (FastAPI)",
+      "onAutoForward": "openPreview"
+    }
+  },
+  "forwardPorts": [8000]
+}

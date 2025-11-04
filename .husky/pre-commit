@@ -1,0 +1,19 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Build Tailwind CSS before commit
+printf "[pre-commit] Building Tailwind CSS...\n"
+npm run --silent build:css || {
+  printf "[pre-commit] CSS build failed. Aborting commit.\n" >&2
+  exit 1
+}
+
+# Check if generated CSS changed; if so, stage it and ask to re-commit
+if ! git diff --quiet -- src/static/css/tailwind.css; then
+  git add src/static/css/tailwind.css
+  printf "[pre-commit] Updated src/static/css/tailwind.css has been staged.\n" >&2
+  printf "[pre-commit] Please re-run your commit to include the updated CSS.\n" >&2
+  exit 1
+fi
+
+exit 0

@@ -1,0 +1,360 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  /* Small helper to show a tidy chevron for collapsibles */
+  .chev { width: 16px; height: 16px; opacity: 0.7; transition: transform 0.2s ease; }
+  .collapse > input[type="checkbox"]:checked + .collapse-title .chev { transform: rotate(180deg); }
+
+  /* Desktop layout */
+  .form-panels { display: grid; gap: 1.5rem; }
+  @media (min-width: 768px) {
+    .form-panels { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* Center title and position chevron */
+  .collapse-title {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center; /* Center the title text */
+  }
+  .custom-chevron {
+    position: absolute;
+    right: 1rem; /* Position chevron to the right */
+  }
+
+  /* Hide the checkbox toggle visually but keep it functional */
+  .collapse > input[type="checkbox"].sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+</style>
+<div class="flex items-start justify-between flex-wrap gap-4 mb-4">
+  <div>
+    <h2 class="text-2xl font-semibold flex items-center gap-3">
+      <span id="subject-code-display">{{subject.subject_code}}</span>
+      <span class="text-base font-normal opacity-70" id="subject-name-display">{{subject.subject_name}}</span>
+      <button id="edit-subject-btn" class="btn btn-xs btn-circle btn-ghost" type="button" onclick="showSubjectEditForm()" title="Edit subject">&#9881;</button>
+    </h2>
+    <form id="subject-edit-form" method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/update" class="flex gap-2 mt-2 hidden" onsubmit="return submitSubjectEditForm(event)">
+      <input type="hidden" name="year" value="{{year}}" />
+      <input name="subject_code" class="input input-xs w-24" value="{{subject.subject_code}}" required />
+      <input name="subject_name" class="input input-xs w-48" value="{{subject.subject_name}}" required />
+      <button type="submit" class="btn btn-xs btn-primary">Save</button>
+      <button type="button" class="btn btn-xs" onclick="hideSubjectEditForm()">Cancel</button>
+    </form>
+    <p class="mt-1 text-xs opacity-70 uppercase tracking-wide">Semester {{semester}} — {{year}}</p>
+  </div>
+  <div class="flex gap-2">
+    {% if return_to %}
+      {% set ret = return_to.split('-') %}
+  <a href="/year/{{ret[1]}}/semester/{{ret[0]}}" class="btn btn-xs btn-outline">Back to Semester</a>
+    {% else %}
+  <a href="/year/{{year}}/semester/{{semester}}" class="btn btn-xs btn-outline">Back to Semester</a>
+    {% endif %}
+    <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/delete" onsubmit="return confirm('Delete this subject and all related assignments/exams?');">
+      <input type="hidden" name="year" value="{{year}}" />
+      <button class="btn btn-xs btn-error" type="submit">Delete Subject</button>
+    </form>
+  </div>
+</div>
+
+<div class="form-panels mb-6">
+  <!-- Add Assignment (collapsible) -->
+  <div class="collapse bg-base-100 rounded-xl shadow card-glow">
+    <input id="toggle-add" type="checkbox" class="sr-only" />
+    <label for="toggle-add" class="collapse-title font-semibold cursor-pointer">
+      <span class="flex items-center gap-2">
+        Add Assignment <span class="badge badge-outline badge-sm">{{ assignments|length }} existing</span>
+      </span>
+      <svg class="custom-chevron chev" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.5a1 1 0 0 1-.71-.29l-7-7a1 1 0 1 1 1.42-1.42L12 13.09l6.29-6.3a1 1 0 1 1 1.42 1.42l-7 7a1 1 0 0 1-.71.29z"/></svg>
+    </label>
+    <div class="collapse-content">
+      {% if error_messages and error_messages|length %}
+        <div class="alert alert-error mb-4 text-sm relative" id="error-alert">
+          <button type="button" class="btn btn-xs btn-circle absolute right-2 top-2" onclick="document.getElementById('error-alert').style.display='none'">✕</button>
+          <ul class="list-disc ml-4">
+            {% for err in error_messages %}<li>{{ err }}</li>{% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/create" class="grid grid-cols-1 md:grid-cols-12 gap-3 text-sm">
+        <input type="hidden" name="year" value="{{year}}" />
+        {% if final_total is not none %}<input type="hidden" name="total_mark" value="{{ final_total }}" />{% endif %}
+        {% if effective_exam_weight %}<input type="hidden" name="exam_weight" value="{{ effective_exam_weight }}" />{% endif %}
+        {% if ps_exam %}<input type="hidden" name="ps_exam" value="true" />{% endif %}
+        {% if ps_exam and ps_factor %}<input type="hidden" name="ps_factor" value="{{ ps_factor }}" />{% endif %}
+        <input name="assessment" placeholder="Assignment" class="input input-bordered input-xs col-span-1 md:col-span-4" required />
+        <input id="weighted_mark_input" name="weighted_mark" type="number" step="any" min="0" placeholder="Weighted mark" class="input input-bordered input-xs col-span-1 md:col-span-2" />
+        <input id="mark_weight_input" name="mark_weight" type="number" step="any" min="0" placeholder="Mark weight" class="input input-bordered input-xs col-span-1 md:col-span-2" />
+        <select id="grade_type_select" name="grade_type" class="select select-bordered select-xs col-span-1 md:col-span-2">
+          <option value="numeric">Numeric</option>
+          <option value="S">S</option>
+          <option value="U">U</option>
+        </select>
+        <button class="btn btn-xs btn-primary col-span-1 md:col-span-2" type="submit">Add</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Total Mark (collapsible) -->
+  <div class="collapse bg-base-100 rounded-xl shadow card-glow">
+    <input id="toggle-total" type="checkbox" class="sr-only" />
+    <label for="toggle-total" class="collapse-title font-semibold cursor-pointer">
+      <span class="flex items-center gap-2">
+        Total Mark
+        {% if subject.total_mark is not none and subject.total_mark != 0 %}
+          <span class="badge badge-outline badge-sm">Saved</span>
+        {% else %}
+          <span class="badge badge-outline badge-sm">Not Saved Yet</span>
+        {% endif %}
+      </span>
+      <svg class="custom-chevron chev" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.5a1 1 0 0 1-.71-.29l-7-7a1 1 0 1 1 1.42-1.42L12 13.09l6.29-6.3a1 1 0 1 1 1.42 1.42l-7 7a1 1 0 0 1-.71.29z"/></svg>
+    </label>
+    <div class="collapse-content">
+      {% if show_total_mark_saved and subject.total_mark is not none and subject.total_mark != 0 %}
+        <div class="alert alert-success mb-2 relative" id="success-alert">
+          <button type="button" class="btn btn-xs btn-circle absolute right-2 top-2" onclick="document.getElementById('success-alert').style.display='none'">✕</button>
+          Total mark saved successfully.
+        </div>
+      {% endif %}
+      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/totalMark/save" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-4 text-sm">
+        <input type="hidden" name="year" value="{{year}}" />
+        <div class="col-span-1 sm:col-span-2 md:col-span-4">
+          <label class="form-control">
+            <span class="label-text text-xs">Desired Final Total Mark</span>
+            <input name="total_mark" value="{{ final_total if final_total is not none else '' }}" placeholder="e.g. 75" class="input input-bordered input-xs" />
+          </label>
+        </div>
+        <div class="col-span-1 sm:col-span-2 md:col-span-4">
+          <label class="form-control">
+            <span class="label-text text-xs">Exam Weight (%)</span>
+            <input disabled value="{{ effective_exam_weight if effective_exam_weight else 0 }}" class="input input-bordered input-xs" />
+          </label>
+        </div>
+        <div class="col-span-1 sm:col-span-1 md:col-span-2 flex items-end">
+          <label class="form-control w-full">
+            <span class="label-text text-xs">PS Factor %</span>
+            <input name="ps_factor" value="{{ ps_factor if ps_factor is not none else '40' }}" class="input input-bordered input-xs" {% if not ps_exam %}disabled{% endif %} />
+          </label>
+        </div>
+        <div class="col-span-1 sm:col-span-1 md:col-span-2 flex items-end">
+          <label class="label cursor-pointer flex gap-2 items-center text-xs">
+            <span>PS Exam?</span>
+            <input type="checkbox" name="ps_exam" value="true" class="toggle toggle-xs" {% if ps_exam %}checked{% endif %} id="ps-exam-toggle" />
+          </label>
+        </div>
+        <div class="col-span-1 sm:col-span-2 md:col-span-4 flex items-end">
+          <div class="flex gap-2 w-full">
+            <button class="btn btn-xs btn-secondary w-full" type="submit">Save Target</button>
+            <button id="confirm-reset-btn" class="btn btn-xs btn-ghost" type="button">Confirm Reset</button>
+          </div>
+        </div>
+      </form>
+      <p class="mt-2 text-xs opacity-70">Provide a desired overall final %; the system derives and stores the required raw exam mark. Exam weight is automatically set to the remaining percentage after assignments (or retained if already created).{% if ps_exam %} PS mode: only {{ effective_scoring_exam_weight }}% (factor {{ ps_factor if ps_factor is not none else 40 }}%) of this weight counts toward the average.{% endif %}</p>
+    </div>
+  </div>
+</div>
+
+<div class="mt-8">
+  <div class="tabs tabs-boxed w-full mb-4">
+    <a class="tab tab-sm tab-active" id="tab-assignments" onclick="showTab('assignments')">Assignments</a>
+    <a class="tab tab-sm" id="tab-summary" onclick="showTab('summary')">Summary</a>
+  </div>
+  <div id="panel-assignments">
+    <h4 class="font-semibold mb-2 flex items-center gap-2">Assignments</h4>
+    <div class="overflow-x-auto mb-6">
+      <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
+        <thead>
+          <tr>
+            <th>Assessment</th>
+            <th>Weighted</th>
+            <th>Unweighted</th>
+            <th>Weight</th>
+            <th>Type</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+  {% for assignment in assignments %}
+  <tr data-assessment="{{ assignment.assessment }}" data-code="{{ assignment.subject_code }}" data-semester="{{ assignment.semester_name }}" data-year="{{ assignment.year }}" class="assignment-row">
+    <td class="assignment-assessment">{{assignment.assessment}}</td>
+    <td class="assignment-weighted">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.weighted_mark|float) if assignment.weighted_mark is not none else '0.00' }}{% endif %}</td>
+    <td class="assignment-unweighted">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}{% endif %}</td>
+    <td class="assignment-mark-weight">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.mark_weight|float) if assignment.mark_weight is not none else '0.00' }}{% endif %}</td>
+    <td class="assignment-grade-type">{{assignment.grade_type}}</td>
+    <td class="flex gap-1">
+      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/{{assignment.assessment}}/{{assignment.subject_code}}/{{assignment.semester_name}}/{{assignment.year}}/delete" onsubmit="return confirm('Delete assignment?');">
+        <input type="hidden" name="year" value="{{year}}" />
+        <button class="btn btn-xs btn-error" type="submit">✕</button>
+      </form>
+      <button class="btn btn-xs btn-outline" type="button" onclick="startInlineEditAssignment('{{ assignment.assessment }}','{{ assignment.subject_code }}','{{ assignment.semester_name }}','{{ assignment.year }}')">Edit</button>
+    </td>
+  </tr>
+  {% endfor %}
+
+  <!-- end assignment loop -->
+  {% if assignments|length == 0 %}
+  <tr><td colspan="6" class="opacity-70">No assignments.</td></tr>
+  {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div id="panel-summary" class="hidden">
+    <h4 class="font-semibold mb-3 flex items-center gap-2">Summary</h4>
+    <div class="overflow-x-auto p-2">
+  <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
+        <thead>
+          <tr>
+            <th>Subject Title</th>
+            <th>Assignment Mark</th>
+            <th>Assessment Weight</th>
+            <th>Final Exam Mark</th>
+            <th>Final Exam Mark Weight</th>
+            <th>Total Mark</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{{ subject.subject_name }}</td>
+            <td>{{ '%.2f' % assignment_weighted_sum }}</td>
+            <td>{{ '%.0f' % assignment_weight_percent }}%</td>
+            <td>{{ '%.2f' % exam_mark if exam_mark is not none else '-' }}</td>
+            <td>{{ '%.0f' % effective_exam_weight if effective_exam_weight else 0 }}%</td>
+            <td>{{ '%.0f' % subject.total_mark if subject.total_mark is not none else '-' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+  window.subjectBasePath = '/semester/{{semester}}/subject/{{subject.subject_code}}';
+  window.subjectYear = '{{year}}';
+  console.log('subject.total_mark:', "{{ subject.total_mark }}");
+</script>
+<script src="/static/js/subject_page.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var saveForm = document.querySelector('form[action*="totalMark/save"]');
+    var psExamToggle = document.getElementById('ps-exam-toggle');
+    var psFactorInput = saveForm ? saveForm.querySelector('input[name="ps_factor"]') : null;
+    if (psExamToggle && psFactorInput) {
+      function updatePsFactorState() {
+        psFactorInput.disabled = !psExamToggle.checked;
+      }
+      psExamToggle.addEventListener('change', updatePsFactorState);
+      updatePsFactorState();
+    }
+    if (saveForm) {
+      saveForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        var formData = new FormData(saveForm);
+        fetch(saveForm.action, {
+          method: 'POST',
+          body: formData,
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            window.location.reload(); // Automatically refresh page
+          }
+        });
+      });
+      var resetBtn = document.getElementById('reset-total-btn');
+        var confirmResetBtn = document.getElementById('confirm-reset-btn');
+        if (confirmResetBtn) {
+          confirmResetBtn.addEventListener('click', function() {
+            if (!confirm('Are you sure you want to reset the saved total mark for this subject? This will clear the stored total.')) return;
+            // POST to dedicated reset endpoint
+            var formData = new FormData();
+            formData.append('year', window.subjectYear);
+            fetch(window.subjectBasePath + '/totalMark/reset', {
+              method: 'POST',
+              body: formData,
+              headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(r => r.json())
+            .then(data => {
+              if (data.success) window.location.reload();
+            });
+          });
+        }
+    }
+  });
+// Force correct assignment edit function after all scripts load
+window.startInlineEditAssignment = function(assessment, code, semester, year) {
+    if (window.editing_assignment_keys !== null) { window.cancelInlineEditAssignment(); }
+    window.editing_assignment_keys = { assessment, code, semester, year };
+    const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
+    if (!row) return;
+    window.original_row_html = row.innerHTML;
+    fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/edit`)
+      .then(response => response.text())
+      .then(html => {
+        console.log('Edit row HTML:', html);
+        row.innerHTML = html;
+      });
+};
+window.submitInlineEditAssignmentRow = function(assessment, code, semester, year) {
+    const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
+    console.log('[Edit] Save clicked', { assessment, code, semester, year, row });
+    if (!row) { console.warn('[Edit] Row not found'); return false; }
+    const weighted_mark = row.querySelector("input[name='weighted_mark']")?.value || '';
+    const mark_weight = row.querySelector("input[name='mark_weight']")?.value || '';
+    const grade_type = row.querySelector("select[name='grade_type']")?.value || 'numeric';
+    console.log('[Edit] Form values', { weighted_mark, mark_weight, grade_type });
+    const formData = new FormData();
+    formData.append('assessment', assessment);
+    formData.append('subject_code', code);
+    formData.append('semester_name', semester);
+    formData.append('year', year);
+    formData.append('weighted_mark', weighted_mark);
+    formData.append('mark_weight', mark_weight);
+    formData.append('grade_type', grade_type);
+    fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/update`, { method: 'POST', body: formData })
+        .then(r => {
+            console.log('[Edit] AJAX response status', r.status);
+            return r.json();
+        })
+        .then(data => {
+            console.log('[Edit] AJAX response data', data);
+            if (data.success && typeof data.row_html === 'string') {
+                row.innerHTML = data.row_html;
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>${data.error || 'Unknown error.'}</div></td>`;
+            }
+            window.editing_assignment_keys = null;
+            window.original_row_html = null;
+            console.log('[Edit] State cleared after save');
+        })
+        .catch((err) => {
+            console.error('[Edit] AJAX error', err);
+            row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>Error submitting edit.</div></td>`;
+            window.editing_assignment_keys = null;
+            window.original_row_html = null;
+            console.log('[Edit] State cleared after error');
+        });
+    return false;
+};
+window.cancelInlineEditAssignment = function() {
+  console.log('[Edit] Cancel clicked', window.editing_assignment_keys);
+  if (window.editing_assignment_keys && typeof window.editing_assignment_keys === 'object') {
+    const { assessment, code, semester, year } = window.editing_assignment_keys;
+    const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
+    if (row && window.original_row_html) {
+      row.innerHTML = window.original_row_html;
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      console.log('[Edit] Row restored after cancel');
+    } else {
+      console.warn('[Edit] Row not found or no original HTML');
+    }
+    window.editing_assignment_keys = null; window.original_row_html = null;
+    console.log('[Edit] State cleared after cancel');
+  } else {
+    window.editing_assignment_keys = null; window.original_row_html = null;
+    console.log('[Edit] State cleared (no keys to cancel)');
+  }
+};
+</script>
+{% endblock %}
