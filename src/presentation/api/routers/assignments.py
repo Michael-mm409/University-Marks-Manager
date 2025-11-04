@@ -4,7 +4,6 @@ from __future__ import annotations
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
-from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select
 
 from src.infrastructure.db.models import Assignment, GradeType
@@ -14,7 +13,7 @@ from src.presentation.api.deps import get_session
 router = APIRouter()
 
 
-@router.api_route("/", response_model=List[AssignmentRead], methods=["GET", "HEAD"], response_class=HTMLResponse)
+@router.api_route("/", response_model=List[AssignmentRead], methods=["GET", "HEAD"])
 def list_assignments(
     session: Session = Depends(get_session),
     subject_code: Optional[str] = None,
@@ -43,7 +42,7 @@ def list_assignments(
     return session.exec(stmt).all()
 
 
-@router.api_route("/", response_model=AssignmentRead, status_code=status.HTTP_201_CREATED, methods=["POST"], response_class=HTMLResponse)
+@router.api_route("/", response_model=AssignmentRead, status_code=status.HTTP_201_CREATED, methods=["POST"])
 def create_assignment(data: AssignmentCreate, session: Session = Depends(get_session)):
     """
     Create a new assignment.
@@ -110,7 +109,7 @@ def create_assignment(data: AssignmentCreate, session: Session = Depends(get_ses
     return assignment
 
 
-@router.api_route("/{assignment_id}", response_model=AssignmentRead, methods=["GET", "HEAD"], response_class=HTMLResponse)
+@router.api_route("/{assignment_id}", response_model=AssignmentRead, methods=["GET", "HEAD"])
 def get_assignment(assignment_id: int, session: Session = Depends(get_session)):
     """
     Retrieve an assignment by its ID.
@@ -131,7 +130,7 @@ def get_assignment(assignment_id: int, session: Session = Depends(get_session)):
     return a
 
 
-@router.api_route("/{assignment_id}", response_model=AssignmentRead, methods=["PUT"], response_class=HTMLResponse)
+@router.api_route("/{assignment_id}", response_model=AssignmentRead, methods=["PUT"])
 def update_assignment(assignment_id: int, data: AssignmentCreate,
                       session: Session = Depends(get_session)):
     """
@@ -172,18 +171,34 @@ def update_assignment(assignment_id: int, data: AssignmentCreate,
     if payload.get("weighted_mark") is not None:
         try:
             payload["weighted_mark"] = float(payload["weighted_mark"])
-        except Exception:
+        except (ValueError, TypeError):
             pass
+    # Guard against creating a duplicate natural key (exclude the current record)
+    duplicate = session.exec(
+        select(Assignment).where(
+            Assignment.id != assignment_id,
+            Assignment.assessment == payload["assessment"],
+            Assignment.subject_code == payload["subject_code"],
+            Assignment.semester_name == payload["semester_name"],
+            Assignment.year == payload["year"],
+        )
+    ).first()
+    if duplicate:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assignment already exists")
     for field, value in payload.items():
         setattr(assignment_record, field, value)
     # recompute unweighted if numeric
-    if assignment_record.grade_type == GradeType.NUMERIC.value and assignment_record.weighted_mark and assignment_record.mark_weight:
+    if (
+        assignment_record.grade_type == GradeType.NUMERIC.value
+        and assignment_record.weighted_mark is not None
+        and assignment_record.mark_weight not in (None, 0)
+    ):
         try:
             weighted_val = float(assignment_record.weighted_mark)
             weight = float(assignment_record.mark_weight)
             if weight:
                 assignment_record.unweighted_mark = round(weighted_val / weight, 4)
-        except ValueError:
+        except (ValueError, TypeError):
             pass
     session.add(assignment_record)
     session.commit()
