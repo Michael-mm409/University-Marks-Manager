@@ -1,3 +1,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Global size tweak: increase base font-size so the whole UI scales up */
+@layer base {
+	html { font-size: 22px; }
+    h1 { font-size: 3rem;  font-weight: 900;}
+}

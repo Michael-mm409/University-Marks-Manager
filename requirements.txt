@@ -7,5 +7,5 @@ jinja2>=3.1.6,<4.0.0
 python-multipart>=0.0.18,<1.0.0
 itsdangerous>=2.2,<3.0.0
 
-# For production use the system-built psycopg2 package
-psycopg2>=2.9.9,<3.0.0
+# Using psycopg2-binary for simpler Docker builds to avoid C-dependencies
+psycopg2-binary>=2.9.9,<3.0.0

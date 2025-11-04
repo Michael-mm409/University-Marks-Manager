@@ -3,15 +3,15 @@
 {% block content %}
 <div class="flex flex-col gap-8">
   <!-- Page heading -->
-  <div class="flex items-center justify-between gap-4">
-    <h1 class="text-2xl md:text-3xl font-bold tracking-tight">Home — Semesters for {{ selected_year or 'All years' }}</h1>
+  <div class="flex flex-col items-center text-center gap-3">
+    <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight">Home — Semesters for {{ selected_year or 'All years' }}</h2>
     <a href="/courses" class="btn btn-sm md:btn-md btn-outline">Manage Courses</a>
   </div>
   <section class="p-6 rounded-xl bg-base-100 shadow card-glow">
-    <div class="flex justify-between items-center mb-3">
-      <h2 class="text-xl font-semibold">Add Semester</h2>
+    <div class="flex flex-col items-center font-semibold justify-center mb-3">
+      <h2 class="text-2xl md:text-3xl font-bold text-center">Add Semester</h2>
     </div>
-    <form method="post" action="/semester/create" class="flex flex-wrap gap-4 items-end">
+    <form method="post" action="/semester/create" class="flex flex-wrap gap-4 items-end justify-center">
       <label class="form-control w-40">
         <span class="label-text">Name</span>
         <input name="name" class="input input-bordered input-sm" placeholder="Autumn" required />
@@ -26,20 +26,19 @@
   </section>
 
   <section>
-    <div class="flex items-center justify-between gap-4 mb-4 flex-wrap">
-      <div class="flex items-center gap-3">
-        <h2 class="text-xl font-semibold">Semesters</h2>
+    <div class="flex flex-col items-center gap-3 mb-4">
+      <div class="flex items-center gap-3 text-center">
+        <h2 class="text-2xl md:text-3xl font-bold">{{ 'Semester' if (semesters|length) == 1 else 'Semesters' }}</h2>
         <span class="badge badge-info badge-sm">{{ semesters|length }}</span>
-        {% if course_filter %}
-        <div class="text-xs opacity-70 ml-2">
-          Filtering by course:
-          <span class="font-semibold">{{ course_filter.name }}</span>
-          {% if course_filter.code %}<span class="ml-1">({{ course_filter.code }})</span>{% endif %}
-        </div>
-        {% endif %}
       </div>
+      {% if course_filter %}
+      <div class="text-xs opacity-70 text-center">
+        Filtering by course: <span class="font-semibold">{{ course_filter.name }}</span>
+        {% if course_filter.code %}<span class="ml-1">({{ course_filter.code }})</span>{% endif %}
+      </div>
+      {% endif %}
       <!-- Year Filter -->
-      <form method="get" action="/" class="flex items-end gap-3">
+      <form method="get" action="/" class="flex items-end gap-3 justify-center">
         <label class="form-control w-44">
           <span class="label-text text-xs">Filter Year</span>
           <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">

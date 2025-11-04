@@ -148,6 +148,24 @@ def home_all(request: Request, session: Session = Depends(get_session)) -> HTMLR
     return _render_home_body(request, session, None)
 
 
+@views.get("/year/{year}/semester/{semester}", response_class=HTMLResponse)
+def semester_detail_pretty(
+    request: Request,
+    year: int,
+    semester: str,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Render the semester overview page for a given year and semester.
+
+    This pretty URL replaces legacy redirects and returns a rendered
+    `semester.html` with subject summaries for the selected term.
+    """
+    ctx = build_semester_context(session, semester=semester, year=str(year))
+    # If there are no subjects/semester, still render the page with empty lists
+    # build_semester_context always returns a context dict
+    return _render(request, "semester.html", ctx)
+
+
 @views.get("/year/{year}/semester/{semester}/subject/{code}", response_class=HTMLResponse)
 def subject_detail_pretty(
         request: Request,

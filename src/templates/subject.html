@@ -26,28 +26,26 @@
   /* Hide the checkbox toggle visually but keep it functional */
   .collapse > input[type="checkbox"].sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 </style>
-<div class="flex items-start justify-between flex-wrap gap-4 mb-4">
-  <div>
-    <h2 class="text-2xl font-semibold flex items-center gap-3">
-      <span id="subject-code-display">{{subject.subject_code}}</span>
-      <span class="text-base font-normal opacity-70" id="subject-name-display">{{subject.subject_name}}</span>
-      <button id="edit-subject-btn" class="btn btn-xs btn-circle btn-ghost" type="button" onclick="showSubjectEditForm()" title="Edit subject">&#9881;</button>
-    </h2>
-    <form id="subject-edit-form" method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/update" class="flex gap-2 mt-2 hidden" onsubmit="return submitSubjectEditForm(event)">
-      <input type="hidden" name="year" value="{{year}}" />
-      <input name="subject_code" class="input input-xs w-24" value="{{subject.subject_code}}" required />
-      <input name="subject_name" class="input input-xs w-48" value="{{subject.subject_name}}" required />
-      <button type="submit" class="btn btn-xs btn-primary">Save</button>
-      <button type="button" class="btn btn-xs" onclick="hideSubjectEditForm()">Cancel</button>
-    </form>
-    <p class="mt-1 text-xs opacity-70 uppercase tracking-wide">Semester {{semester}} — {{year}}</p>
-  </div>
-  <div class="flex gap-2">
+<div class="flex flex-col items-center text-center gap-2 mb-4">
+  <h2 class="text-3xl md:text-4xl font-extrabold flex items-center gap-3 justify-center">
+    <span id="subject-code-display">{{subject.subject_code}}</span>
+    <span class="text-lg md:text-xl font-normal opacity-70" id="subject-name-display">{{subject.subject_name}}</span>
+    <button id="edit-subject-btn" class="btn btn-xs btn-circle btn-ghost" type="button" onclick="showSubjectEditForm()" title="Edit subject">&#9881;</button>
+  </h2>
+  <form id="subject-edit-form" method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/update" class="flex gap-2 mt-2 hidden justify-center" onsubmit="return submitSubjectEditForm(event)">
+    <input type="hidden" name="year" value="{{year}}" />
+    <input name="subject_code" class="input input-xs w-24" value="{{subject.subject_code}}" required />
+    <input name="subject_name" class="input input-xs w-48" value="{{subject.subject_name}}" required />
+    <button type="submit" class="btn btn-xs btn-primary">Save</button>
+    <button type="button" class="btn btn-xs" onclick="hideSubjectEditForm()">Cancel</button>
+  </form>
+  <p class="mt-1 text-xs opacity-70 uppercase tracking-wide">Semester {{semester}} — {{year}}</p>
+  <div class="flex gap-2 justify-center">
     {% if return_to %}
       {% set ret = return_to.split('-') %}
-  <a href="/year/{{ret[1]}}/semester/{{ret[0]}}" class="btn btn-xs btn-outline">Back to Semester</a>
+      <a href="/year/{{ret[1]}}/semester/{{ret[0]}}" class="btn btn-xs btn-outline">Back to Semester</a>
     {% else %}
-  <a href="/year/{{year}}/semester/{{semester}}" class="btn btn-xs btn-outline">Back to Semester</a>
+      <a href="/year/{{year}}/semester/{{semester}}" class="btn btn-xs btn-outline">Back to Semester</a>
     {% endif %}
     <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/delete" onsubmit="return confirm('Delete this subject and all related assignments/exams?');">
       <input type="hidden" name="year" value="{{year}}" />
@@ -159,7 +157,7 @@
     <a class="tab tab-sm" id="tab-summary" onclick="showTab('summary')">Summary</a>
   </div>
   <div id="panel-assignments">
-    <h4 class="font-semibold mb-2 flex items-center gap-2">Assignments</h4>
+    <h4 class="text-2xl md:text-3xl font-bold mb-2 flex items-center gap-2 justify-center text-center">Assignments</h4>
     <div class="overflow-x-auto mb-6">
       <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
         <thead>
@@ -199,7 +197,7 @@
     </div>
   </div>
   <div id="panel-summary" class="hidden">
-    <h4 class="font-semibold mb-3 flex items-center gap-2">Summary</h4>
+    <h4 class="text-2xl md:text-3xl font-bold mb-3 flex items-center gap-2 justify-center text-center">Summary</h4>
     <div class="overflow-x-auto p-2">
   <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
         <thead>
