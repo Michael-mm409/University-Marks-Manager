@@ -128,17 +128,47 @@ def upsert_assignments(pg_sess: Session, rows: list[Row]):
         subject_code = str(r._mapping.get("subject_code"))
         semester_name = str(r._mapping.get("semester_name"))
         year = str(r._mapping.get("year"))
-        weighted_mark = r._mapping.get("weighted_mark")
-        unweighted_mark = r._mapping.get("unweighted_mark")
-        mark_weight = r._mapping.get("mark_weight")
-        grade_type = r._mapping.get("grade_type")
+        grade_type = str(r._mapping.get("grade_type", "numeric"))
 
-        if not (assessment and subject_code and semester_name and year):
-            continue
-
-        exists = pg_sess.get(Assignment, (assessment, subject_code, semester_name, year))
+        # Skip if this record already exists in Postgres
+        exists = pg_sess.exec(
+            select(Assignment).where(
+                Assignment.assessment == assessment,
+                Assignment.subject_code == subject_code,
+                Assignment.semester_name == semester_name,
+                Assignment.year == year,
+            )
+        ).first()
         if exists:
             continue
+
+        # Initialize marks to None
+        w_mark, uw_mark, m_weight = None, None, None
+
+        # ONLY attempt to convert to float if the grade is numeric
+        if grade_type.lower() == "numeric":
+            raw_w_mark = r._mapping.get("weighted_mark")
+            raw_uw_mark = r._mapping.get("unweighted_mark")
+            raw_m_weight = r._mapping.get("mark_weight")
+
+            # Safely convert each value, checking for valid content first
+            if raw_w_mark is not None and str(raw_w_mark).strip() != "":
+                try:
+                    w_mark = float(raw_w_mark)
+                except (ValueError, TypeError):
+                    pass  # Keep as None if conversion fails
+            
+            if raw_uw_mark is not None and str(raw_uw_mark).strip() != "":
+                try:
+                    uw_mark = float(raw_uw_mark)
+                except (ValueError, TypeError):
+                    pass
+
+            if raw_m_weight is not None and str(raw_m_weight).strip() != "":
+                try:
+                    m_weight = float(raw_m_weight)
+                except (ValueError, TypeError):
+                    pass
 
         pg_sess.add(
             Assignment(
@@ -146,10 +176,10 @@ def upsert_assignments(pg_sess: Session, rows: list[Row]):
                 subject_code=subject_code,
                 semester_name=semester_name,
                 year=year,
-                weighted_mark=str(weighted_mark) if weighted_mark not in (None, "") else None,
-                unweighted_mark=float(unweighted_mark) if unweighted_mark not in (None, "") else None,
-                mark_weight=float(mark_weight) if mark_weight not in (None, "") else None,
-                grade_type=str(grade_type) if grade_type else "numeric",
+                weighted_mark=w_mark,
+                unweighted_mark=uw_mark,
+                mark_weight=m_weight,
+                grade_type=grade_type,
             )
         )
         created += 1

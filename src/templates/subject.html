@@ -1,5 +1,31 @@
 {% extends 'base.html' %}
 {% block content %}
+<style>
+  /* Small helper to show a tidy chevron for collapsibles */
+  .chev { width: 16px; height: 16px; opacity: 0.7; transition: transform 0.2s ease; }
+  .collapse > input[type="checkbox"]:checked + .collapse-title .chev { transform: rotate(180deg); }
+
+  /* Desktop layout */
+  .form-panels { display: grid; gap: 1.5rem; }
+  @media (min-width: 768px) {
+    .form-panels { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* Center title and position chevron */
+  .collapse-title {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center; /* Center the title text */
+  }
+  .custom-chevron {
+    position: absolute;
+    right: 1rem; /* Position chevron to the right */
+  }
+
+  /* Hide the checkbox toggle visually but keep it functional */
+  .collapse > input[type="checkbox"].sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+</style>
 <div class="flex items-start justify-between flex-wrap gap-4 mb-4">
   <div>
     <h2 class="text-2xl font-semibold flex items-center gap-3">
@@ -19,9 +45,9 @@
   <div class="flex gap-2">
     {% if return_to %}
       {% set ret = return_to.split('-') %}
-      <a href="/semester/{{ret[0]}}?year={{ret[1]}}" class="btn btn-xs btn-outline">Back to Semester</a>
+  <a href="/year/{{ret[1]}}/semester/{{ret[0]}}" class="btn btn-xs btn-outline">Back to Semester</a>
     {% else %}
-      <a href="/semester/{{semester}}?year={{year}}" class="btn btn-xs btn-outline">Back to Semester</a>
+  <a href="/year/{{year}}/semester/{{semester}}" class="btn btn-xs btn-outline">Back to Semester</a>
     {% endif %}
     <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/delete" onsubmit="return confirm('Delete this subject and all related assignments/exams?');">
       <input type="hidden" name="year" value="{{year}}" />
@@ -30,83 +56,101 @@
   </div>
 </div>
 
-<div class="p-4 md:p-5 rounded-xl bg-base-100 shadow card-glow mb-6">
-  {% if error_messages and error_messages|length %}
-    <div class="alert alert-error mb-4 text-sm relative" id="error-alert">
-      <button type="button" class="btn btn-xs btn-circle absolute right-2 top-2" onclick="document.getElementById('error-alert').style.display='none'">✕</button>
-      <ul class="list-disc ml-4">
-        {% for err in error_messages %}<li>{{ err }}</li>{% endfor %}
-      </ul>
-    </div>
-  {% endif %}
-  <h3 class="font-semibold mb-3 flex items-center gap-2">Add Assignment <span class="badge badge-outline badge-sm">{{ assignments|length }} existing</span></h3>
-  <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/create" class="grid grid-cols-1 md:grid-cols-12 gap-3 text-sm">
-  <input type="hidden" name="year" value="{{year}}" />
-  {% if final_total is not none %}<input type="hidden" name="total_mark" value="{{ final_total }}" />{% endif %}
-  {% if effective_exam_weight %}<input type="hidden" name="exam_weight" value="{{ effective_exam_weight }}" />{% endif %}
-  {% if ps_exam %}<input type="hidden" name="ps_exam" value="true" />{% endif %}
-  {% if ps_exam and ps_factor %}<input type="hidden" name="ps_factor" value="{{ ps_factor }}" />{% endif %}
-  <input name="assessment" placeholder="Assignment" class="input input-bordered input-xs col-span-1 md:col-span-4" required />
-  <input id="weighted_mark_input" name="weighted_mark" type="number" step="any" min="0" placeholder="Weighted mark" class="input input-bordered input-xs col-span-1 md:col-span-2" />
-  <input id="mark_weight_input" name="mark_weight" type="number" step="any" min="0" placeholder="Mark weight" class="input input-bordered input-xs col-span-1 md:col-span-2" />
-  <select id="grade_type_select" name="grade_type" class="select select-bordered select-xs col-span-1 md:col-span-2">
-    <option value="numeric">Numeric</option>
-    <option value="S">S</option>
-    <option value="U">U</option>
-  </select>
-  <button class="btn btn-xs btn-primary col-span-1 md:col-span-2" type="submit">Add</button>
-  </form>
-</div>
-
-<div class="p-4 md:p-5 rounded-xl bg-base-100 shadow card-glow mb-6">
-  <h3 class="font-semibold mb-3 flex items-center gap-2">Total Mark
-      {% if subject.total_mark is not none and subject.total_mark != 0 %}
-        <span class="badge badge-outline badge-sm">Saved</span>
-      {% else %}
-        <span class="badge badge-outline badge-sm">Not Saved Yet</span>
+<div class="form-panels mb-6">
+  <!-- Add Assignment (collapsible) -->
+  <div class="collapse bg-base-100 rounded-xl shadow card-glow">
+    <input id="toggle-add" type="checkbox" class="sr-only" />
+    <label for="toggle-add" class="collapse-title font-semibold cursor-pointer">
+      <span class="flex items-center gap-2">
+        Add Assignment <span class="badge badge-outline badge-sm">{{ assignments|length }} existing</span>
+      </span>
+      <svg class="custom-chevron chev" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.5a1 1 0 0 1-.71-.29l-7-7a1 1 0 1 1 1.42-1.42L12 13.09l6.29-6.3a1 1 0 1 1 1.42 1.42l-7 7a1 1 0 0 1-.71.29z"/></svg>
+    </label>
+    <div class="collapse-content">
+      {% if error_messages and error_messages|length %}
+        <div class="alert alert-error mb-4 text-sm relative" id="error-alert">
+          <button type="button" class="btn btn-xs btn-circle absolute right-2 top-2" onclick="document.getElementById('error-alert').style.display='none'">✕</button>
+          <ul class="list-disc ml-4">
+            {% for err in error_messages %}<li>{{ err }}</li>{% endfor %}
+          </ul>
+        </div>
       {% endif %}
-  </h3>
-    {% if show_total_mark_saved and subject.total_mark is not none and subject.total_mark != 0 %}
-      <div class="alert alert-success mb-2 relative" id="success-alert">
-        <button type="button" class="btn btn-xs btn-circle absolute right-2 top-2" onclick="document.getElementById('success-alert').style.display='none'">✕</button>
-        Total mark saved successfully.
-      </div>
-    {% endif %}
-  <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/totalMark/save" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-4 text-sm">
-  <input type="hidden" name="year" value="{{year}}" />
-  <!-- Remove hidden ps_exam and ps_factor inputs, use only visible ones below -->
-    <div class="col-span-1 sm:col-span-2 md:col-span-4">
-      <label class="form-control">
-        <span class="label-text text-xs">Desired Final Total Mark</span>
-        <input name="total_mark" value="{{ final_total if final_total is not none else '' }}" placeholder="e.g. 75" class="input input-bordered input-xs" />
-      </label>
+      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/create" class="grid grid-cols-1 md:grid-cols-12 gap-3 text-sm">
+        <input type="hidden" name="year" value="{{year}}" />
+        {% if final_total is not none %}<input type="hidden" name="total_mark" value="{{ final_total }}" />{% endif %}
+        {% if effective_exam_weight %}<input type="hidden" name="exam_weight" value="{{ effective_exam_weight }}" />{% endif %}
+        {% if ps_exam %}<input type="hidden" name="ps_exam" value="true" />{% endif %}
+        {% if ps_exam and ps_factor %}<input type="hidden" name="ps_factor" value="{{ ps_factor }}" />{% endif %}
+        <input name="assessment" placeholder="Assignment" class="input input-bordered input-xs col-span-1 md:col-span-4" required />
+        <input id="weighted_mark_input" name="weighted_mark" type="number" step="any" min="0" placeholder="Weighted mark" class="input input-bordered input-xs col-span-1 md:col-span-2" />
+        <input id="mark_weight_input" name="mark_weight" type="number" step="any" min="0" placeholder="Mark weight" class="input input-bordered input-xs col-span-1 md:col-span-2" />
+        <select id="grade_type_select" name="grade_type" class="select select-bordered select-xs col-span-1 md:col-span-2">
+          <option value="numeric">Numeric</option>
+          <option value="S">S</option>
+          <option value="U">U</option>
+        </select>
+        <button class="btn btn-xs btn-primary col-span-1 md:col-span-2" type="submit">Add</button>
+      </form>
     </div>
-    <div class="col-span-1 sm:col-span-2 md:col-span-4">
-      <label class="form-control">
-        <span class="label-text text-xs">Exam Weight (%)</span>
-        <input disabled value="{{ effective_exam_weight if effective_exam_weight else 0 }}" class="input input-bordered input-xs" />
-      </label>
+  </div>
+
+  <!-- Total Mark (collapsible) -->
+  <div class="collapse bg-base-100 rounded-xl shadow card-glow">
+    <input id="toggle-total" type="checkbox" class="sr-only" />
+    <label for="toggle-total" class="collapse-title font-semibold cursor-pointer">
+      <span class="flex items-center gap-2">
+        Total Mark
+        {% if subject.total_mark is not none and subject.total_mark != 0 %}
+          <span class="badge badge-outline badge-sm">Saved</span>
+        {% else %}
+          <span class="badge badge-outline badge-sm">Not Saved Yet</span>
+        {% endif %}
+      </span>
+      <svg class="custom-chevron chev" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.5a1 1 0 0 1-.71-.29l-7-7a1 1 0 1 1 1.42-1.42L12 13.09l6.29-6.3a1 1 0 1 1 1.42 1.42l-7 7a1 1 0 0 1-.71.29z"/></svg>
+    </label>
+    <div class="collapse-content">
+      {% if show_total_mark_saved and subject.total_mark is not none and subject.total_mark != 0 %}
+        <div class="alert alert-success mb-2 relative" id="success-alert">
+          <button type="button" class="btn btn-xs btn-circle absolute right-2 top-2" onclick="document.getElementById('success-alert').style.display='none'">✕</button>
+          Total mark saved successfully.
+        </div>
+      {% endif %}
+      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/totalMark/save" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-4 text-sm">
+        <input type="hidden" name="year" value="{{year}}" />
+        <div class="col-span-1 sm:col-span-2 md:col-span-4">
+          <label class="form-control">
+            <span class="label-text text-xs">Desired Final Total Mark</span>
+            <input name="total_mark" value="{{ final_total if final_total is not none else '' }}" placeholder="e.g. 75" class="input input-bordered input-xs" />
+          </label>
+        </div>
+        <div class="col-span-1 sm:col-span-2 md:col-span-4">
+          <label class="form-control">
+            <span class="label-text text-xs">Exam Weight (%)</span>
+            <input disabled value="{{ effective_exam_weight if effective_exam_weight else 0 }}" class="input input-bordered input-xs" />
+          </label>
+        </div>
+        <div class="col-span-1 sm:col-span-1 md:col-span-2 flex items-end">
+          <label class="form-control w-full">
+            <span class="label-text text-xs">PS Factor %</span>
+            <input name="ps_factor" value="{{ ps_factor if ps_factor is not none else '40' }}" class="input input-bordered input-xs" {% if not ps_exam %}disabled{% endif %} />
+          </label>
+        </div>
+        <div class="col-span-1 sm:col-span-1 md:col-span-2 flex items-end">
+          <label class="label cursor-pointer flex gap-2 items-center text-xs">
+            <span>PS Exam?</span>
+            <input type="checkbox" name="ps_exam" value="true" class="toggle toggle-xs" {% if ps_exam %}checked{% endif %} id="ps-exam-toggle" />
+          </label>
+        </div>
+        <div class="col-span-1 sm:col-span-2 md:col-span-4 flex items-end">
+          <div class="flex gap-2 w-full">
+            <button class="btn btn-xs btn-secondary w-full" type="submit">Save Target</button>
+            <button id="confirm-reset-btn" class="btn btn-xs btn-ghost" type="button">Confirm Reset</button>
+          </div>
+        </div>
+      </form>
+      <p class="mt-2 text-xs opacity-70">Provide a desired overall final %; the system derives and stores the required raw exam mark. Exam weight is automatically set to the remaining percentage after assignments (or retained if already created).{% if ps_exam %} PS mode: only {{ effective_scoring_exam_weight }}% (factor {{ ps_factor if ps_factor is not none else 40 }}%) of this weight counts toward the average.{% endif %}</p>
     </div>
-    <div class="col-span-1 sm:col-span-1 md:col-span-2 flex items-end">
-      <label class="form-control w-full">
-        <span class="label-text text-xs">PS Factor %</span>
-        <input name="ps_factor" value="{{ ps_factor if ps_factor is not none else '40' }}" class="input input-bordered input-xs" {% if not ps_exam %}disabled{% endif %} />
-      </label>
-    </div>
-    <div class="col-span-1 sm:col-span-1 md:col-span-2 flex items-end">
-      <label class="label cursor-pointer flex gap-2 items-center text-xs">
-        <span>PS Exam?</span>
-  <input type="checkbox" name="ps_exam" value="true" class="toggle toggle-xs" {% if ps_exam %}checked{% endif %} id="ps-exam-toggle" />
-      </label>
-    </div>
-    <div class="col-span-1 sm:col-span-2 md:col-span-4 flex items-end">
-      <div class="flex gap-2">
-        <button class="btn btn-xs btn-secondary w-full" type="submit">Save Target</button>
-          <button id="confirm-reset-btn" class="btn btn-xs btn-ghost" type="button">Confirm Reset</button>
-      </div>
-    </div>
-  </form>
-  <p class="mt-2 text-xs opacity-70">Provide a desired overall final %; the system derives and stores the required raw exam mark. Exam weight is automatically set to the remaining percentage after assignments (or retained if already created).{% if ps_exam %} PS mode: only {{ effective_scoring_exam_weight }}% (factor {{ ps_factor if ps_factor is not none else 40 }}%) of this weight counts toward the average.{% endif %}</p>
+  </div>
 </div>
 
 <div class="mt-8">
@@ -245,7 +289,7 @@ window.startInlineEditAssignment = function(assessment, code, semester, year) {
     if (!row) return;
     window.original_row_html = row.innerHTML;
     fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/edit`)
-      .then(r => r.text())
+      .then(response => response.text())
       .then(html => {
         console.log('Edit row HTML:', html);
         row.innerHTML = html;

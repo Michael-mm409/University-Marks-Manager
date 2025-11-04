@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="flex items-center gap-3 mb-4">
-  <a href="/?year={{year}}" class="btn btn-xs btn-outline">Back</a>
+  <a href="/year/{{year}}" class="btn btn-xs btn-outline">Back</a>
   <h2 class="text-2xl font-semibold">{{semester}} <span class="text-base font-normal opacity-70">({{year}})</span></h2>
   <span class="badge badge-info badge-sm">{{ subject_summaries|length }} subjects</span>
 </div>
@@ -54,9 +54,9 @@
         <td class="p-4 text-right font-bold">{{ '%.0f' % row.total_mark if row.total_mark is not none else '-' }}</td>
         <td class="p-4 text-right">
           {% if row.sync_subject and row.semester_name != semester %}
-            <a class="btn btn-xs btn-outline" href="/semester/{{row.semester_name}}/subject/{{row.code}}?year={{year}}&return_to={{semester}}-{{year}}">Open</a>
+            <a class="btn btn-xs btn-outline" href="/year/{{year}}/semester/{{row.semester_name}}/subject/{{row.code}}?return_to={{semester}}-{{year}}">Open</a>
           {% else %}
-            <a class="btn btn-xs btn-outline" href="/semester/{{semester}}/subject/{{row.code}}?year={{year}}">Open</a>
+            <a class="btn btn-xs btn-outline" href="/year/{{year}}/semester/{{semester}}/subject/{{row.code}}">Open</a>
           {% endif %}
         </td>
       </tr>

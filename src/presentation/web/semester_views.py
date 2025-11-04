@@ -123,36 +123,14 @@ def update_semester(
     return RedirectResponse(f"/?year={target_year}", status_code=303)
 
 
-@semester_router.api_route("/{semester}", response_class=HTMLResponse, methods=["GET", "HEAD"])
-def semester_detail(
-    request: Request,
-    semester: str,
-    year: str,
-    session: Session = Depends(get_session),
-) -> HTMLResponse:
-    """
-    Render the semester detail page listing subjects in the semester/year with summary metrics.
-    
-    Args:
-        request (Request): The incoming HTTP request.
-        semester (str): Semester name.
-        year (str): Semester year.
-        session (Session): Database session dependency.
-    
-    Returns:
-        HTMLResponse: Rendered semester detail page.
-    """
-    # Get all subjects for the year, including synced subjects from other semesters
-    subjects = session.exec(
-        select(Subject).where(Subject.year == year)
-    ).all()
-    # Only show subjects for the current semester and all synced subjects
+def build_semester_context(session: Session, semester: str, year: str) -> SemesterContext:
+    """Build the context used by the semester detail page for rendering."""
+    subjects = session.exec(select(Subject).where(Subject.year == year)).all()
     main_subjects = [s for s in subjects if s.semester_name == semester]
     synced_subjects = [s for s in subjects if s.sync_subject and s.semester_name != semester]
     display_subjects = main_subjects + synced_subjects
     summaries: List[SemesterSummary] = []
     for sub in display_subjects:
-        # Use correct semester for assignments/exams
         assignments = session.exec(
             select(Assignment).where(
                 Assignment.semester_name == sub.semester_name,
@@ -171,13 +149,11 @@ def semester_detail(
         assess_weighted_total = 0.0
         for a in assignments:
             if a.grade_type == GradeType.NUMERIC.value:
-                # Always include the assignment's weight if present, even if not yet marked
                 if a.mark_weight not in (None, ""):
                     try:
                         assess_weight_sum += float(a.mark_weight)
                     except ValueError:
                         pass
-                # Only add to weighted total when a weighted mark exists
                 if a.weighted_mark not in (None, ""):
                     try:
                         assess_weighted_total += float(a.weighted_mark)
@@ -194,7 +170,6 @@ def semester_detail(
                 exam_weight = float(exam.exam_weight)
             except (TypeError, ValueError):
                 exam_weight = None
-        # Use the saved total_mark from the database
         total_mark = sub.total_mark if sub.total_mark not in (None, 0) else None
         summaries.append(
             {
@@ -209,12 +184,20 @@ def semester_detail(
                 "sync_subject": sub.sync_subject,
             }
         )
-
-    ctx: SemesterContext = {
+    return {
         "semester": semester,
         "year": year,
         "subjects": display_subjects,
         "subject_summaries": summaries,
     }
 
-    return _render(request, "semester.html", ctx)
+
+@semester_router.api_route("/{semester}", response_class=RedirectResponse, methods=["GET", "HEAD"])
+def semester_detail(
+    request: Request,
+    semester: str,
+    year: str,
+    session: Session = Depends(get_session),
+) -> RedirectResponse:
+    """Legacy path: redirect to canonical /year/{year}/semester/{semester}."""
+    return RedirectResponse(url=f"/year/{year}/semester/{semester}", status_code=303)

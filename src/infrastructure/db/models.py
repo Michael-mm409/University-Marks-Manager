@@ -83,15 +83,19 @@ class Assignment(SQLModel, table=True):
     """Assessment item belonging to a subject (numeric or S/U)."""
 
     __tablename__: ClassVar[str] = "assignments"
-    assessment: str = Field(primary_key=True)
-    subject_code: str = Field(primary_key=True, index=True)
-    semester_name: str = Field(primary_key=True, index=True)
-    year: str = Field(primary_key=True, index=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    assessment: str = Field(index=True)
+    subject_code: str = Field(index=True)
+    semester_name: str = Field(index=True)
+    year: str = Field(index=True)
     # Store numeric weighted marks as floats. Grade type tracks S/U separately.
     weighted_mark: Optional[float] = None
     unweighted_mark: Optional[float] = None
     mark_weight: Optional[float] = None
     grade_type: str = Field(default=GradeType.NUMERIC.value)
+    __table_args__ = (
+        UniqueConstraint("assessment", "subject_code", "semester_name", "year", name="uq_assignment"),
+    )
 
 
 class Examination(SQLModel, table=True):
