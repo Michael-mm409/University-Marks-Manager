@@ -5,7 +5,15 @@
 /Azure-ttk-theme-main
 /dist
 /build
-.*/
 /node_modules
 *.bak
 src/**/*.bak
+__pycache__/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+.coverage
+.env
+.env.local
