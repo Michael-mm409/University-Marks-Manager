@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}Home — {{ selected_year or 'All years' }}{% endblock %}
+{% block content %}
+<div class="flex flex-col gap-8">
+  <!-- Page heading -->
+  <div class="flex items-center justify-between gap-4">
+    <h1 class="text-2xl md:text-3xl font-bold tracking-tight">Home — Semesters for {{ selected_year or 'All years' }}</h1>
+    <a href="/courses" class="btn btn-sm md:btn-md btn-outline">Manage Courses</a>
+  </div>
+  <section class="p-6 rounded-xl bg-base-100 shadow card-glow">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="text-xl font-semibold">Add Semester</h2>
+    </div>
+    <form method="post" action="/semester/create" class="flex flex-wrap gap-4 items-end">
+      <label class="form-control w-40">
+        <span class="label-text">Name</span>
+        <input name="name" class="input input-bordered input-sm" placeholder="Autumn" required />
+      </label>
+      <label class="form-control w-32">
+        <span class="label-text">Year</span>
+        <input name="year" type="number" class="input input-bordered input-sm" value="{{ selected_year or current_year }}" min="2000" max="2100" step="1" id="add-semester-year" />
+      </label>
+      <input type="hidden" name="return_year" value="{{ selected_year or '' }}" />
+      <button class="btn btn-sm btn-primary mt-4" type="submit">Add</button>
+    </form>
+  </section>
+
+  <section>
+    <div class="flex items-center justify-between gap-4 mb-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <h2 class="text-xl font-semibold">Semesters</h2>
+        <span class="badge badge-info badge-sm">{{ semesters|length }}</span>
+        {% if course_filter %}
+        <div class="text-xs opacity-70 ml-2">
+          Filtering by course:
+          <span class="font-semibold">{{ course_filter.name }}</span>
+          {% if course_filter.code %}<span class="ml-1">({{ course_filter.code }})</span>{% endif %}
+        </div>
+        {% endif %}
+      </div>
+      <!-- Year Filter -->
+      <form method="get" action="/" class="flex items-end gap-3">
+        <label class="form-control w-44">
+          <span class="label-text text-xs">Filter Year</span>
+          <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">
+            <option value="" {% if not selected_year %}selected{% endif %}>All</option>
+            {% for y in years %}
+              <option value="{{y}}" {% if selected_year == y %}selected{% endif %}>{{y}}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% if selected_year is not none %}
+          <a href="/all" class="btn btn-sm btn-ghost" title="Clear year filter">Reset</a>
+        {% endif %}
+      </form>
+    </div>
+
+    {% if semesters %}
+      {% include 'partials/semesters_grid.html' %}
+    {% else %}
+      <div class="p-8 rounded-xl border-dashed border-2 text-center opacity-70">
+        No semesters{% if selected_year %} for {{selected_year}}{% endif %}
+        {% if course_filter %}in this course{% endif %}. Add your first above.
+      </div>
+    {% endif %}
+  </section>
+
+  <script>
+    // Dynamically set the default year to the current year
+    document.addEventListener('DOMContentLoaded', function() {
+      var yearInput = document.getElementById('add-semester-year');
+      // Only set if the input is empty to avoid overriding server-provided value
+      if (yearInput && (!yearInput.value || yearInput.value.toString().trim() === '')) {
+        yearInput.value = new Date().getFullYear();
+      }
+    });
+  </script>
+</div>
+{% endblock %}

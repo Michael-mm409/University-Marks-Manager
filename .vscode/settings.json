@@ -1,0 +1,8 @@
+{
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportAttributeAccessIssue": "information"
+  },
+  "python.analysis.extraPaths": ["./"],
+  "python.analysis.stubPath": "./stubs"
+}

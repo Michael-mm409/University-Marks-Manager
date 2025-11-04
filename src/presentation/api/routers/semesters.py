@@ -1,0 +1,124 @@
+"""Semester API endpoints."""
+from __future__ import annotations
+
+from typing import List, Optional, Sequence
+
+from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi.responses import HTMLResponse
+from sqlmodel import Session, select
+
+from src.infrastructure.db.models import Semester
+from src.presentation.api.schemas import SemesterCreate, SemesterRead
+from src.presentation.api.deps import get_session
+
+semester_router = APIRouter()
+
+
+@semester_router.api_route("/", response_model=List[SemesterRead], methods=["GET", "HEAD"])
+def list_semesters(session: Session = Depends(get_session), year: Optional[int] = None) -> Sequence[Semester]:
+    """
+    List all semesters, optionally filtered by year.
+    
+    Args:
+        session (Session): Database session dependency.
+        year (Optional[str]): Year to filter semesters by.
+        
+    Returns:
+        Sequence[Semester]: List of semesters.
+    """
+    stmt = select(Semester)
+    if year:
+        stmt = stmt.where(Semester.year == year)
+    return session.exec(stmt).all()
+
+
+@semester_router.api_route("/", response_model=SemesterRead, status_code=status.HTTP_201_CREATED, methods=["POST"])
+def create_semester(data: SemesterCreate, session: Session = Depends(get_session)) -> Semester:
+    """
+    Create a new semester if it does not already exist.
+    
+    Args:
+        data (Semester): Semester data to create.
+        session (Session): Database session dependency.
+    
+    Returns:
+        Semester: The created semester.
+    """
+    exists = session.exec(
+        select(Semester).where(Semester.name == data.name, Semester.year == data.year)
+    ).first()
+    if exists:
+        raise HTTPException(status_code=409, detail="Semester already exists")
+    sem = Semester(name=data.name, year=data.year)
+    session.add(sem)
+    session.commit()
+    session.refresh(sem)
+    return sem
+
+
+@semester_router.api_route("/{semester_id}", response_model=SemesterRead, methods=["GET", "HEAD"])
+def get_semester(semester_id: int, session: Session = Depends(get_session)) -> Semester:
+    """
+    Retrieve a semester by its ID.
+
+    Args:
+        semester_id (int): The ID of the semester to retrieve.
+        session (Session): Database session dependency.
+    
+    Returns:
+        Semester: The requested semester.
+    """
+    sem = session.get(Semester, semester_id)
+    if not sem:
+        raise HTTPException(status_code=404, detail="Not found")
+    return sem
+
+@semester_router.api_route("/{semester_id}", response_model=SemesterRead, methods=["PUT"])
+def update_semester(semester_id: int, data: SemesterCreate, session: Session = Depends(get_session)) -> Semester:
+    """
+    Update an existing semester's details.
+    
+    Args:
+        semester_id (int): The ID of the semester to update.
+        data (Semester): Updated semester data.
+        session (Session): Database session dependency.
+    
+    Returns:
+        Semester: The updated semester.
+    """
+    sem = session.get(Semester, semester_id)
+    if not sem:
+        raise HTTPException(status_code=404, detail="Not found")
+    conflict = session.exec(
+        select(Semester).where(
+            Semester.name == data.name,
+            Semester.year == data.year,
+            Semester.id != semester_id,
+        )
+    ).first()
+    if conflict:
+        raise HTTPException(status_code=409, detail="Semester already exists")
+    sem.name = data.name
+    sem.year = data.year
+    session.add(sem)
+    session.commit()
+    session.refresh(sem)
+    return sem
+
+@semester_router.api_route("/{semester_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response, methods=["DELETE"])
+def delete_semester(semester_id: int, session: Session = Depends(get_session)) -> Response:
+    """
+    Delete a semester by its ID.
+    
+    Args:
+        semester_id (int): The ID of the semester to delete.
+        session (Session): Database session dependency.
+    """
+    sem = session.get(Semester, semester_id)
+    if not sem:
+        raise HTTPException(status_code=404, detail="Not found")
+    session.delete(sem)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+__all__ = ["semester_router"]
