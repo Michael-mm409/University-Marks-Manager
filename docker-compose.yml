@@ -24,6 +24,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}
       - ENABLE_DEBUG_ROUTES=${ENABLE_DEBUG_ROUTES}
+      - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
     # Mark the web app healthy only when /healthz responds OK; helps avoid transient 502s on restart
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz').getcode()==200 else 1)\""]

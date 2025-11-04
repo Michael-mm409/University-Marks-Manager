@@ -82,6 +82,63 @@ Target total logic only recalculates if `total_mark` parameter (or stored subjec
 
 If using SQLite and fast reloads, occasional lock errors can occur. Stop the server, wait a moment, restart. Consider WAL mode for advanced usage.
 
+## Postgres: password authentication failed for user
+
+Symptom in container logs:
+
+```text
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "db" (…): FATAL:  password authentication failed for user "<user>"
+```
+
+Why this happens:
+
+- The Postgres Docker image initializes the database only on the first start of the data volume. After that, changing `POSTGRES_USER`/`POSTGRES_PASSWORD` in `.env` will NOT change the existing database cluster. If your `db` service uses a named volume (e.g. `postgres_data_nas`), your previous credentials remain in effect.
+- Also ensure your `DATABASE_URL` matches the actual username/password and database name. If your password includes special characters like `@ : / # ? & % +`, URL-encode it in the URL.
+
+Fix options:
+
+1. Keep the existing data and align credentials
+
+- Exec into the DB container and reset or create the role to match `.env`:
+
+```sh
+docker compose exec db psql -U postgres -d postgres -c "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='Michael') THEN CREATE ROLE \"Michael\" LOGIN PASSWORD 'Mickyb22*'; ELSE ALTER ROLE \"Michael\" WITH LOGIN PASSWORD 'Mickyb22*'; END IF; END $$;"
+```
+
+- If needed, ensure the database exists and has an owner (replace names as appropriate):
+
+```sh
+docker compose exec db psql -U postgres -d postgres -c "CREATE DATABASE \"marks-manager-db\" OWNER \"Michael\";"
+```
+
+Notes:
+
+- If your superuser is not `postgres`, use that username in `-U`.
+- Local socket auth inside the container typically allows `-U postgres` without a password; if prompted, supply the superuser password you initialized with.
+
+2. Recreate the database volume (data loss)
+
+If this is a fresh dev setup or you can discard existing Postgres data:
+
+```sh
+docker compose down -v
+docker compose up -d --build
+```
+
+This removes the named volume and reinitializes Postgres using the current `.env` values for `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`.
+
+URL-encoding tip (PowerShell):
+
+```powershell
+[System.Uri]::EscapeDataString("YourP@ss:Word")
+```
+
+Then set `DATABASE_URL` like:
+
+```
+DATABASE_URL=postgresql://user:URLEncodedPassword@db/dbname
+```
+
 ## How to Rebuild Tailwind CSS
 
 ```sh

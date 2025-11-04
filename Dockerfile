@@ -24,6 +24,16 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
+# Install build dependencies for psycopg2 and potentially other packages
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    # Packages required to build psycopg2:
+    gcc \
+    pkg-config \
+    libpq-dev \
+    # Clean up to keep image size down
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy requirements and install Python dependencies
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt

@@ -11,7 +11,7 @@ subject_router = APIRouter()
 
 @subject_router.api_route("/subject/create", methods=["POST"])
 def create_subject(
-    semester: str = Form(...),
+    semester: str,
     year: str = Form(...),
     subject_code: str = Form(...),
     subject_name: str = Form(...),
