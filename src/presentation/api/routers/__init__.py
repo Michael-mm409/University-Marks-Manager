@@ -49,18 +49,14 @@ def api_debug(request: Request) -> dict:
 		if isinstance(p, str):
 			paths.append(p)
 	def present(path: str) -> bool:
-     """
-     Short description.
+		"""Return whether the given path is present in the collected paths.
 
-     Args:
-         path: Description.
+		Args:
+			path: Path to check.
 
-     Returns:
-         Description.
-
-     Raises:
-         Description.
-     """
+		Returns:
+			True if the path exists in the routes list, False otherwise.
+		"""
 		return path in paths
 	return {
 		"routes_present": {

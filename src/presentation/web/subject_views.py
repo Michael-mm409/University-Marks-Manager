@@ -11,7 +11,7 @@ subject_router = APIRouter()
 
 @subject_router.api_route("/subject/create", methods=["POST"])
 def create_subject(
-    semester: str,
+    semester: str = Form(...),
     year: str = Form(...),
     subject_code: str = Form(...),
     subject_name: str = Form(...),
@@ -92,12 +92,16 @@ def build_subject_context(
 
     assignment_weighted_sum = 0.0
     assignment_weight_percent = 0.0
-    for a in assignments:
-        if a.grade_type == GradeType.NUMERIC.value and a.weighted_mark and a.mark_weight:
+    for assignment_record in assignments:
+        if (
+            assignment_record.grade_type == GradeType.NUMERIC.value
+            and assignment_record.weighted_mark is not None
+            and assignment_record.mark_weight is not None
+        ):
             try:
-                assignment_weighted_sum += float(a.weighted_mark)
-                assignment_weight_percent += float(a.mark_weight)
-            except ValueError:
+                assignment_weighted_sum += float(assignment_record.weighted_mark)
+                assignment_weight_percent += float(assignment_record.mark_weight)
+            except (TypeError, ValueError):
                 pass
 
     exam_raw_percent: Optional[float] = None

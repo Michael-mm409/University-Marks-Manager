@@ -172,6 +172,7 @@
     outline-style: none;
   }
 }
+
 @property --tw-rotate-x {
   syntax: "*";
   inherits: false;

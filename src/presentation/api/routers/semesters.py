@@ -89,6 +89,15 @@ def update_semester(semester_id: int, data: SemesterCreate, session: Session = D
     sem = session.get(Semester, semester_id)
     if not sem:
         raise HTTPException(status_code=404, detail="Not found")
+    conflict = session.exec(
+        select(Semester).where(
+            Semester.name == data.name,
+            Semester.year == data.year,
+            Semester.id != semester_id,
+        )
+    ).first()
+    if conflict:
+        raise HTTPException(status_code=409, detail="Semester already exists")
     sem.name = data.name
     sem.year = data.year
     session.add(sem)

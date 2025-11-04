@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlmodel import Session, select
 from src.infrastructure.db.models import Assignment, ExamSettings, Examination, GradeType, Subject
 from src.presentation.api.deps import get_session
+from html import escape
 
 assignment_router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ def create_assignment(
     weighted_mark: Optional[float] = Form(None),
     mark_weight: Optional[float] = Form(None),
     grade_type: str = Form("numeric"),
-    total_mark: Optional[str] = Form(""),  # propagate desired final total to trigger recompute
+    total_mark: Optional[str] = Form(None),  # propagate desired final total to trigger recompute
     session: Session = Depends(get_session),  # noqa: B008 - FastAPI dependency injection is intended here
 ):
     """
@@ -348,6 +349,23 @@ def update_assignment_ajax(
                         assess_weighted_total += float(a.weighted_mark)
                     except ValueError:
                         pass
+            # Prepare escaped/display values for the updated row (prevent stored XSS)
+            assessment_value = escape(assignment.assessment or "")
+            weighted_value = "-" if assignment.grade_type in ("S", "U") else (
+                f"{float(assignment.weighted_mark):.2f}" if assignment.weighted_mark is not None else "0.00"
+            )
+            unweighted_value = "-" if assignment.grade_type in ("S", "U") else (
+                f"{float(assignment.unweighted_mark):.2f}" if assignment.unweighted_mark is not None else "0.00"
+            )
+            mark_weight_value = "-" if assignment.grade_type in ("S", "U") else (
+                f"{float(assignment.mark_weight):.2f}" if assignment.mark_weight is not None else "0.00"
+            )
+            grade_type_value = escape(assignment.grade_type or "")
+            assessment_key = escape(assessment)
+            code_key = escape(code)
+            semester_key = escape(semester)
+            year_key = escape(year)
+
             exam_mark = None
             exam_weight = None
             if exams:

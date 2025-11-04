@@ -1,11 +1,15 @@
 {
   "scripts": {
     "watch": "tailwindcss -i ./src/static/css/input.css -o ./src/static/css/tailwind.css --watch",
-    "build:css": "tailwindcss -i ./src/static/css/input.css -o ./src/static/css/tailwind.css --minify"
+    "build:css": "tailwindcss -i ./src/static/css/input.css -o ./src/static/css/tailwind.css --minify",
+    "prepare": "husky install"
   },
   "dependencies": {
     "@tailwindcss/cli": "^4.1.13",
     "tailwindcss": "^4.1.13",
     "daisyui": "^4.12.10"
+  },
+  "devDependencies": {
+    "husky": "^9.0.0"
   }
 }

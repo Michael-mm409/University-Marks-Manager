@@ -11,23 +11,21 @@ from src.presentation.api.schemas import ExaminationCreate, ExaminationRead
 from src.presentation.api.deps import get_session
 
 router = APIRouter()
-
-
 @router.get("/", response_model=List[ExaminationRead])
 def list_exams(
-	session: Session = Depends(get_session),
-	subject_code: Optional[str] = None,
-	semester_name: Optional[str] = None,
-	year: Optional[str] = None,
+    session: Session = Depends(get_session),
+    subject_code: Optional[str] = None,
+    semester_name: Optional[str] = None,
+    year: Optional[str] = None,
 ) -> Sequence[Examination]:
     """
     List all exams, optionally filtered by subject code, semester name, and year.
-	
-	Args:
-	    session (Session): Database session dependency.
+    
+    Args:
+        session (Session): Database session dependency.
         subject_code (Optional[str]): Subject code to filter exams by.
-		semester_name (Optional[str]): Semester name to filter exams by.
-		year (Optional[str]): Year to filter exams by.
+        semester_name (Optional[str]): Semester name to filter exams by.
+        year (Optional[str]): Year to filter exams by.
     Returns:
         Sequence[Examination]: List of examinations.
     """
@@ -93,45 +91,34 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
     return exam
 
 
-@router.get("/{exam_id}", response_model=ExaminationRead)
-def get_exam(exam_id: int, session: Session = Depends(get_session)) -> Examination:
+@router.get("/{subject_code}/{semester_name}/{year}", response_model=ExaminationRead)
+def get_exam(
+    subject_code: str,
+    semester_name: str,
+    year: str,
+    session: Session = Depends(get_session),
+) -> Examination:
     """
-    Retrieve an examination by its ID.
-    
-    Args:
-        exam_id (int): The ID of the examination to retrieve.
-        session (Session): Database session dependency.
-
-    Raises:
-        HTTPException: If the examination is not found (404).
-    
-    Returns:
-        Examination: The requested examination.
+    Retrieve an examination by its composite primary key (subject_code, semester_name, year).
     """
-    exam = session.get(Examination, exam_id)
+    exam = session.get(Examination, (subject_code, semester_name, year))
     if not exam:
         raise HTTPException(status_code=404, detail="Not found")
     return exam
 
 
-@router.put("/{exam_id}", response_model=ExaminationRead)
-def update_exam(exam_id: int, data: ExaminationCreate,
-                session: Session = Depends(get_session)) -> Examination:
+@router.put("/{subject_code}/{semester_name}/{year}", response_model=ExaminationRead)
+def update_exam(
+    subject_code: str,
+    semester_name: str,
+    year: str,
+    data: ExaminationCreate,
+    session: Session = Depends(get_session),
+) -> Examination:
     """
-    Update an existing examination's details.
-    
-    Args:
-        exam_id (int): The ID of the examination to update.
-        data (Examination): Updated examination data.
-        session (Session): Database session dependency.
-    
-    Raises:
-        HTTPException: If the examination is not found (404).
-    
-    Returns:
-        Examination: The updated examination.
+    Update an existing examination's details identified by its composite primary key.
     """
-    exam = session.get(Examination, exam_id)
+    exam = session.get(Examination, (subject_code, semester_name, year))
     if not exam:
         raise HTTPException(status_code=404, detail="Not found")
     # Only assign exam_mark if the client provided a value (it may be optional in the schema)
@@ -144,24 +131,23 @@ def update_exam(exam_id: int, data: ExaminationCreate,
     session.refresh(exam)
     return exam
 
-@router.delete("/{exam_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
-def delete_exam(exam_id: int, session: Session = Depends(get_session)) -> Response:
-    """
-    Delete an examination by its ID.
-    
-    Args:
-        exam_id (int): The ID of the examination to delete.
-        session (Session): Database session dependency.
 
-    Raises:
-        HTTPException: If the examination is not found (404).
-    
+@router.delete("/{subject_code}/{semester_name}/{year}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+def delete_exam(
+    subject_code: str,
+    semester_name: str,
+    year: str,
+    session: Session = Depends(get_session),
+) -> Response:
     """
-    exam = session.get(Examination, exam_id)
+    Delete an examination by its composite primary key.
+    """
+    exam = session.get(Examination, (subject_code, semester_name, year))
     if not exam:
         raise HTTPException(status_code=404, detail="Not found")
     session.delete(exam)
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 
 __all__ = ["router"]

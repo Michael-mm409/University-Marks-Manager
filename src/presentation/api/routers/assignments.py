@@ -56,13 +56,18 @@ def create_assignment(data: AssignmentCreate, session: Session = Depends(get_ses
         Assignment: The created assignment.
     """
     # For numeric grades compute unweighted when possible
-    if data.grade_type == GradeType.NUMERIC.value and data.weighted_mark and data.mark_weight:
+    if (
+        data.grade_type == GradeType.NUMERIC.value
+        and data.weighted_mark is not None
+        and data.mark_weight not in (None, 0)
+    ):
         try:
             weighted_val = float(data.weighted_mark)
             weight = float(data.mark_weight)
+            # weight parsed; division-by-zero is guarded by `if weight:` below
             if weight:
                 data.unweighted_mark = round(weighted_val / weight, 4)
-        except ValueError:
+        except (ValueError, TypeError):
             pass
     # Safely obtain a dict payload from the SQLModel/Pydantic object. Some language servers
     # may not recognize `model_dump` (pydantic v2). Fall back to `dict` when needed.
@@ -77,6 +82,27 @@ def create_assignment(data: AssignmentCreate, session: Session = Depends(get_ses
         except Exception:
             # If conversion fails, leave as-is and let the ORM/DB raise if invalid
             pass
+    duplicate = session.exec(
+        select(Assignment).where(
+            Assignment.assessment == payload["assessment"],
+            Assignment.subject_code == payload["subject_code"],
+            Assignment.semester_name == payload["semester_name"],
+            Assignment.year == payload["year"],
+        )
+    ).first()
+    if duplicate:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assignment already exists")
+    duplicate = session.exec(
+        select(Assignment).where(
+            Assignment.assessment == payload["assessment"],
+            Assignment.subject_code == payload["subject_code"],
+            Assignment.semester_name == payload["semester_name"],
+            Assignment.year == payload["year"],
+        )
+    ).first()
+
+    if duplicate:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assignment already exists")
     assignment = Assignment(**payload)
     session.add(assignment)
     session.commit()
@@ -120,10 +146,22 @@ def update_assignment(assignment_id: int, data: AssignmentCreate,
         HTTPException: If the assignment is not found (404).
     
     Returns:
+        if (
+            a.grade_type == GradeType.NUMERIC.value
+            and a.weighted_mark is not None
+            and a.mark_weight not in (None, 0)
+        ):
+            try:
+                weighted_val = float(a.weighted_mark)
+                weight = float(a.mark_weight)
+                if weight:
+                    a.unweighted_mark = round(weighted_val / weight, 4)
+            except (ValueError, TypeError):
+                pass
         Assignment: The updated assignment.
     """
-    a = session.get(Assignment, assignment_id)
-    if not a:
+    assignment_record = session.get(Assignment, assignment_id)
+    if not assignment_record:
         raise HTTPException(status_code=404, detail="Not found")
     # Safely obtain payload dict (see create_assignment note)
     if hasattr(data, "model_dump"):
@@ -137,20 +175,20 @@ def update_assignment(assignment_id: int, data: AssignmentCreate,
         except Exception:
             pass
     for field, value in payload.items():
-        setattr(a, field, value)
+        setattr(assignment_record, field, value)
     # recompute unweighted if numeric
-    if a.grade_type == GradeType.NUMERIC.value and a.weighted_mark and a.mark_weight:
+    if assignment_record.grade_type == GradeType.NUMERIC.value and assignment_record.weighted_mark and assignment_record.mark_weight:
         try:
-            weighted_val = float(a.weighted_mark)
-            weight = float(a.mark_weight)
+            weighted_val = float(assignment_record.weighted_mark)
+            weight = float(assignment_record.mark_weight)
             if weight:
-                a.unweighted_mark = round(weighted_val / weight, 4)
+                assignment_record.unweighted_mark = round(weighted_val / weight, 4)
         except ValueError:
             pass
-    session.add(a)
+    session.add(assignment_record)
     session.commit()
-    session.refresh(a)
-    return a
+    session.refresh(assignment_record)
+    return assignment_record
 
 
 @router.api_route("/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response, methods=["DELETE"])

@@ -119,17 +119,27 @@ docker compose build web; docker compose up -d
 - View logs (follow): `docker compose logs -f`
 - Exec in web container: `docker compose exec web bash`
 
-## 🧪 Optional Tailwind Build (Local Compilation)
+## 🧪 Tailwind CSS (Local Compilation)
 
 If you want to remove CDN usage:
 
 ```powershell
-npm init -y
-npm install -D tailwindcss daisyui
-npx tailwindcss -i ./static/css/tailwind.input.css -o ./static/css/tailwind.css --watch
+npm install
+npm run watch
 ```
 
-Then include `<link rel="stylesheet" href="/static/css/tailwind.css" />` in `base.html` and remove CDN script.
+Or build once for production:
+
+```powershell
+npm run build:css
+```
+
+Inputs/outputs:
+
+- Source: `src/static/css/input.css`
+- Output: `src/static/css/tailwind.css`
+
+Note: A Git pre-commit hook (Husky) runs `npm run build:css` and will stage an updated `src/static/css/tailwind.css` if it changes, then ask you to re-run your commit.
 
 See `docs/tailwind-cli-install.md` for full details.
 
