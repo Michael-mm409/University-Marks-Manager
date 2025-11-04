@@ -1,13 +1,8 @@
 {
-    "files.associations": {
-        "iostream": "cpp",
-        "stdexcept": "cpp",
-        "unordered_map": "cpp"
-    },
-    "python.analysis.typeCheckingMode": "basic",
-    "python.analysis.diagnosticSeverityOverrides": {
-        "reportAttributeAccessIssue": "information"
-    },
-    "python.analysis.extraPaths": ["./"],
-    "python.analysis.stubPath": "./stubs"
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportAttributeAccessIssue": "information"
+  },
+  "python.analysis.extraPaths": ["./"],
+  "python.analysis.stubPath": "./stubs"
 }
