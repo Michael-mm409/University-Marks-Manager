@@ -73,5 +73,16 @@ def fix_schema():
             else:
                 print("grade_scales.scale_name exists.")
 
+        # 5. Check courses.grading_scale
+        if "courses" in inspector.get_table_names():
+            cols = [c["name"] for c in inspector.get_columns("courses")]
+            if "grading_scale" not in cols:
+                print("Adding grading_scale to courses...")
+                conn.execute(text("ALTER TABLE courses ADD COLUMN grading_scale VARCHAR DEFAULT 'Standard'"))
+                conn.commit()
+                print("Added grading_scale to courses.")
+            else:
+                print("courses.grading_scale exists.")
+
 if __name__ == "__main__":
     fix_schema()

@@ -21,7 +21,8 @@ class GradeCalculator:
                 GradeScale(scale_name="Standard", grade="HD", label="High Distinction", min_mark=85.0, gpa_point=4.0),
                 GradeScale(scale_name="Standard", grade="D", label="Distinction", min_mark=75.0, gpa_point=3.7),
                 GradeScale(scale_name="Standard", grade="C", label="Credit", min_mark=65.0, gpa_point=3.3),
-                GradeScale(scale_name="Standard", grade="P", label="Pass", min_mark=50.0, gpa_point=2.0),
+                GradeScale(scale_name="Standard", grade="P", label="Pass", min_mark=50.01, gpa_point=2.0),
+                GradeScale(scale_name="Standard", grade="PS", label="Pass Supplementary", min_mark=50.0, gpa_point=2.0),
                 GradeScale(scale_name="Standard", grade="F", label="Fail", min_mark=0.0, gpa_point=0.0),
             ]
             for d in defaults:

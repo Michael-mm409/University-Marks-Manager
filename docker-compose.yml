@@ -18,7 +18,7 @@ services:
       dockerfile: Dockerfile
     image: university-marks-manager:fastapi
     # Development-friendly command: enables live reload for Python/template changes
-    command: uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --reload --reload-dir /app/src --reload-dir /app/src/templates
+    command: uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --reload --reload-dir /app/src --reload-dir /app/src/templates --log-level info
     restart: unless-stopped
     env_file:
       - .env

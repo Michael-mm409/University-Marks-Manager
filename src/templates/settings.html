@@ -19,7 +19,15 @@
         <div>
           Editing configuration for active course: <strong>{{ course.name }}</strong>
           <br>
-          Current Scale: <span class="badge badge-sm">{{ current_scale_name }}</span>
+          <form action="/settings/scale/update" method="post" style="display:inline">
+            <label for="scale_name" class="mr-2">Current Scale:</label>
+            <select name="scale_name" id="scale_name" class="select select-sm select-bordered" onchange="this.form.submit()">
+              {% for scale in all_scale_names %}
+                <option value="{{ scale }}" {% if scale == current_scale_name %}selected{% endif %}>{{ scale }}</option>
+              {% endfor %}
+            </select>
+            <noscript><button type="submit" class="btn btn-sm ml-2">Change</button></noscript>
+          </form>
         </div>
       </div>
       {% else %}
@@ -38,7 +46,16 @@
       </p>
 
       <form action="/settings/grades/update" method="post">
-        <input type="hidden" name="scale_name" value="{{ current_scale_name }}" />
+        <div class="mb-4 flex items-center">
+          <label for="scale_name" class="mr-2 font-semibold">Scale Name:</label>
+          <input type="text" id="scale_name" name="scale_name" class="input input-bordered input-sm w-48" value="{{ current_scale_name }}" list="all_scale_names" required />
+          <datalist id="all_scale_names">
+            {% for scale in all_scale_names %}
+              <option value="{{ scale }}">{{ scale }}</option>
+            {% endfor %}
+          </datalist>
+          <span class="ml-2 text-xs opacity-60">(Type a new name to create a new scale)</span>
+        </div>
         <div class="overflow-x-auto">
           <table class="table table-zebra w-full">
             <thead>
