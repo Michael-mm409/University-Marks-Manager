@@ -39,8 +39,10 @@ class Semester(SQLModel, table=True):
     name: str = Field(index=True)
     year: int = Field(index=True)
     course_id: Optional[int] = Field(default=None, foreign_key="courses.id")
+    # Target uniqueness per UML: one (name, year) per course
+    # NOTE: Applying this change requires a DB migration (updates constraint name and keys)
     __table_args__ = (
-        UniqueConstraint("name", "year", name="uq_semester_name_year"),
+        UniqueConstraint("course_id", "name", "year", name="uq_semester_course_name_year"),
     )
 
     # Relationship is attached after class definitions to avoid forward-ref issues
@@ -53,10 +55,13 @@ class Subject(SQLModel, table=True):
     __tablename__: ClassVar[str] = "subjects"
     id: Optional[int] = Field(default=None, primary_key=True)
     subject_code: str = Field(index=True)
+    # New: FK to semesters.id for normalized schema (backfilled by migration)
+    semester_id: Optional[int] = Field(default=None, foreign_key="semesters.id", index=True)
     semester_name: str = Field(index=True)
     year: str = Field(index=True)
     subject_name: str
     total_mark: Optional[float] = 0.0
+    credit_points: int = Field(default=6)
     sync_subject: bool = False
 
     # NOTE:
@@ -77,6 +82,7 @@ class Course(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     code: str = Field(index=True)
+    grading_scale: str = Field(default="Standard")
     __table_args__ = (
         UniqueConstraint("code", name="uq_course_code"),
         UniqueConstraint("name", "code", name="uq_course_name_code"),
@@ -94,8 +100,10 @@ class Assignment(SQLModel, table=True):
     """Assessment item belonging to a subject (numeric or S/U)."""
 
     __tablename__: ClassVar[str] = "assignments"
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int = Field(default=None, primary_key=True)
     assessment: str = Field(index=True)
+    # New: FK to subjects.id (backfilled by migration; NOT NULL after migration)
+    subject_id: Optional[int] = Field(default=None, foreign_key="subjects.id", index=True)
     subject_code: str = Field(index=True)
     semester_name: str = Field(index=True)
     year: str = Field(index=True)
@@ -104,6 +112,7 @@ class Assignment(SQLModel, table=True):
     unweighted_mark: Optional[float] = None
     mark_weight: Optional[float] = None
     grade_type: str = Field(default=GradeType.NUMERIC.value)
+    is_exam: bool = Field(default=False)
     __table_args__ = (
         UniqueConstraint("assessment", "subject_code", "semester_name", "year", name="uq_assignment"),
     )
@@ -113,6 +122,8 @@ class Examination(SQLModel, table=True):
     """Single exam record per subject."""
 
     __tablename__: ClassVar[str] = "examinations"
+    # New: FK to subjects.id (backfilled by migration; NOT NULL after migration)
+    subject_id: Optional[int] = Field(default=None, foreign_key="subjects.id", index=True)
     subject_code: str = Field(primary_key=True, index=True)
     semester_name: str = Field(primary_key=True, index=True)
     year: str = Field(primary_key=True, index=True)
@@ -128,11 +139,30 @@ class ExamSettings(SQLModel, table=True):
     """
 
     __tablename__: ClassVar[str] = "exam_settings"
+    # New: FK to subjects.id (backfilled by migration; NOT NULL after migration)
+    subject_id: Optional[int] = Field(default=None, foreign_key="subjects.id", index=True)
     subject_code: str = Field(primary_key=True, index=True)
     semester_name: str = Field(primary_key=True, index=True)
     year: str = Field(primary_key=True, index=True)
     ps_exam: bool = False
     ps_factor: float = 40.0
+
+
+class GradeScale(SQLModel, table=True):
+    """
+    Configuration for grade bands (e.g. HD, D, C, P, F).
+    Allows customizing thresholds and GPA points.
+    """
+    __tablename__: ClassVar[str] = "grade_scales"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    scale_name: str = Field(default="Standard", index=True)
+    grade: str  # e.g. "HD"
+    label: str  # e.g. "High Distinction"
+    min_mark: float  # e.g. 85.0
+    gpa_point: float  # e.g. 4.0
+    __table_args__ = (
+        UniqueConstraint("scale_name", "grade", name="uq_scale_grade"),
+    )
 
 
 __all__ = [
@@ -144,6 +174,7 @@ __all__ = [
     "ExamSettings",
     "Course",
     "CourseSubjectLink",
+    "GradeScale",
 ]
 
 # Attach relationships explicitly after all classes are defined to avoid

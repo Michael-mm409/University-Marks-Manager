@@ -5,12 +5,13 @@ from typing import Optional, List, cast
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlmodel import Session, select
 
 from src.presentation.api.deps import get_session
 from src.infrastructure.db.models import (
     Semester,
+    Subject,
 )
 from .template_helpers import _render
 from .assignment_views import assignment_router
@@ -18,9 +19,11 @@ from .exam_views import exam_router
 from .semester_views import semester_router, build_semester_context
 from .subject_views import subject_router, build_subject_context
 from .course_views import router as course_router
+from .settings_views import router as settings_router
 from .types import IndexContext
 from src.core.services.semester_manager import SemesterManager
 from src.core.services.course_manager import CourseManager
+from src.core.services.grade_calculator import GradeCalculator
 
 views = APIRouter()
 views.include_router(assignment_router, prefix="/semester/{semester}/subject/{code}", tags=["assignments"])
@@ -28,6 +31,7 @@ views.include_router(exam_router, prefix="/semester/{semester}/subject/{code}", 
 views.include_router(semester_router, prefix="/semester", tags=["semesters"])
 views.include_router(subject_router, prefix="/semester/{semester}", tags=["subjects"])
 views.include_router(course_router, prefix="", tags=["courses"])
+views.include_router(settings_router, prefix="", tags=["settings"])
 
 
 def _render_home_body(request: Request, session: Session, parsed_year: Optional[int]) -> HTMLResponse:
@@ -37,6 +41,11 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
     # If a course is selected, restrict semesters and years to that course
     # Resolve active course id robustly (fallback to code lookup)
     sess = request.session
+    # Debug: log the current session active course keys to help trace state
+    try:
+        print(f"[debug] _render_home_body session current_course_id={sess.get('current_course_id')!r} current_course_name={sess.get('current_course_name')!r} current_course_code={sess.get('current_course_code')!r}")
+    except Exception:
+        pass
     active_course_id = sess.get("current_course_id")
     cid = None
     if active_course_id is not None:
@@ -84,6 +93,12 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
             "code": sess.get("current_course_code"),
         }
 
+    # Calculate WAM
+    gc = GradeCalculator(session)
+    wam = gc.calculate_wam(cid)
+    gpa = gc.calculate_gpa(cid)
+    grade_counts = gc.calculate_grade_counts(cid)
+
     ctx: IndexContext = {
         "semesters": display_semesters,
         "years": years,
@@ -91,6 +106,9 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
         "current_year": str(datetime.now().year),
         "flash_message": flash_message,
         "course_filter": course_filter,
+        "wam": wam,
+        "gpa": gpa,
+        "grade_counts": grade_counts,
     }
     return _render(request, "index.html", ctx)
 
@@ -140,6 +158,17 @@ def home_year(request: Request, year: int, session: Session = Depends(get_sessio
         Description.
     """
     return _render_home_body(request, session, year)
+
+
+@views.head("/year/{year}")
+def home_year_head(request: Request, year: int, session: Session = Depends(get_session)):
+    """HEAD variant for year overview: return same status/headers as GET but no body.
+
+    This reuses the GET view to compute the same headers so HEAD checks succeed.
+    """
+    resp = home_year(request=request, year=year, session=session)
+    headers = dict(resp.headers) if resp is not None else {}
+    return Response(status_code=resp.status_code if resp is not None else 200, headers=headers)
 
 
 @views.get("/all", response_class=HTMLResponse)
@@ -247,6 +276,147 @@ def subject_detail_pretty(
         if ctx is None:
                 return HTMLResponse("Subject not found", status_code=404)
         return _render(request, "subject.html", ctx)
+
+
+@views.get("/subjects/{year}/{code}", response_class=HTMLResponse)
+def subject_detail_short(
+    request: Request,
+    year: str,
+    code: str,
+    semester: Optional[str] = None,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Shorter subject URL.
+
+    Behaviour:
+    - If `semester` query param provided: render same as the pretty URL.
+    - If not provided: attempt to resolve subjects matching year+code. If exactly one
+      match is found, render that subject. If multiple matches are found, present a
+      small choice page linking to the canonical semester-specific pages.
+    """
+    # If semester provided, delegate to the same build path used by the pretty view
+    # Also support `offering` query parameter commonly used in external links
+    qp = request.query_params
+    offering = qp.get("offering")
+    # Prefer explicit query param, else consume a one-time return_to stored in session by a preceding POST
+    return_to = qp.get("return_to") or request.session.pop("return_to", None)
+
+    # If client supplied a concrete semester param, prefer it
+    if semester:
+        ctx = build_subject_context(
+            session,
+            semester=semester,
+            year=year,
+            code=code,
+            exam_weight=None,
+            final_total=None,
+            total_mark=None,
+            return_to=return_to,
+        )
+        if ctx is None:
+            return HTMLResponse("Subject not found", status_code=404)
+        return _render(request, "subject.html", ctx)
+
+    # If offering is provided, attempt to resolve a semester from it.
+    # Typical offering values look like: 'Wollongong-Autumn-On-Campus'. We'll try:
+    # 1) exact match against semester_name
+    # 2) token match (split on '-') against semester_name
+    # If a semester is resolved we'll render that subject directly.
+    if offering:
+        # Try exact match first
+        candidate = session.exec(
+            select(Subject).where(Subject.year == str(year), Subject.subject_code == code, Subject.semester_name == offering)
+        ).all()
+        if len(candidate) == 1:
+            sem = getattr(candidate[0], "semester_name", None)
+            if sem:
+                ctx = build_subject_context(session, semester=sem, year=year, code=code, return_to=return_to)
+                if ctx:
+                    return _render(request, "subject.html", ctx)
+
+        # Token match: split offering and look for any token equal to semester_name
+        parts = [p for p in offering.split("-") if p]
+        if parts:
+            for token in parts:
+                candidate = session.exec(
+                    select(Subject).where(Subject.year == str(year), Subject.subject_code == code, Subject.semester_name == token)
+                ).all()
+                if len(candidate) == 1:
+                    sem = getattr(candidate[0], "semester_name", None)
+                    if sem:
+                        sem_str = str(sem)
+                        ctx = build_subject_context(session, semester=sem_str, year=year, code=code, return_to=return_to)
+                        if ctx:
+                            return _render(request, "subject.html", ctx)
+
+    # No semester provided: find matching subjects for this year+code
+    rows = session.exec(
+        select(Subject).where(Subject.year == str(year), Subject.subject_code == code)
+    ).all()
+    if not rows:
+        return HTMLResponse("Subject not found", status_code=404)
+    if len(rows) == 1:
+        semester_name = getattr(rows[0], "semester_name", None)
+        if not semester_name:
+            return HTMLResponse("Subject not found", status_code=404)
+        # Build context and render
+        ctx = build_subject_context(
+            session,
+            semester=semester_name,
+            year=year,
+            code=code,
+            return_to=return_to,
+        )
+        if ctx is None:
+            return HTMLResponse("Subject not found", status_code=404)
+        return _render(request, "subject.html", ctx)
+
+    # Multiple semesters found: show choices
+    links = []
+    for s in rows:
+        sem = getattr(s, "semester_name", "")
+        links.append(f"<li><a href='/subjects/{year}/{code}?semester={sem}'>Semester {sem}</a></li>")
+    body = f"<h1>Multiple semesters</h1><p>Choose semester for {code} {year}:</p><ul>{''.join(links)}</ul>"
+    return HTMLResponse(body)
+
+
+@views.post("/subjects/{year}/{code}/open")
+def subject_open(
+    request: Request,
+    year: str,
+    code: str,
+    semester: str = Form(...),
+    return_to: Optional[str] = Form(None),
+) -> RedirectResponse:
+    """Accept a POST that sets a one-time return_to in session and redirects to the canonical subject GET.
+
+    This prevents the return_to token from appearing in the query string while preserving
+    the ability for the subject template to render a 'Back to Semester' link.
+    """
+    if return_to:
+        try:
+            request.session["return_to"] = return_to
+        except Exception:
+            pass
+    return RedirectResponse(url=f"/subjects/{year}/{code}?semester={semester}", status_code=303)
+
+
+@views.head("/year/{year}/semester/{semester}")
+def semester_detail_head(
+    request: Request,
+    year: int,
+    semester: str,
+    session: Session = Depends(get_session),
+):
+    """HEAD variant for semester detail: return same status/headers as GET but no body.
+
+    This delegates to the GET handler and returns headers (no body) so HEAD checks succeed
+    and remain in sync with what a GET would return.
+    """
+    # Reuse the GET view to compute the same response/headers
+    resp = semester_detail_pretty(request=request, year=year, semester=semester, session=session)
+    headers = dict(resp.headers) if resp is not None else {}
+    return Response(status_code=resp.status_code if resp is not None else 200, headers=headers)
 
 
 __all__ = ["views"]

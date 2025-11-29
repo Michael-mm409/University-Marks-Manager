@@ -1,73 +1,62 @@
-# Data Model Overview
+# Data Model Overview (current vs target)
 
-This document describes the data model for the University Marks Manager, aligning the UML diagram with the actual SQLite schema.
+This document reconciles the current application schema with the target UML (normalized with surrogate keys) and outlines a staged migration plan.
 
 ![Relational Diagram](../UML/relational%20diagram.png)
-## Tables and Relationships
 
-### Semester
-- **Fields:**
-  - `name`: TEXT (PK)
-  - `year`: TEXT (PK)
-- **Notes:**
-  - The primary key is a composite of `name` and `year`.
-  - No separate `id` field is present in the schema.
+## Target schema (UML)
 
-### Subjects
-- **Fields:**
-  - `subject_code`: (PK)
-  - `subject_name`: (PK)
-  - `semester_name`: TEXT (FK to Semester.name) (PK)
-  - `year`: TEXT
-  - `total_mark`: REAL DEFAULT 0.0
-  - `sync_subject`: BOOLEAN (INTEGER 0/1)
-- **Constraints:**
-  - Foreign key (`semester_name`, `year`) references Semester(`name`, `year`).
+The UML describes the desired normalized model:
 
-### Assignment
-- **Fields:**
-  - `subject_code`: TEXT (NOT NULL) (PK)
-  - `semester_name`: TEXT (PK)
-  - `year`: TEXT  (PK)
-  - `assessment`: TEXT (PK)
-  - `weighted_mark`: REAL
-  - `unweighted_mark`: REAL
-  - `mark_weight`: REAL
-  - `grade_type`: TEXT (enum)
-- **Constraints:**
-  - UNIQUE(`assessment`, `subject_code`, `semester_name`, `year`)
-  - Foreign key (`subject_code`, `semester_name`, `year`) references Subjects(`subject_code`, `semester_name`, `year`).
-  - `grade_type` should be validated as an enum (use CHECK or a lookup table if needed).
+- Course(id, code UNIQUE, name)
+- Semester(id PK, name, year, course_id FK Course(id), UNIQUE(course_id, name, year))
+- Subject(id PK, subject_code, subject_name, semester_id FK Semester(id), total_mark, sync_subject, UNIQUE(semester_id, subject_code))
+- Assignment(id PK, subject_id FK Subject(id), assessment, weighted_mark, unweighted_mark, mark_weight, grade_type, UNIQUE(subject_id, assessment))
+- Examination(subject_id PK/FK Subject(id), exam_mark, exam_weight) 1:1 with Subject
+- ExamSettings(subject_id PK/FK Subject(id), ps_exam, ps_factor) 1:1 with Subject
 
-### Examination
-- **Fields:**
-  - `subject_code`: TEXT  (PK)
-  - `semester_name`: TEXT  (PK)
-  - `year`: TEXT   (PK)
-  - `exam_mark`: REAL
-  - `exam_weight`: REAL
-- **Constraints:**
-  - UNIQUE(`subject_code`, `semester_name`, `year`)
-  - Foreign key (`subject_code`, `semester_name`, `year`) references Subjects(`subject_code`, `semester_name`, `year`).
+Rationale:
 
-### ExamSettings
-- **Fields:**
-  - `subject_code`: TEXT  (PK)
-  - `semester_name`: TEXT  (PK)
-  - `year`: TEXT (PK)
-  - `ps_exam`: BOOLEAN (INTEGER 0/1)
-  - `ps_factor`: REAL
+- Surrogate integer keys and proper FKs avoid string-mismatch bugs and simplify joins.
+- Uniques enforce business rules at the DB layer (e.g., one subject_code per semester, one exam per subject).
 
-## Data Types and Conventions
-- **Booleans:** Stored as INTEGER (0/1) in SQLite.
-- **Enums:** Use TEXT with CHECK constraints or a lookup table for validation.
-- **Foreign Keys:** All relationships are enforced for referential integrity.
-- **Defaults:** `total_mark` defaults to 0.0.
+## Current application schema (as implemented)
 
-## Summary of Alignment
-- The model now matches the schema:
-  - Composite PKs and FKs are used as in the database.
-  - Data types reflect SQLite conventions.
-  - Constraints (UNIQUE, FK, enum/boolean) are enforced.
+Today, the code primarily uses natural keys and composites:
 
-For further details, see the UML diagram and the actual SQLite schema in `data/marks.db`.
+- Semester: id PK (present), name TEXT, year INT, course_id FK; UNIQUE(name, year) in DB (to be aligned to UNIQUE(course_id, name, year)).
+- Subject: id PK, subject_code TEXT, subject_name TEXT, semester_name TEXT, year TEXT, total_mark REAL, sync_subject BOOL.
+- Assignment: id PK, assessment TEXT, subject_code TEXT, semester_name TEXT, year TEXT, weighted_mark REAL, unweighted_mark REAL, mark_weight REAL, grade_type TEXT; UNIQUE(assessment, subject_code, semester_name, year).
+- Examination: composite PK (subject_code, semester_name, year).
+- ExamSettings: composite PK (subject_code, semester_name, year).
+- Course: id PK, code UNIQUE, name (plus a many-to-many Course↔Subject link table used for filtering).
+
+Implications:
+
+- Subjects and children (Assignment, Examination, ExamSettings) are joined by (subject_code, semester_name, year) rather than subject_id.
+- Semester uniqueness currently ignores course_id; duplicates across courses are theoretically blocked (will be fixed during migration).
+
+## Migration plan (staged and backward compatible)
+
+Stage 1: Constraints and compatibility columns
+
+- Enforce Semester uniqueness per UML at the model level: UNIQUE(course_id, name, year). A DB migration is required to update the constraint.
+- Keep existing Subject fields (semester_name, year) but introduce and backfill semester_id via join on (name, year, course_id).
+- Introduce and backfill subject_id on Assignment, Examination, ExamSettings via join from Subject (subject_code, semester_name, year).
+- Maintain legacy fields during the transition; code continues to function.
+
+Stage 2: Code refactor to IDs
+
+- Update queries and routes to prefer subject_id/semester_id internally (pretty URLs can remain name/code based, resolved at request-time).
+- Remove reliance on the Course↔Subject link if not needed; or document it in UML if it’s a required feature.
+
+Stage 3: Cleanup
+
+- Drop legacy composite columns and constraints after the switch to ID-based logic is complete and data is verified.
+
+## Status today
+
+- The application code and DB still operate on the current schema.
+- The model definition for Semester now targets UNIQUE(course_id, name, year) and needs a DB migration to enforce.
+
+If you want, we can add migration scripts to backfill new FK columns and adjust constraints with minimal downtime.

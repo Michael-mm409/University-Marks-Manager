@@ -17,7 +17,8 @@ services:
       context: .
       dockerfile: Dockerfile
     image: university-marks-manager:fastapi
-    command: uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --workers 2
+    # Development-friendly command: enables live reload for Python/template changes
+    command: uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --reload --reload-dir /app/src --reload-dir /app/src/templates
     restart: unless-stopped
     env_file:
       - .env
@@ -25,6 +26,11 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}
       - ENABLE_DEBUG_ROUTES=${ENABLE_DEBUG_ROUTES}
       - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
+      # Ensure file change detection works reliably on bind mounts (Docker Desktop / Windows)
+      - WATCHFILES_FORCE_POLLING=true
+    volumes:
+      # Bind-mount the source so edits update inside the container without rebuilds
+      - ./:/app
     # Mark the web app healthy only when /healthz responds OK; helps avoid transient 502s on restart
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz').getcode()==200 else 1)\""]

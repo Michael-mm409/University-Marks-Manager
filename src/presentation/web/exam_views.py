@@ -19,6 +19,7 @@ def save_total_mark(
     exam_mark: Optional[str] = Form(""),   # fallback legacy field
     ps_exam: Optional[str] = Form(None),
     ps_factor: Optional[str] = Form(None),
+    return_to: Optional[str] = Form(None),
     session: Session = Depends(get_session),
 ):
     """Create or update exam using desired total mark input.
@@ -27,21 +28,26 @@ def save_total_mark(
     implied exam mark needed given current assignment contributions and exam weight.
     If exam_mark provided explicitly (legacy), that value is stored instead.
     """
+    # Resolve subject_id for normalized lookups
+    subj = session.exec(
+        select(Subject).where(
+            Subject.semester_name == semester,
+            Subject.year == year,
+            Subject.subject_code == code,
+        )
+    ).first()
+    sid = getattr(subj, "id", None)
     # Fetch existing exam (single allowed)
     existing = session.exec(
         select(Examination).where(
-            Examination.semester_name == semester,
-            Examination.year == year,
-            Examination.subject_code == code,
+            Examination.subject_id == sid
         )
     ).first()
 
     # Aggregate assignment weighted marks and weight percent
     assignments = session.exec(
         select(Assignment).where(
-            Assignment.semester_name == semester,
-            Assignment.year == year,
-            Assignment.subject_code == code,
+            Assignment.subject_id == sid
         ).order_by(Assignment.assessment)
     ).all()
     assignment_weight_percent = 0.0
@@ -91,11 +97,16 @@ def save_total_mark(
 
     # Always set exam_mark and exam_weight, regardless of whether it affects total_mark
     print(f"[DEBUG] Saving exam_mark for subject {code}: derived_exam_mark={derived_exam_mark}, exam_weight={current_exam_weight}, total_mark={total_mark}, assignment_weighted_sum={assignment_weighted_sum}, assignment_weight_percent={assignment_weight_percent}, ps_exam={ps_exam}, ps_factor={ps_factor}")
+    # Resolve subject to set subject_id for normalized schema
     if existing:
         existing.exam_mark = derived_exam_mark
         existing.exam_weight = current_exam_weight
+        # Ensure subject_id is set (legacy rows are backfilled, but be defensive)
+        if getattr(existing, "subject_id", None) is None and sid is not None:
+            existing.subject_id = sid
     else:
         new_exam = Examination(
+            subject_id=sid,
             subject_code=code,
             semester_name=semester,
             year=year,
@@ -144,9 +155,10 @@ def save_total_mark(
         from fastapi.responses import JSONResponse
         return JSONResponse({"success": True, "exam_mark": derived_exam_mark, "exam_weight": current_exam_weight})
     else:
-        return RedirectResponse(
-            f"/semester/{semester}/subject/{code}?year={year}", status_code=303
-        )
+        url = f"/semester/{semester}/subject/{code}?year={year}"
+        if return_to:
+            url += f"&return_to={return_to}"
+        return RedirectResponse(url, status_code=303)
 
 
 @exam_router.api_route("/totalMark/reset", methods=["POST"], response_class=RedirectResponse)
@@ -205,17 +217,20 @@ def delete_exam(
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
     """Delete the examination record for a subject (single exam model)."""
-    # Examination has a composite primary key (subject_code, semester_name, year)
-    # Lookup by natural key rather than a scalar id
-    existing = session.get(Examination, (code, semester, year))
+    # Prefer normalized lookup by subject_id; fallback to composite key for legacy rows
+    subj = session.exec(
+        select(Subject).where(
+            Subject.semester_name == semester,
+            Subject.year == year,
+            Subject.subject_code == code,
+        )
+    ).first()
+    sid = getattr(subj, "id", None)
+    existing = None
+    if sid is not None:
+        existing = session.exec(select(Examination).where(Examination.subject_id == sid)).first()
     if not existing:
-        existing = session.exec(
-            select(Examination).where(
-                Examination.subject_code == code,
-                Examination.semester_name == semester,
-                Examination.year == year,
-            )
-        ).first()
+        existing = session.get(Examination, (code, semester, year))
     if existing:
         session.delete(existing)
         session.commit()

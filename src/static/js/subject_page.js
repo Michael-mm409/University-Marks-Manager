@@ -64,12 +64,19 @@
     fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/update`, { method: 'POST', body: formData })
       .then(r => r.json())
       .then(data => {
-        if (data.success && typeof data.row_html === 'string') {
-          row.innerHTML = data.row_html;
-          editing_assignment_keys = null; original_row_html = null;
-        } else {
-          row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>${data.error || 'Unknown error.'}</div></td>`;
+        if (data && data.success) {
+          if (data.reload_url) {
+            // Force full page reload to ensure summaries/averages reflect latest changes
+            window.location.assign(data.reload_url);
+            return;
+          }
+          if (typeof data.row_html === 'string') {
+            row.innerHTML = data.row_html;
+            editing_assignment_keys = null; original_row_html = null;
+            return;
+          }
         }
+        row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>${(data && data.error) || 'Unknown error.'}</div></td>`;
       })
       .catch(() => { row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>Error submitting edit.</div></td>`; });
     return false;

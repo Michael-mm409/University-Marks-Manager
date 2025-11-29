@@ -6,7 +6,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlmodel import Session, select
 
-from src.infrastructure.db.models import Assignment, GradeType
+from src.infrastructure.db.models import Assignment, GradeType, Subject
 from src.presentation.api.schemas import AssignmentCreate, AssignmentRead
 from src.presentation.api.deps import get_session
 
@@ -33,6 +33,20 @@ def list_assignments(
         Sequence[Assignment]: List of assignments.
     """
     stmt = select(Assignment).order_by(Assignment.assessment)
+    # Prefer normalized filtering when all three are provided
+    if subject_code and semester_name and year:
+        subj = session.exec(
+            select(Subject).where(
+                Subject.subject_code == subject_code,
+                Subject.semester_name == semester_name,
+                Subject.year == year,
+            )
+        ).first()
+        sid = getattr(subj, "id", None)
+        if sid is not None:
+            stmt = select(Assignment).where(Assignment.subject_id == sid).order_by(Assignment.assessment)
+            return session.exec(stmt).all()
+    # Fallback legacy filters (partial filters supported)
     if subject_code:
         stmt = stmt.where(Assignment.subject_code == subject_code)
     if semester_name:
@@ -81,25 +95,22 @@ def create_assignment(data: AssignmentCreate, session: Session = Depends(get_ses
         except Exception:
             # If conversion fails, leave as-is and let the ORM/DB raise if invalid
             pass
-    duplicate = session.exec(
-        select(Assignment).where(
-            Assignment.assessment == payload["assessment"],
-            Assignment.subject_code == payload["subject_code"],
-            Assignment.semester_name == payload["semester_name"],
-            Assignment.year == payload["year"],
+    # Resolve subject_id and enforce duplicate by (subject_id, assessment)
+    subj = session.exec(
+        select(Subject).where(
+            Subject.subject_code == payload.get("subject_code"),
+            Subject.semester_name == payload.get("semester_name"),
+            Subject.year == payload.get("year"),
         )
     ).first()
-    if duplicate:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assignment already exists")
+    sid = getattr(subj, "id", None)
+    payload["subject_id"] = sid
     duplicate = session.exec(
         select(Assignment).where(
+            Assignment.subject_id == sid,
             Assignment.assessment == payload["assessment"],
-            Assignment.subject_code == payload["subject_code"],
-            Assignment.semester_name == payload["semester_name"],
-            Assignment.year == payload["year"],
         )
     ).first()
-
     if duplicate:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assignment already exists")
     assignment = Assignment(**payload)
@@ -174,13 +185,21 @@ def update_assignment(assignment_id: int, data: AssignmentCreate,
         except (ValueError, TypeError):
             pass
     # Guard against creating a duplicate natural key (exclude the current record)
+    # Resolve subject_id for duplicate check and update the record's subject_id if changed
+    subj = session.exec(
+        select(Subject).where(
+            Subject.subject_code == payload.get("subject_code"),
+            Subject.semester_name == payload.get("semester_name"),
+            Subject.year == payload.get("year"),
+        )
+    ).first()
+    sid = getattr(subj, "id", None)
+    payload["subject_id"] = sid
     duplicate = session.exec(
         select(Assignment).where(
             Assignment.id != assignment_id,
+            Assignment.subject_id == sid,
             Assignment.assessment == payload["assessment"],
-            Assignment.subject_code == payload["subject_code"],
-            Assignment.semester_name == payload["semester_name"],
-            Assignment.year == payload["year"],
         )
     ).first()
     if duplicate:

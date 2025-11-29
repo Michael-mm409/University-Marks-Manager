@@ -18,7 +18,8 @@ api_router = APIRouter()
 api_router.include_router(semester_router, prefix="/semesters", tags=["Semesters"])
 api_router.include_router(subjects_router, prefix="/subjects", tags=["Subjects"])
 api_router.include_router(assignments_router, prefix="/assignments", tags=["Assignments"])
-api_router.include_router(exams_router, prefix="/exams", tags=["Exams"])
+# Mount exam endpoints under the subjects namespace so paths look like /api/subjects/{year}/{subject_code}/...
+api_router.include_router(exams_router, prefix="/subjects", tags=["Exams"])
 api_router.include_router(courses_router)  # already has /courses prefix
 
 

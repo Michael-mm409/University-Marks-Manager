@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, Form
 from fastapi.responses import RedirectResponse
-from sqlmodel import Session, select, desc
-from typing import Optional
+from sqlmodel import Session, select
+from typing import Optional, cast
+from sqlalchemy import Table
 from fastapi import Request
 from src.presentation.api.deps import get_session
-from src.infrastructure.db.models import Subject, Assignment, Examination, ExamSettings, GradeType
+from src.infrastructure.db.models import Subject, Assignment, Examination, ExamSettings, GradeType, Semester
 from .types import SubjectContext
 
 subject_router = APIRouter()
@@ -15,6 +16,7 @@ def create_subject(
     year: str = Form(...),
     subject_code: str = Form(...),
     subject_name: str = Form(...),
+    credit_points: int = Form(6),
     sync_subject: Optional[str] = Form(None),
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
@@ -40,12 +42,22 @@ def create_subject(
         )
     ).first()
     if not exists:
+        # Resolve semester_id for normalized schema
+        sem = session.exec(
+            select(Semester).where(
+                Semester.name == semester,
+                Semester.year == int(year) if str(year).isdigit() else Semester.year == Semester.year,
+            )
+        ).first()
+        semester_id = getattr(sem, "id", None)
         session.add(
             Subject(
+                semester_id=semester_id,
                 subject_code=subject_code,
                 subject_name=subject_name,
                 semester_name=semester,
                 year=year,
+                credit_points=credit_points,
                 sync_subject=bool(sync_subject),
             )
         )
@@ -74,25 +86,42 @@ def build_subject_context(
     if not subject:
         return None
 
-    # Scope to this specific semester + year to avoid cross-term leakage
+    # Now that the DB has surrogate keys, prefer subject_id for child lookups
+    sid = getattr(subject, "id", None)
+    # Order assignments by their numeric id so the UI shows them in creation/order sequence
+    # Use .asc() to produce a SQL expression that static type-checkers (Pylance) accept
+    # Use the model's Table column expression so static checkers see a SQL column element
+    # Use a typed Table reference so static analysers (Pylance) accept the column accessl
+    assignments_table = cast(Table, getattr(Assignment, "__table__"))
     assignments = session.exec(
         select(Assignment).where(
-            Assignment.year == year,
-            Assignment.semester_name == semester,
-            Assignment.subject_code == code,
-        ).order_by(Assignment.id)  # type: ignore
+            Assignment.subject_id == sid
+        ).order_by(assignments_table.columns.id.asc())
     ).all()
     examinations = session.exec(
         select(Examination).where(
-            Examination.year == year,
-            Examination.semester_name == semester,
-            Examination.subject_code == code,
+            Examination.subject_id == sid
         )
     ).all()
 
     assignment_weighted_sum = 0.0
     assignment_weight_percent = 0.0
+    
+    count_s = 0
+    count_u = 0
+
+    # Identify assignment-based exam
+    exam_assignment = next((a for a in assignments if getattr(a, "is_exam", False)), None)
+
     for assignment_record in assignments:
+        if assignment_record.grade_type == GradeType.SATISFACTORY.value:
+            count_s += 1
+        elif assignment_record.grade_type == GradeType.UNSATISFACTORY.value:
+            count_u += 1
+
+        if getattr(assignment_record, "is_exam", False):
+            continue
+
         if (
             assignment_record.grade_type == GradeType.NUMERIC.value
             and assignment_record.weighted_mark is not None
@@ -107,30 +136,48 @@ def build_subject_context(
     exam_raw_percent: Optional[float] = None
     exam_contribution = 0.0
     existing_exam_weight = 0.0
+    
+    # Legacy exam data
     single_exam = examinations[0] if examinations else None
+    legacy_exam_mark: Optional[float] = None
+    legacy_exam_weight: float = 0.0
+
     if single_exam:
         try:
-            exam_raw_percent = float(single_exam.exam_mark)
+            legacy_exam_mark = float(single_exam.exam_mark)
         except (TypeError, ValueError):
-            exam_raw_percent = None
+            pass
         try:
-            existing_exam_weight = float(single_exam.exam_weight)
+            legacy_exam_weight = float(single_exam.exam_weight)
         except (TypeError, ValueError):
-            existing_exam_weight = 0.0
+            pass
+
+    # Determine active exam source
+    if exam_assignment:
+        # Use assignment based exam
+        # Assignment stores unweighted_mark as a ratio (e.g. 0.75 for 75%), so we multiply by 100 for percent logic
+        if exam_assignment.unweighted_mark is not None:
+             exam_raw_percent = float(exam_assignment.unweighted_mark) * 100.0
+        
+        if exam_assignment.mark_weight is not None:
+            existing_exam_weight = float(exam_assignment.mark_weight)
+            
+    elif single_exam:
+        # Fallback to legacy
+        exam_raw_percent = legacy_exam_mark
+        existing_exam_weight = legacy_exam_weight
 
     inferred_remaining = 0.0
-    if not examinations:
+    if not exam_assignment and not examinations:
         inferred_remaining = max(0.0, 100.0 - assignment_weight_percent)
 
     effective_exam_weight = (
         existing_exam_weight
-        or (exam_weight if (exam_weight and not examinations) else inferred_remaining)
+        or (exam_weight if (exam_weight and not examinations and not exam_assignment) else inferred_remaining)
     )
     setting = session.exec(
         select(ExamSettings).where(
-            ExamSettings.semester_name == semester,
-            ExamSettings.year == year,
-            ExamSettings.subject_code == code,
+            ExamSettings.subject_id == sid
         )
     ).first()
     ps_exam = bool(setting.ps_exam) if setting else False
@@ -160,22 +207,32 @@ def build_subject_context(
         desired_goal = final_total
     elif total_mark not in (None, ""):
         desired_goal = total_mark
+    elif subject.total_mark not in (None, 0, 0.0):
+        desired_goal = str(subject.total_mark)
+    
     if desired_goal is not None:
         try:
             goal = float(desired_goal)
             if goal <= 0 or goal > 100:
                 requirement_status = "invalid"
             else:
-                if average is not None and exam_raw_percent is not None and average >= goal:
+                # If exam is 0, we treat it as not taken yet for the purpose of calculating requirement
+                is_exam_taken = exam_raw_percent is not None and exam_raw_percent > 0
+                
+                # Calculate required mark regardless of whether exam is taken or not, 
+                # if the current average is not enough or exam is not taken.
+                effective_exam_score = effective_scoring_exam_weight
+                if effective_exam_score > 0:
+                     required_exam_mark = (
+                        (goal / 100.0) * (assignment_weight_percent + effective_exam_score) - assignment_weighted_sum
+                    ) * 100.0 / effective_exam_score
+
+                if average is not None and is_exam_taken and average >= goal:
                     requirement_status = "achieved"
                 else:
-                    effective_exam_score = effective_scoring_exam_weight
                     if effective_exam_score <= 0:
                         requirement_status = "impossible"
-                    else:
-                        required_exam_mark = (
-                            (goal / 100.0) * (assignment_weight_percent + effective_exam_score) - assignment_weighted_sum
-                        ) * 100.0 / effective_exam_score
+                    elif required_exam_mark is not None:
                         if required_exam_mark < 0:
                             requirement_status = "achieved"
                         elif required_exam_mark > 100:
@@ -211,22 +268,103 @@ def build_subject_context(
         "exam_weighted_sum": round(exam_contribution, 2),
         "effective_scoring_exam_weight": round(effective_scoring_exam_weight, 2),
         "return_to": return_to,
+        "legacy_exam_mark": legacy_exam_mark,
+        "legacy_exam_weight": legacy_exam_weight,
+        "has_legacy_exam": bool(single_exam),
+        "has_assignment_exam": bool(exam_assignment),
+        "count_s": count_s,
+        "count_u": count_u,
     }
     return ctx
 
 
 @subject_router.api_route("/subject/{code}", methods=["GET", "HEAD"], response_class=RedirectResponse)
 def subject_detail(
-    request: Request,
     semester: str,
     code: str,
     year: str,
-    exam_weight: Optional[float] = None,
-    final_total: Optional[str] = None,
-    total_mark: Optional[str] = None,
+) -> RedirectResponse:
+    """Legacy path: redirect to the short subject URL (/subjects/{year}/{code}?semester=...)."""
+    return RedirectResponse(url=f"/subjects/{year}/{code}?semester={semester}", status_code=303)
+
+
+@subject_router.api_route("/subject/{code}/update", methods=["POST"], response_class=RedirectResponse)
+def update_subject(
+    semester: str,
+    code: str,
+    year: str = Form(...),
+    subject_code: str = Form(...),
+    subject_name: str = Form(...),
+    credit_points: int = Form(6),
+    return_to: Optional[str] = Form(None),
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
-    """Legacy path: redirect to /year/{year}/semester/{semester}/subject/{code}."""
-    return RedirectResponse(
-        url=f"/year/{year}/semester/{semester}/subject/{code}", status_code=303
-    )
+    """Update subject details."""
+    subject = session.exec(
+        select(Subject).where(
+            Subject.semester_name == semester,
+            Subject.year == year,
+            Subject.subject_code == code,
+        )
+    ).first()
+    
+    if subject:
+        subject.subject_code = subject_code
+        subject.subject_name = subject_name
+        subject.credit_points = credit_points
+        session.add(subject)
+        session.commit()
+        session.refresh(subject)
+        
+        # If subject code changed, we need to redirect to the new code
+        new_code = subject.subject_code
+    else:
+        new_code = code
+
+    # Redirect back to the subject page
+    url = f"/subjects/{year}/{new_code}?semester={semester}"
+    if return_to:
+         url += f"&return_to={return_to}"
+
+    return RedirectResponse(url=url, status_code=303)
+
+
+@subject_router.api_route("/subject/{code}/delete", methods=["POST"], response_class=RedirectResponse)
+def delete_subject(
+    semester: str,
+    code: str,
+    year: str = Form(...),
+    return_to: Optional[str] = Form(None),
+    session: Session = Depends(get_session),
+) -> RedirectResponse:
+    """Delete a subject and all its related data."""
+    subject = session.exec(
+        select(Subject).where(
+            Subject.semester_name == semester,
+            Subject.year == year,
+            Subject.subject_code == code,
+        )
+    ).first()
+    if subject:
+        # Delete related data (assignments, exams, settings)
+        sid = getattr(subject, "id", None)
+        if sid:
+            assignments = session.exec(select(Assignment).where(Assignment.subject_id == sid)).all()
+            for a in assignments:
+                session.delete(a)
+            exams = session.exec(select(Examination).where(Examination.subject_id == sid)).all()
+            for e in exams:
+                session.delete(e)
+            settings = session.exec(select(ExamSettings).where(ExamSettings.subject_id == sid)).all()
+            for s in settings:
+                session.delete(s)
+        session.delete(subject)
+        session.commit()
+    
+    # Redirect
+    if return_to:
+        parts = return_to.split('-')
+        if len(parts) == 2:
+            return RedirectResponse(f"/year/{parts[1]}/semester/{parts[0]}", status_code=303)
+    
+    return RedirectResponse(f"/year/{year}/semester/{semester}", status_code=303)

@@ -18,6 +18,9 @@ class IndexContext(TypedDict):
     current_year: str
     flash_message: Optional[str]
     course_filter: Optional[dict]
+    wam: Optional[float]
+    gpa: Optional[float]
+    grade_counts: Optional[dict[str, int]]
 
 
 class SemesterSummary(TypedDict):
@@ -36,6 +39,7 @@ class SemesterSummary(TypedDict):
     exam_weight: Optional[float]
     total_mark: Optional[float]
     sync_subject: bool
+    is_exam_required: bool
 
 
 class SemesterContext(TypedDict):
@@ -81,6 +85,12 @@ class SubjectContext(TypedDict):
     exam_weighted_sum: Optional[float]
     effective_scoring_exam_weight: Optional[float]
     return_to: Optional[str]
+    legacy_exam_mark: Optional[float]
+    legacy_exam_weight: Optional[float]
+    has_legacy_exam: bool
+    has_assignment_exam: bool
+    count_s: int
+    count_u: int
 
 
 TemplateContext = Union[IndexContext, SemesterContext, SubjectContext, Mapping[str, object]]

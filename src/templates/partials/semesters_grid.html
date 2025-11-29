@@ -3,27 +3,30 @@
 {# Determine an appropriate column count based on number of semesters (max 3) #}
 {% set n = semesters|length %}
 {% set cols = 1 if n <= 1 else (2 if n == 2 else 3) %}
-<div class="sem-grid grid gap-5 md:gap-6 sm:grid-cols-2 md:grid-cols-3"
+<div class="sem-grid grid gap-5 md:gap-6 sm:grid-cols-2 md:grid-cols-3 justify-items-center"
      style="grid-template-columns: repeat({{ cols }}, minmax(0, 1fr));">
   {% for semester in semesters %}
-  <div class="sem-card relative p-5 rounded-lg bg-base-100 border border-base-300 hover:border-primary/70 transition-shadow shadow-sm hover:shadow-md card-glow flex flex-col gap-3 group text-center items-center">
-    <div class="flex items-center justify-center gap-2">
+  <div class="sem-card relative p-5 rounded-lg bg-base-100 border border-base-300 hover:border-primary/70 transition-shadow shadow-sm hover:shadow-md card-glow flex flex-col gap-3 group text-center items-center max-w-md w-full">
+    <!-- Header row: centered title with cog adjacent and spaced -->
+    <div class="flex items-center justify-center gap-2 w-full">
       <h3 class="text-lg md:text-xl font-bold"><a class="link link-hover" href="/year/{{semester.year}}/semester/{{semester.name}}">{{semester.name}}</a></h3>
-      <span class="badge badge-outline">{{semester.year}}</span>
+  <span class="badge badge-outline ml-2 sm:ml-3">{{semester.year}}</span>
+      <button class="btn btn-ghost btn-xs ml-3 shrink-0" onclick="this.closest('.sem-card').querySelector('.manage-panel').classList.toggle('hidden');" title="Manage">⚙️</button>
     </div>
-    <button class="btn btn-ghost btn-xs absolute top-2 right-2" onclick="this.closest('.sem-card').querySelector('.manage-panel').classList.toggle('hidden');" title="Manage">⚙️</button>
     <p class="text-xs opacity-70">View subjects & assignments</p>
     <div class="manage-panel hidden mt-1 animate-fade-in text-xs space-y-2">
-      <form method="post" action="/semester/{{semester.name}}/update" class="flex gap-1 items-end flex-wrap">
+  <form method="post" action="/semester/{{semester.name}}/update" hx-post="/semester/{{semester.name}}/update" hx-target="#semesters-section" hx-swap="outerHTML" class="flex gap-1 items-end flex-wrap">
         <input type="hidden" name="year" value="{{semester.year}}" />
+        <input type="hidden" name="return_year" value="{{selected_year}}" />
         <label class="form-control w-28">
           <span class="label-text text-xs">Rename</span>
           <input name="new_name" placeholder="New name" class="input input-bordered input-xs" required />
         </label>
         <button class="btn btn-xs btn-primary mt-4" type="submit">Save</button>
       </form>
-      <form method="post" action="/semester/{{semester.name}}/delete" onsubmit="return confirm('Delete semester {{semester.name}} {{semester.year}} and ALL its data?');">
+  <form method="post" action="/semester/{{semester.name}}/delete" hx-post="/semester/{{semester.name}}/delete" hx-target="#semesters-section" hx-swap="outerHTML" onsubmit="return confirm('Delete semester {{semester.name}} {{semester.year}} and ALL its data?');">
         <input type="hidden" name="year" value="{{semester.year}}" />
+        <input type="hidden" name="return_year" value="{{selected_year}}" />
         <button class="btn btn-xs btn-error btn-outline">Delete</button>
       </form>
     </div>

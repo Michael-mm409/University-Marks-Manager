@@ -1,155 +1,248 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <diagram program="umlet" version="15.1">
-  <zoom_level>8</zoom_level>
+  <zoom_level>10</zoom_level>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>280</x>
-      <y>432</y>
-      <w>168</w>
-      <h>144</h>
+      <x>130</x>
+      <y>660</y>
+      <w>240</w>
+      <h>180</h>
     </coordinates>
     <panel_attributes>Semester
 --
-name: string  PK
-year: int  PK
-</panel_attributes>
+id: int PK
+name: string
+year: int 
+course_id: int FK Ref Course(id)
+
+UNIQUE(course_id, name, year)</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
       <x>600</x>
-      <y>424</y>
-      <w>264</w>
-      <h>144</h>
+      <y>650</y>
+      <w>340</w>
+      <h>240</h>
     </coordinates>
-    <panel_attributes>Subjects
+    <panel_attributes>Subject
 --
-subject_code: string  PK
-subject_name: string  
-semester_name: string FK1 Ref Semester(name)  PK
-year: string  PK
+id: int PK
+subject_code: string  
+subject_name: string
+semester_id: int FK Ref Semester(id)
 total_mark: float[0.0]
-sync_subject: boolean
+credit_points: int[6]
+sync_subject: bool[false]
+-- Exam source priority:
+-- 1) Assignment where is_exam=true
+-- 2) Examination (Legacy) row if present
+-- 3) None =&gt; total_mark from assignments only
+
+UNIQUE(semester_id, subject_code)
 </panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>440</x>
-      <y>488</y>
-      <w>176</w>
-      <h>32</h>
+      <x>360</x>
+      <y>720</y>
+      <w>260</w>
+      <h>50</h>
+    </coordinates>
+    <panel_attributes>
+lt=-
+m1=1..*
+m2=1</panel_attributes>
+    <additional_attributes>240.0;20.0;10.0;20.0</additional_attributes>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>620</x>
+      <y>210</y>
+      <w>390</w>
+      <h>300</h>
+    </coordinates>
+    <panel_attributes>Assignment
+--
+id: int PK
+subject_id: int FK Ref Subject(id)
+assessment: string
+weighted_mark: float
+unweighted_mark: float
+mark_weight: float
+grade_type: enum[numeric, S, U]
+is_exam: bool[false]
+
+UNIQUE(assessment, subject_id)
+-- Only one exam per subject (partial unique index or application check)
+-- If is_exam=true, this row supplies the exam mark; its mark_weight represents computed exam weight.
+
+ON DELETE CASCADE via subject_id
+</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>1070</x>
+      <y>650</y>
+      <w>580</w>
+      <h>180</h>
+    </coordinates>
+    <panel_attributes>ExamSettings
+--
+subject_id: int PK FK Ref Subject(id)
+ps_exam: bool[false]
+ps_factor: float[40]
+exam_assignment_id: int FK Ref Assignment(id) NULL
+-- Constraint: (exam_assignment_id IS NULL) OR (Assignment.subject_id = subject_id)
+-- Ensures selected assignment belongs to same subject.
+-- exam weight derived: 100 - SUM(mark_weight WHERE subject_id AND is_exam=false)
+
+UNIQUE(exam_assignment_id)  -- ensures an assignment is not tied to multiple settings
+</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>820</x>
+      <y>880</y>
+      <w>50</w>
+      <h>110</h>
+    </coordinates>
+    <panel_attributes>lt=-
+m1=1
+m2=0..1</panel_attributes>
+    <additional_attributes>10.0;10.0;10.0;90.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>940</x>
+      <y>500</y>
+      <w>220</w>
+      <h>170</h>
+    </coordinates>
+    <panel_attributes>lt=-
+m1=1
+m2=0..1</panel_attributes>
+    <additional_attributes>190.0;150.0;190.0;90.0;10.0;90.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>140</x>
+      <y>320</y>
+      <w>270</w>
+      <h>190</h>
+    </coordinates>
+    <panel_attributes>Course
+--
+id: int PK
+code: string
+name: string
+grading_scale: string[Standard]
+
+UNIQUE(code)
+UNIQUE(name, code)</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>230</x>
+      <y>500</y>
+      <w>50</w>
+      <h>180</h>
     </coordinates>
     <panel_attributes>lt=-
 m1=1..*
 m2=1</panel_attributes>
-    <additional_attributes>200.0;10.0;10.0;10.0</additional_attributes>
+    <additional_attributes>10.0;160.0;10.0;10.0</additional_attributes>
   </element>
   <element>
-    <id>UMLClass</id>
+    <id>Relation</id>
     <coordinates>
-      <x>616</x>
-      <y>120</y>
-      <w>312</w>
-      <h>232</h>
+      <x>400</x>
+      <y>460</y>
+      <w>220</w>
+      <h>230</h>
     </coordinates>
-    <panel_attributes>Assignment
---
-subject_code: string NOT NULL  PK
-semester_name: string  PK
-year: string  PK
-assessment: string  PK
-weighted_mark: float
-unweighted_mark: float
-mark_weight: float
-grade_type: enum
-
-UNIQUE(assessment, subject_code, semester_name, year)
-
-FOREIGN KEY 1(subject_code, semester_name, year) REF 
-Subjects(subject_code, semester_name, year)
-</panel_attributes>
-    <additional_attributes/>
+    <panel_attributes>lt=-
+m1=1..*
+m2=1</panel_attributes>
+    <additional_attributes>200.0;200.0;90.0;200.0;90.0;10.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
       <x>600</x>
-      <y>688</y>
-      <w>272</w>
-      <h>160</h>
+      <y>970</y>
+      <w>340</w>
+      <h>200</h>
     </coordinates>
-    <panel_attributes>Examination
+    <panel_attributes>Examination (Legacy)
 --
-subject_code: string          PK
-semester_name: string     PK
-year: string                        PK
+subject_id: int PK FK Ref Subject(id)
 exam_mark: float
 exam_weight: float
-
-UNIQUE(subject_code, semester_name, year)
-FK1(subject_code, semester_name, year) REF
-Subjects(subject_code, semester_name, year)</panel_attributes>
+-- Ignored if an Assignment.is_exam=true exists for same subject.
+-- Migration path: copy (exam_mark, exam_weight) into new assignment row then delete.
+1:1 with Subject(id)
+ON DELETE CASCADE via subject_id</panel_attributes>
     <additional_attributes/>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>776</x>
-      <y>560</y>
-      <w>32</w>
-      <h>144</h>
-    </coordinates>
-    <panel_attributes>lt=-
-m1=1
-m2=1</panel_attributes>
-    <additional_attributes>10.0;10.0;10.0;160.0</additional_attributes>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>1032</x>
-      <y>424</y>
-      <w>192</w>
-      <h>120</h>
+      <x>200</x>
+      <y>70</y>
+      <w>240</w>
+      <h>130</h>
     </coordinates>
-    <panel_attributes>ExamSettings
+    <panel_attributes>Grade Scale
 --
-subject_code: string          PK
-semester_name: string      PK
-year: string                         PK
-ps_exam: bool
-ps_factor: float
+id: int PK
+scale_name: string[Standard]
+grade: string
+label: string
+min_mark: float
+gpa_point: float
+bg=#f5f5f5
+
 </panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>856</x>
-      <y>464</y>
-      <w>192</w>
-      <h>32</h>
+      <x>250</x>
+      <y>190</y>
+      <w>50</w>
+      <h>150</h>
     </coordinates>
     <panel_attributes>lt=-
-m1=1
-m2=1</panel_attributes>
-    <additional_attributes>220.0;10.0;10.0;10.0</additional_attributes>
+m1=0..*
+m2=1..*</panel_attributes>
+    <additional_attributes>10.0;130.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>720</x>
-      <y>344</y>
-      <w>40</w>
-      <h>96</h>
+      <x>770</x>
+      <y>500</y>
+      <w>50</w>
+      <h>170</h>
     </coordinates>
     <panel_attributes>lt=-
-m1=1
-m2=1..*</panel_attributes>
-    <additional_attributes>10.0;100.0;10.0;10.0</additional_attributes>
+m1=1..*
+m2=1</panel_attributes>
+    <additional_attributes>10.0;10.0;10.0;150.0</additional_attributes>
   </element>
 </diagram>

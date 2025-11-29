@@ -39,9 +39,12 @@ async def lifespan(fastapi_app: FastAPI):
     # For development: drop and recreate tables on each startup
     # SQLModel.metadata.drop_all(engine)
     SQLModel.metadata.create_all(engine)
+    # Enable template auto-reload in development so Jinja picks up template changes without restarts
     fastapi_app.state.jinja_env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
         autoescape=select_autoescape(["html", "xml"]),
+        auto_reload=True,
+        cache_size=0,  # avoid template caching during active development
     )
     # Provide a global current_year for all templates (used for Home link building)
     fastapi_app.state.jinja_env.globals.update(current_year=str(datetime.now().year))

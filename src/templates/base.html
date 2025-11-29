@@ -33,27 +33,38 @@
       </div>
     </header>
     {% if flash_message %}
-      <div role="alert" class="alert alert-success mb-4">
-        <span>{{ flash_message }}</span>
+      <div id="flash-alert" role="status" aria-live="polite" aria-atomic="true" class="alert alert-success mb-4 flex items-start justify-between gap-4">
+        <div class="flex-1">
+          <span>{{ flash_message }}</span>
+          <div class="text-xs opacity-70 mt-2">
+            <label class="inline-flex items-center gap-2">
+              <input id="flash-autoclose" type="checkbox" class="checkbox checkbox-sm" checked />
+              <span>Auto-close</span>
+            </label>
+          </div>
+        </div>
+        <div class="flex-shrink-0">
+          <button type="button" class="btn btn-ghost btn-sm flash-close" aria-label="Close">✕</button>
+        </div>
       </div>
     {% endif %}
-    {% if request and request.session and request.session.get('current_course_id') %}
-      <div class="mb-4 p-3 rounded-lg bg-base-100 border border-base-300 flex items-center justify-between">
-        <div class="text-sm">
-          <span class="opacity-70">Active Course:</span>
-          <span class="font-semibold">{{ request.session.get('current_course_name') or ('#' ~ request.session.get('current_course_id')) }}</span>
-          {% if request.session.get('current_course_code') %}
-            <span class="opacity-70 text-xs ml-2">{{ request.session.get('current_course_code') }}</span>
+  <div class="mb-6 flex justify-center">
+  <div id="course-header-container" class="w-full max-w-4xl p-4 rounded-xl bg-base-100 border border-base-300 flex items-center justify-between gap-4 shadow-sm" hx-get="/courses/_selector" hx-trigger="load" hx-swap="outerHTML">
+        <div class="flex items-center gap-4">
+          <span class="text-sm opacity-70">Active Course</span>
+          {% if request and request.session and request.session.get('current_course_id') %}
+            <span class="text-lg font-semibold">&nbsp;{{ request.session.get('current_course_name') or ('#' ~ request.session.get('current_course_id')) }}</span>
+            {% if request.session.get('current_course_code') %}
+              <span class="opacity-70 text-sm">&nbsp;{{ request.session.get('current_course_code') }}</span>
+            {% endif %}
+          {% else %}
+            <!-- Intentionally show nothing when no active course is set -->
+            <span class="text-sm opacity-70">&nbsp;</span>
           {% endif %}
         </div>
-        <div class="flex items-center gap-2">
-          <a href="/courses/{{ request.session.get('current_course_code') or request.session.get('current_course_id') }}" class="btn btn-xs btn-outline">View</a>
-          <form method="post" action="/courses/clear-selection">
-            <button class="btn btn-xs btn-ghost" type="submit">Clear</button>
-          </form>
-        </div>
+  <div id="course-selector-container" class="flex-shrink-0"></div>
       </div>
-    {% endif %}
+    </div>
     <main class="space-y-6">
       {% block content %}{% endblock %}
     </main>
@@ -69,6 +80,56 @@
       root.setAttribute('data-theme', theme);
       localStorage.setItem('uom-theme', theme);
     });
+  </script>
+  <script>
+    // Listen for server-triggered HX-Trigger events indicating the course list changed.
+    // When received, request an updated header fragment and replace the header.
+    document.body.addEventListener('courseListChanged', function () {
+      if (window.htmx) {
+        htmx.ajax('GET', '/courses/_selector', {target: '#course-header-container', swap: 'outerHTML'});
+      }
+    });
+  </script>
+  <script>
+    // Auto-close and manual close for one-time flash alert shown after actions
+    (function () {
+      const KEY = 'uom.flash.autoclose';
+      function removeAlert(el) {
+        if (!el) return;
+        // Fade out using tailwind classes then remove
+        el.classList.add('opacity-0');
+        setTimeout(() => el.remove(), 400);
+      }
+      document.addEventListener('DOMContentLoaded', function () {
+        const alert = document.getElementById('flash-alert');
+        if (!alert) return;
+
+        // Wire up close button
+        const btn = alert.querySelector('.flash-close');
+        if (btn) btn.addEventListener('click', () => removeAlert(alert));
+
+        // Auto-close preference control
+        const chk = document.getElementById('flash-autoclose');
+        try {
+          const stored = localStorage.getItem(KEY);
+          if (stored === '0') {
+            chk.checked = false;
+          } else {
+            chk.checked = true;
+          }
+        } catch (e) {
+          // ignore localStorage errors (e.g., private mode)
+        }
+        chk?.addEventListener('change', function () {
+          try { localStorage.setItem(KEY, this.checked ? '1' : '0'); } catch (e) {}
+        });
+
+        // Auto-close after 0.5 second if the user didn't disable it
+        let doAuto = true;
+        try { doAuto = localStorage.getItem(KEY) !== '0'; } catch (e) { doAuto = true; }
+        if (doAuto) setTimeout(() => removeAlert(alert), 500);
+      });
+    })();
   </script>
 </body>
 </html>

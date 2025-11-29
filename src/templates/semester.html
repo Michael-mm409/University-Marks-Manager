@@ -3,7 +3,10 @@
 <div class="flex flex-col items-center text-center gap-2 mb-6">
   <h2 class="text-3xl md:text-4xl font-extrabold">{{semester}} <span class="text-lg md:text-xl font-normal opacity-70">({{year}})</span></h2>
   <span class="badge badge-info badge-sm">{{ subject_summaries|length }} {{ 'subject' if (subject_summaries|length) == 1 else 'subjects' }}</span>
-  <a href="/year/{{year}}" class="btn btn-xs btn-outline">Back</a>
+  <div class="flex gap-2">
+    <a href="/year/{{year}}" class="btn btn-xs btn-outline">Back</a>
+    <a href="/" class="btn btn-xs btn-secondary">Return to Home</a>
+  </div>
   
 </div>
 <div class="p-4 md:p-5 rounded-xl bg-base-100 shadow card-glow mb-6">
@@ -52,14 +55,29 @@
         </td>
         <td class="p-4 text-right">{{ '%.2f' % row.assessment_mark if row.assessment_mark is not none else '-' }}</td>
         <td class="p-4 text-right">{{ '%.0f' % row.assessment_weight if row.assessment_weight is not none else '-' }}%</td>
-        <td class="p-4 text-right">{% if row.exam_mark is not none %}{{ '%.2f' % row.exam_mark }}{% else %}-{% endif %}</td>
+        <td class="p-4 text-right">
+          {% if row.is_exam_required %}
+            <span class="text-info font-bold" title="Required (Weighted)">{{ '%.2f' % row.exam_mark }}</span>
+          {% elif row.exam_mark is not none %}
+            {{ '%.2f' % row.exam_mark }}
+          {% else %}
+            -
+          {% endif %}
+        </td>
         <td class="p-4 text-right">{% if row.exam_weight is not none %}{{ '%.0f' % row.exam_weight }}%{% else %}-{% endif %}</td>
         <td class="p-4 text-right font-bold">{{ '%.0f' % row.total_mark if row.total_mark is not none else '-' }}</td>
         <td class="p-4 text-right">
           {% if row.sync_subject and row.semester_name != semester %}
-            <a class="btn btn-xs btn-outline" href="/year/{{year}}/semester/{{row.semester_name}}/subject/{{row.code}}?return_to={{semester}}-{{year}}">Open</a>
+            <form method="post" action="/subjects/{{year}}/{{row.code}}/open" class="inline-block m-0 p-0">
+              <input type="hidden" name="semester" value="{{row.semester_name}}" />
+              <input type="hidden" name="return_to" value="{{semester}}-{{year}}" />
+              <button class="btn btn-xs btn-outline" type="submit">Open</button>
+            </form>
           {% else %}
-            <a class="btn btn-xs btn-outline" href="/year/{{year}}/semester/{{semester}}/subject/{{row.code}}">Open</a>
+            <form method="post" action="/subjects/{{year}}/{{row.code}}/open" class="inline-block m-0 p-0">
+              <input type="hidden" name="semester" value="{{semester}}" />
+              <button class="btn btn-xs btn-outline" type="submit">Open</button>
+            </form>
           {% endif %}
         </td>
       </tr>

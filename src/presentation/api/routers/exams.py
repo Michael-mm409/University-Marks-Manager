@@ -6,7 +6,7 @@ from typing import List, Optional, Sequence
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlmodel import Session, select
 
-from src.infrastructure.db.models import Examination, Assignment
+from src.infrastructure.db.models import Examination, Assignment, Subject
 from src.presentation.api.schemas import ExaminationCreate, ExaminationRead
 from src.presentation.api.deps import get_session
 
@@ -29,6 +29,19 @@ def list_exams(
     Returns:
         Sequence[Examination]: List of examinations.
     """
+    # Prefer normalized filtering when all three are provided
+    if subject_code and semester_name and year:
+        subj = session.exec(
+            select(Subject).where(
+                Subject.subject_code == subject_code,
+                Subject.semester_name == semester_name,
+                Subject.year == year,
+            )
+        ).first()
+        sid = getattr(subj, "id", None)
+        if sid is not None:
+            return session.exec(select(Examination).where(Examination.subject_id == sid)).all()
+    # Fallback legacy partial filters
     stmt = select(Examination)
     if subject_code:
         stmt = stmt.where(Examination.subject_code == subject_code)
@@ -54,13 +67,16 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
     Returns:
         Examination: The created examination.
     """
-    existing = session.exec(
-        select(Examination).where(
-            Examination.subject_code == data.subject_code,
-            Examination.semester_name == data.semester_name,
-            Examination.year == data.year,
+    # Resolve subject_id, enforce one-exam-per-subject
+    subj = session.exec(
+        select(Subject).where(
+            Subject.subject_code == data.subject_code,
+            Subject.semester_name == data.semester_name,
+            Subject.year == data.year,
         )
     ).first()
+    sid = getattr(subj, "id", None)
+    existing = session.exec(select(Examination).where(Examination.subject_id == sid)).first()
     if existing:
         raise HTTPException(status_code=409, detail="Exam already exists for subject")
 
@@ -68,9 +84,7 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
     if not data.exam_weight:
         assignments = session.exec(
             select(Assignment).where(
-                Assignment.subject_code == data.subject_code,
-                Assignment.semester_name == data.semester_name,
-                Assignment.year == data.year,
+                Assignment.subject_id == sid
             ).order_by(Assignment.assessment)
         ).all()
         used = 0.0
@@ -84,6 +98,7 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
 
     # Exclude None values so SQLModel will use the model defaults for non-optional fields
     payload = data.model_dump(exclude_none=True, exclude={"id"})
+    payload["subject_id"] = sid
     exam = Examination(**payload)
     session.add(exam)
     session.commit()
@@ -91,34 +106,60 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
     return exam
 
 
-@router.get("/{subject_code}/{semester_name}/{year}", response_model=ExaminationRead)
+@router.get("/{year}/{subject_code}/{semester_name}", response_model=ExaminationRead)
 def get_exam(
+    year: str,
     subject_code: str,
     semester_name: str,
-    year: str,
     session: Session = Depends(get_session),
 ) -> Examination:
     """
     Retrieve an examination by its composite primary key (subject_code, semester_name, year).
     """
-    exam = session.get(Examination, (subject_code, semester_name, year))
+    # Prefer normalized lookup by subject_id; fallback to composite if not found
+    subj = session.exec(
+        select(Subject).where(
+            Subject.subject_code == subject_code,
+            Subject.semester_name == semester_name,
+            Subject.year == year,
+        )
+    ).first()
+    sid = getattr(subj, "id", None)
+    exam = None
+    if sid is not None:
+        exam = session.exec(select(Examination).where(Examination.subject_id == sid)).first()
+    if not exam:
+        exam = session.get(Examination, (subject_code, semester_name, year))
     if not exam:
         raise HTTPException(status_code=404, detail="Not found")
     return exam
 
 
-@router.put("/{subject_code}/{semester_name}/{year}", response_model=ExaminationRead)
+@router.put("/{year}/{subject_code}/{semester_name}", response_model=ExaminationRead)
 def update_exam(
+    year: str,
     subject_code: str,
     semester_name: str,
-    year: str,
     data: ExaminationCreate,
     session: Session = Depends(get_session),
 ) -> Examination:
     """
     Update an existing examination's details identified by its composite primary key.
     """
-    exam = session.get(Examination, (subject_code, semester_name, year))
+    # Prefer normalized lookup by subject_id; fallback to composite if not found
+    subj = session.exec(
+        select(Subject).where(
+            Subject.subject_code == subject_code,
+            Subject.semester_name == semester_name,
+            Subject.year == year,
+        )
+    ).first()
+    sid = getattr(subj, "id", None)
+    exam = None
+    if sid is not None:
+        exam = session.exec(select(Examination).where(Examination.subject_id == sid)).first()
+    if not exam:
+        exam = session.get(Examination, (subject_code, semester_name, year))
     if not exam:
         raise HTTPException(status_code=404, detail="Not found")
     # Only assign exam_mark if the client provided a value (it may be optional in the schema)
@@ -132,11 +173,11 @@ def update_exam(
     return exam
 
 
-@router.delete("/{subject_code}/{semester_name}/{year}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+@router.delete("/{year}/{subject_code}/{semester_name}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 def delete_exam(
+    year: str,
     subject_code: str,
     semester_name: str,
-    year: str,
     session: Session = Depends(get_session),
 ) -> Response:
     """

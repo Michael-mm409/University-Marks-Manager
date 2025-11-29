@@ -20,7 +20,9 @@ def create_assignment(
     weighted_mark: Optional[float] = Form(None),
     mark_weight: Optional[float] = Form(None),
     grade_type: str = Form("numeric"),
+    is_exam: bool = Form(False),
     total_mark: Optional[str] = Form(None),  # propagate desired final total to trigger recompute
+    return_to: Optional[str] = Form(None),
     session: Session = Depends(get_session),  # noqa: B008 - FastAPI dependency injection is intended here
 ):
     """
@@ -62,17 +64,26 @@ def create_assignment(
         weighted_val = None
         mark_weight_val = None
         unweighted_val = None
+    # Resolve subject_id first for normalized lookups
+    subj = session.exec(
+        select(Subject).where(
+            Subject.subject_code == code,
+            Subject.semester_name == semester,
+            Subject.year == year,
+        )
+    ).first()
+    subject_id = getattr(subj, "id", None)
+    # Check duplicate by (subject_id, assessment)
     existing_assignment = session.exec(
         select(Assignment).where(
-            Assignment.subject_code == code,
-            Assignment.semester_name == semester,
-            Assignment.year == year,
+            Assignment.subject_id == subject_id,
             Assignment.assessment == assessment,
         )
     ).first()
     if existing_assignment:
         return HTMLResponse("An assignment with this name already exists for this subject/semester/year.", status_code=400)
     new_assignment = Assignment(
+        subject_id=subject_id,
         subject_code=code,
         semester_name=semester,
         year=year,
@@ -82,19 +93,14 @@ def create_assignment(
         unweighted_mark=unweighted_val,
         mark_weight=mark_weight_val,
         grade_type=grade_type,
+        is_exam=is_exam,
     )
     session.add(new_assignment)
     session.commit()
 
     # If total_mark is not provided or is empty, use the subject's stored total_mark
     if total_mark in (None, ""):
-        subject = session.exec(
-            select(Subject).where(
-                Subject.semester_name == semester,
-                Subject.year == year,
-                Subject.subject_code == code,
-            )
-        ).first()
+        subject = subj
         target_val = subject.total_mark if subject and subject.total_mark is not None else None
     else:
         target_val = total_mark
@@ -109,34 +115,33 @@ def create_assignment(
             # Recompute assignment aggregates including newly added assignment
             assignments = session.exec(
                 select(Assignment).where(
-                    Assignment.semester_name == semester,
-                    Assignment.year == year,
-                    Assignment.subject_code == code,
+                    Assignment.subject_id == subject_id,
                 ).order_by(Assignment.assessment)
             ).all()
             assign_weight_sum = 0.0
             assign_weighted_total = 0.0
             for a in assignments:
-                if a.grade_type == GradeType.NUMERIC.value and a.mark_weight and a.weighted_mark:
-                    try:
-                        assign_weight_sum += float(a.mark_weight)
-                        assign_weighted_total += float(a.weighted_mark)
-                    except ValueError:
-                        pass
+                if a.grade_type == GradeType.NUMERIC.value:
+                    if a.mark_weight not in (None, ""):
+                        try:
+                            assign_weight_sum += float(a.mark_weight)
+                        except ValueError:
+                            pass
+                    if a.weighted_mark not in (None, ""):
+                        try:
+                            assign_weighted_total += float(a.weighted_mark)
+                        except ValueError:
+                            pass
             existing_exam = session.exec(
                 select(Examination).where(
-                    Examination.semester_name == semester,
-                    Examination.year == year,
-                    Examination.subject_code == code,
+                    Examination.subject_id == subject_id,
                 )
             ).first()
             exam_weight = existing_exam.exam_weight if existing_exam else max(0.0, 100.0 - assign_weight_sum)
             # Apply PS scaling based on persisted settings (if any)
             setting = session.exec(
                 select(ExamSettings).where(
-                    ExamSettings.semester_name == semester,
-                    ExamSettings.year == year,
-                    ExamSettings.subject_code == code,
+                    ExamSettings.subject_id == subject_id,
                 )
             ).first()
             ps_enabled = bool(setting.ps_exam) if setting else False
@@ -156,6 +161,7 @@ def create_assignment(
                 else:
                     session.add(
                         Examination(
+                            subject_id=subject_id,
                             subject_code=code,
                             semester_name=semester,
                             year=year,
@@ -164,9 +170,10 @@ def create_assignment(
                         )
                     )
                 session.commit()
-    return RedirectResponse(
-        f"/semester/{semester}/subject/{code}?year={year}&total_mark={target_val or ''}", status_code=303
-    )
+    url = f"/semester/{semester}/subject/{code}?year={year}&total_mark={target_val or ''}"
+    if return_to:
+        url += f"&return_to={return_to}"
+    return RedirectResponse(url, status_code=303)
 
 
 @assignment_router.api_route("/assignment/{assessment}/{year}/delete", methods=["POST"], response_class=HTMLResponse)
@@ -175,6 +182,7 @@ def delete_assignment(
     code: str,
     semester: str,
     year: str,
+    return_to: Optional[str] = Form(None),
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
     """
@@ -190,20 +198,28 @@ def delete_assignment(
     Returns:
         RedirectResponse: Redirect to subject detail page.
     """
+    # Resolve subject and delete by (subject_id, assessment)
+    subj = session.exec(
+        select(Subject).where(
+            Subject.subject_code == code,
+            Subject.semester_name == semester,
+            Subject.year == year,
+        )
+    ).first()
+    sid = getattr(subj, "id", None)
     existing = session.exec(
         select(Assignment).where(
+            Assignment.subject_id == sid,
             Assignment.assessment == assessment,
-            Assignment.subject_code == code,
-            Assignment.semester_name == semester,
-            Assignment.year == year,
         )
     ).first()
     if existing:
         session.delete(existing)
         session.commit()
-    return RedirectResponse(
-        f"/semester/{semester}/subject/{code}?year={year}", status_code=303
-    )
+    url = f"/semester/{semester}/subject/{code}?year={year}"
+    if return_to:
+        url += f"&return_to={return_to}"
+    return RedirectResponse(url, status_code=303)
 
 # AJAX endpoint: return assignment edit form HTML
 @assignment_router.api_route("/assignment/{assessment}/{year}/edit", response_class=HTMLResponse, methods=["GET", "HEAD"])
@@ -229,19 +245,32 @@ def edit_assignment_form(
     Raises:
         Description.
     """
+    # Resolve subject to query by normalized ID
+    subj = session.exec(
+        select(Subject).where(
+            Subject.subject_code == code,
+            Subject.semester_name == semester,
+            Subject.year == year,
+        )
+    ).first()
+    sid = getattr(subj, "id", None)
     assignment = session.exec(
         select(Assignment).where(
+            Assignment.subject_id == sid,
             Assignment.assessment == assessment,
-            Assignment.subject_code == code,
-            Assignment.semester_name == semester,
-            Assignment.year == year,
         )
     ).first()
     if not assignment:
         return HTMLResponse("Assignment not found", status_code=404)
     # Return only <td> cells for inline editing, with a form inside the last cell
+    is_exam_checked = "checked" if getattr(assignment, "is_exam", False) else ""
     return HTMLResponse(f"""
-    <td><input name='assessment' class='input input-xs w-24' value='{assignment.assessment}' required /></td>
+    <td>
+        <input name='assessment' class='input input-xs w-24' value='{assignment.assessment}' required />
+        <div class="flex items-center mt-1">
+            <label class="cursor-pointer label p-0"><span class="label-text text-[10px] mr-1">Exam?</span><input type="checkbox" name="is_exam" value="true" class="checkbox checkbox-xs" {is_exam_checked} /></label>
+        </div>
+    </td>
     <td><input name='weighted_mark' type='number' step='any' min='0' class='input input-xs w-16' value='{assignment.weighted_mark if assignment.weighted_mark is not None else ''}' placeholder='Weighted mark' /></td>
     <td class='assignment-unweighted'><input name='unweighted_mark' type='text' class='input input-xs w-16' value="{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.unweighted_mark) if assignment.unweighted_mark is not None else '0.00')}" readonly /></td>
     <td><input name='mark_weight' type='number' step='any' min='0' class='input input-xs w-16' value='{assignment.mark_weight if assignment.mark_weight is not None else ''}' placeholder='Mark weight' /></td>
@@ -265,6 +294,7 @@ def update_assignment_ajax(
     weighted_mark: Optional[float] = Form(None),
     mark_weight: Optional[float] = Form(None),
     grade_type: str = Form("numeric"),
+    is_exam: bool = Form(False),
     session: Session = Depends(get_session),
 ):
     """
@@ -284,12 +314,19 @@ def update_assignment_ajax(
         Description.
     """
     try:
+        # Resolve subject to use normalized ID-based lookups
+        subj = session.exec(
+            select(Subject).where(
+                Subject.subject_code == code,
+                Subject.semester_name == semester,
+                Subject.year == year,
+            )
+        ).first()
+        sid = getattr(subj, "id", None)
         assignment = session.exec(
             select(Assignment).where(
+                Assignment.subject_id == sid,
                 Assignment.assessment == assessment,
-                Assignment.subject_code == code,
-                Assignment.semester_name == semester,
-                Assignment.year == year,
             )
         ).first()
         if not assignment:
@@ -316,39 +353,35 @@ def update_assignment_ajax(
             assignment.mark_weight = None
             assignment.unweighted_mark = None
         assignment.grade_type = grade_type
+        assignment.is_exam = is_exam
         session.commit()
         # Recalculate and update subject total_mark after assignment edit
-        subject = session.exec(
-            select(Subject).where(
-                Subject.subject_code == code,
-                Subject.semester_name == semester,
-                Subject.year == year,
-            )
-        ).first()
+        subject = subj
         if subject:
             assignments = session.exec(
                 select(Assignment).where(
-                    Assignment.subject_code == code,
-                    Assignment.semester_name == semester,
-                    Assignment.year == year,
+                    Assignment.subject_id == sid,
                 ).order_by(Assignment.assessment)
             ).all()
             exams = session.exec(
                 select(Examination).where(
-                    Examination.subject_code == code,
-                    Examination.semester_name == semester,
-                    Examination.year == year,
+                    Examination.subject_id == sid,
                 )
             ).all()
             assess_weight_sum = 0.0
             assess_weighted_total = 0.0
             for a in assignments:
-                if a.grade_type == GradeType.NUMERIC.value and a.mark_weight and a.weighted_mark:
-                    try:
-                        assess_weight_sum += float(a.mark_weight)
-                        assess_weighted_total += float(a.weighted_mark)
-                    except ValueError:
-                        pass
+                if a.grade_type == GradeType.NUMERIC.value:
+                    if a.mark_weight not in (None, ""):
+                        try:
+                            assess_weight_sum += float(a.mark_weight)
+                        except ValueError:
+                            pass
+                    if a.weighted_mark not in (None, ""):
+                        try:
+                            assess_weighted_total += float(a.weighted_mark)
+                        except ValueError:
+                            pass
             # Prepare escaped/display values for the updated row (prevent stored XSS)
             assessment_value = escape(assignment.assessment or "")
             weighted_value = "-" if assignment.grade_type in ("S", "U") else (
@@ -392,21 +425,24 @@ def update_assignment_ajax(
                     except ZeroDivisionError:
                         total_mark = None
         # Return updated row HTML for table
+        exam_badge = "<span class='badge badge-xs badge-info ml-1'>Exam</span>" if getattr(assignment, "is_exam", False) else ""
         row_html = (
-            f"<td class='assignment-assessment'>{assignment.assessment}</td>"
+            f"<td class='assignment-assessment'>{assignment.assessment}{exam_badge}</td>"
             f"<td class='assignment-weighted'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.weighted_mark) if assignment.weighted_mark is not None else '0.00')}</td>"
             f"<td class='assignment-unweighted'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.unweighted_mark) if assignment.unweighted_mark is not None else '0.00')}</td>"
             f"<td class='assignment-mark-weight'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.mark_weight) if assignment.mark_weight is not None else '0.00')}</td>"
             f"<td class='assignment-grade-type'>{assignment.grade_type}</td>"
             f"<td class='flex gap-1'>"
-            f"<form method='post' action='/semester/{semester}/subject/{code}/assignment/{assessment}/{code}/{semester}/{year}/delete'>"
+            f"<form method='post' action='/semester/{semester}/subject/{code}/assignment/{assessment}/{year}/delete'>"
             f"<input type='hidden' name='year' value='{year}' />"
             f"<button class='btn btn-xs btn-error' type='submit'>✕</button>"
             f"</form>"
             f"<button class='btn btn-xs btn-outline' type='button' onclick=\"window.startInlineEditAssignment('{assessment}','{code}','{semester}','{year}')\">Edit</button>"
             f"</td>"
         )
-        return JSONResponse({"success": True, "row_html": row_html})
+        # Instruct client to fully reload the subject page so summary/averages recalculate consistently
+        reload_url = f"/subjects/{year}/{code}?semester={semester}"
+        return JSONResponse({"success": True, "row_html": row_html, "reload_url": reload_url})
     except Exception:
         logger.exception("update_assignment_ajax failed")
         return JSONResponse({"success": False, "error": "Internal server error"}, status_code=500)

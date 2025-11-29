@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from sqlmodel import Session, select
 
 from src.core.services.course_manager import CourseManager
@@ -42,6 +42,55 @@ def get_courses_page(
     courses = course_manager.get_all_courses()
     template = jinja_env.get_template("courses.html")
     return template.render(request=request, courses=courses)
+
+
+@router.head("/courses")
+def get_courses_head(request: Request, session: Session = Depends(get_session)):
+    """HEAD variant for the courses page so clients that probe with HEAD get headers/status.
+
+    Reuse the GET handler to compute headers; return a Response without a body.
+    """
+    # Call the GET handler but be defensive: template.render() returns a string
+    # so attempting to read .headers on it will raise. Return a simple 200
+    # with no body and preserve headers if the GET returned a Response-like
+    # object.
+    try:
+        resp = get_courses_page(request=request, session=session)
+        if hasattr(resp, "headers"):
+            headers = dict(resp.headers) if resp is not None else {}
+        else:
+            headers = {}
+        status = getattr(resp, "status_code", 200)
+        return Response(status_code=status, headers=headers)
+    except Exception:
+        # Fallback: return an empty 200 response for HEAD
+        return Response(status_code=200)
+
+
+# The selector fragment must be registered before the dynamic /courses/{course_code}
+# route to avoid the literal path "_selector" being captured as a course_code.
+# See: requests like /courses/_selector should match this static route.
+@router.get("/courses/_selector", response_class=HTMLResponse)
+def courses_selector_fragment(request: Request, session: Session = Depends(get_session)):
+    """Return a small HTML fragment with a course dropdown for inline selection.
+
+    This endpoint is intended to be loaded into the header via HTMX so users can
+    change the active course without leaving the current page.
+    """
+    jinja_env = request.app.state.jinja_env
+    cm = CourseManager(session)
+    courses = cm.get_all_courses()
+    template = jinja_env.get_template("partials/course_header.html")
+    current_course_id = request.session.get("current_course_id")
+    current_course_name = request.session.get("current_course_name")
+    current_course_code = request.session.get("current_course_code")
+    return template.render(
+        request=request,
+        courses=courses,
+        current_course_id=current_course_id,
+        current_course_name=current_course_name,
+        current_course_code=current_course_code,
+    )
 
 
 @router.get("/courses/_codes", response_class=HTMLResponse)
@@ -211,7 +260,19 @@ def create_course_view(
     course_manager = CourseManager(session)
     course = course_manager.create_course(name=name, code=code)
     template = jinja_env.get_template("partials/course_item.html")
-    return template.render(request=request, course=course)
+    # If this request was issued by HTMX, return the new course fragment
+    # and trigger a client-side event so the header/selector can be refreshed
+    # via a separate HTMX GET (keeps behavior fast and avoids full reload).
+    content = template.render(request=request, course=course)
+    if request.headers.get("HX-Request"):
+        resp = HTMLResponse(content)
+        # Trigger a client-side event 'courseListChanged' so page JS can
+        # request an updated selector/header fragment and swap it in.
+        resp.headers["HX-Trigger"] = "courseListChanged"
+        return resp
+
+    # Non-HTMX: return the fragment (legacy behavior)
+    return content
 
 
 @router.get("/courses/{course_code}", response_class=HTMLResponse)
@@ -347,6 +408,56 @@ def select_current_course(
 
     # Otherwise, return a redirect response to home with a hint for UI to show alert
     redirect_url = "/?selected=1"
+    response = RedirectResponse(url=redirect_url, status_code=303)
+    response.headers["HX-Redirect"] = redirect_url
+    return response
+
+
+@router.post("/courses/select-inline")
+def select_course_inline(request: Request, course_key: str = Form(""), session: Session = Depends(get_session)) -> Response:
+    """Set the active course via an inline POST and return the updated selector fragment.
+
+    If the request is via HTMX the fragment returned will replace the selector and
+    include a small success message via the flash mechanism.
+    """
+    # Debug: log invocation so container logs show whether the endpoint was hit
+    try:
+        print(f"[debug] select_course_inline hit course_key={course_key!r} HX-Request={request.headers.get('HX-Request')!r}")
+    except Exception:
+        # avoid any accidental logging errors breaking the flow
+        pass
+    sess = request.session
+    # Treat explicit sentinel or empty value as a clear request
+    if not course_key or course_key == "__clear__":
+        sess.pop("current_course_id", None)
+        sess.pop("current_course_name", None)
+        sess.pop("current_course_code", None)
+        sess["flash_message"] = "Active course cleared."
+    else:
+        course = _resolve_course(CourseManager(session), course_key)
+        if course:
+            sess["current_course_id"] = course.id
+            sess["current_course_name"] = course.name
+            if getattr(course, "code", None):
+                sess["current_course_code"] = course.code
+            else:
+                sess.pop("current_course_code", None)
+            sess["flash_message"] = f"Active course changed to {course.name}{' (' + course.code + ')' if getattr(course, 'code', None) else ''}."
+
+    # After changing the session, navigate to Home so the header (active course)
+    # is refreshed. For HTMX clients we provide both HX-Redirect and HX-Refresh
+    # as some proxies or intermediary rewrites can prevent the browser from
+    # following the redirect reliably; HX-Refresh forces a full client reload.
+    redirect_url = "/?selected=1"
+    if request.headers.get("HX-Request"):
+        # Return an HTMLResponse with HTMX headers so HTMX will perform a
+        # navigation or a full page refresh.
+        resp = HTMLResponse("")
+        resp.headers["HX-Redirect"] = redirect_url
+        resp.headers["HX-Refresh"] = "true"
+        return resp
+
+    # Non-HTMX clients: standard 303 redirect to Home
     response = RedirectResponse(url=redirect_url, status_code=303)
     response.headers["HX-Redirect"] = redirect_url
     return response

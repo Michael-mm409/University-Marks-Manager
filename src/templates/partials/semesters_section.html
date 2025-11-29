@@ -1,0 +1,83 @@
+<section id="semesters-section" class="max-w-4xl mx-auto px-2"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <div class="flex flex-col items-center gap-3 mb-4">
+    <div class="flex items-center gap-3 text-center">
+      <h2 class="text-2xl md:text-3xl font-bold">{{ 'Semester' if (semesters|length) == 1 else 'Semesters' }}</h2>
+      <span class="badge badge-info badge-sm">{{ semesters|length }}</span>
+    </div>
+    {% if course_filter %}
+    <div class="text-xs opacity-70 text-center">
+      Filtering by course: <span class="font-semibold">{{ course_filter.name }}</span>
+      {% if course_filter.code %}<span class="ml-1">({{ course_filter.code }})</span>{% endif %}
+    </div>
+    {% endif %}
+    
+    {% if wam is not none or gpa is not none %}
+    <div class="w-full max-w-3xl mx-auto mt-4">
+      <div role="tablist" class="tabs tabs-lifted">
+        <input type="radio" name="grade_tabs" role="tab" class="tab" aria-label="WAM" checked />
+        <div role="tabpanel" class="tab-content bg-base-100 border-base-300 rounded-box p-6 relative">
+          <a href="/settings" class="btn btn-sm btn-circle btn-ghost absolute top-2 right-2 opacity-50 hover:opacity-100 text-lg" title="Configure Grade Scales" style="text-decoration:none;">
+            ⚙️
+          </a>
+          <div class="stats stats-vertical sm:stats-horizontal w-full shadow-none justify-center">
+            <div class="stat place-items-center min-w-[140px]">
+              <div class="stat-title text-xs uppercase tracking-wider opacity-60 font-bold">WAM</div>
+              <div class="stat-value text-primary text-3xl md:text-4xl">{{ wam if wam is not none else '-' }}</div>
+              <div class="stat-desc text-xs">Weighted Average</div>
+            </div>
+            {% if grade_counts %}
+              {% for grade, count in grade_counts.items() %}
+                {% if count > 0 %}
+                <div class="stat place-items-center">
+                  <div class="stat-title text-xs font-bold opacity-60">{{ grade }}</div>
+                  <div class="stat-value text-xl">{{ count }}</div>
+                </div>
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          </div>
+        </div>
+
+        <input type="radio" name="grade_tabs" role="tab" class="tab" aria-label="GPA" />
+        <div role="tabpanel" class="tab-content bg-base-100 border-base-300 rounded-box p-6 relative">
+          <a href="/settings" class="btn btn-sm btn-circle btn-ghost absolute top-2 right-2 opacity-50 hover:opacity-100 text-lg" title="Configure Grade Scales" style="text-decoration:none;">
+            ⚙️
+          </a>
+           <div class="stats w-full shadow-none justify-center">
+            <div class="stat place-items-center">
+              <div class="stat-title text-xs uppercase tracking-wider opacity-60 font-bold">GPA</div>
+              <div class="stat-value text-secondary text-3xl md:text-4xl">{{ gpa if gpa is not none else '-' }}</div>
+              <div class="stat-desc text-xs">Grade Point Average (4.0 Scale)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Year Filter -->
+    <form method="get" action="/" class="flex items-end gap-3 justify-center">
+      <label class="form-control w-44">
+        <span class="label-text text-xs">Filter Year</span>
+        <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">
+          <option value="" {% if not selected_year %}selected{% endif %}>All</option>
+          {% for y in years %}
+            <option value="{{y}}" {% if selected_year == y %}selected{% endif %}>{{y}}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% if selected_year is not none %}
+        <a href="/all" class="btn btn-sm btn-ghost" title="Clear year filter">Reset</a>
+      {% endif %}
+    </form>
+  </div>
+
+  {% if semesters %}
+    {% include 'partials/semesters_grid.html' %}
+  {% else %}
+    <div class="p-8 rounded-xl border-dashed border-2 text-center opacity-70">
+      No semesters{% if selected_year %} for {{selected_year}}{% endif %}
+      {% if course_filter %}in this course{% endif %}. Add your first above.
+    </div>
+  {% endif %}
+</section>

@@ -36,6 +36,7 @@
     <input type="hidden" name="year" value="{{year}}" />
     <input name="subject_code" class="input input-xs w-24" value="{{subject.subject_code}}" required />
     <input name="subject_name" class="input input-xs w-48" value="{{subject.subject_name}}" required />
+    <input name="credit_points" type="number" class="input input-xs w-16" value="{{subject.credit_points}}" placeholder="CP" required />
     <button type="submit" class="btn btn-xs btn-primary">Save</button>
     <button type="button" class="btn btn-xs" onclick="hideSubjectEditForm()">Cancel</button>
   </form>
@@ -47,8 +48,10 @@
     {% else %}
       <a href="/year/{{year}}/semester/{{semester}}" class="btn btn-xs btn-outline">Back to Semester</a>
     {% endif %}
+    <a href="/" class="btn btn-xs btn-secondary">Return to Home</a>
     <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/delete" onsubmit="return confirm('Delete this subject and all related assignments/exams?');">
       <input type="hidden" name="year" value="{{year}}" />
+      {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}" />{% endif %}
       <button class="btn btn-xs btn-error" type="submit">Delete Subject</button>
     </form>
   </div>
@@ -75,6 +78,7 @@
       {% endif %}
       <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/create" class="grid grid-cols-1 md:grid-cols-12 gap-3 text-sm">
         <input type="hidden" name="year" value="{{year}}" />
+        {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}" />{% endif %}
         {% if final_total is not none %}<input type="hidden" name="total_mark" value="{{ final_total }}" />{% endif %}
         {% if effective_exam_weight %}<input type="hidden" name="exam_weight" value="{{ effective_exam_weight }}" />{% endif %}
         {% if ps_exam %}<input type="hidden" name="ps_exam" value="true" />{% endif %}
@@ -87,6 +91,12 @@
           <option value="S">S</option>
           <option value="U">U</option>
         </select>
+        <div class="col-span-1 md:col-span-2 flex items-center">
+            <label class="cursor-pointer label p-0">
+                <span class="label-text text-xs mr-2">Is Exam?</span>
+                <input type="checkbox" name="is_exam" value="true" class="checkbox checkbox-xs" />
+            </label>
+        </div>
         <button class="btn btn-xs btn-primary col-span-1 md:col-span-2" type="submit">Add</button>
       </form>
     </div>
@@ -115,6 +125,7 @@
       {% endif %}
       <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/totalMark/save" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-4 text-sm">
         <input type="hidden" name="year" value="{{year}}" />
+        {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}" />{% endif %}
         <div class="col-span-1 sm:col-span-2 md:col-span-4">
           <label class="form-control">
             <span class="label-text text-xs">Desired Final Total Mark</span>
@@ -157,7 +168,6 @@
     <a class="tab tab-sm" id="tab-summary" onclick="showTab('summary')">Summary</a>
   </div>
   <div id="panel-assignments">
-    <h4 class="text-2xl md:text-3xl font-bold mb-2 flex items-center gap-2 justify-center text-center">Assignments</h4>
     <div class="overflow-x-auto mb-6">
       <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
         <thead>
@@ -173,14 +183,32 @@
         <tbody>
   {% for assignment in assignments %}
   <tr data-assessment="{{ assignment.assessment }}" data-code="{{ assignment.subject_code }}" data-semester="{{ assignment.semester_name }}" data-year="{{ assignment.year }}" class="assignment-row">
-    <td class="assignment-assessment">{{assignment.assessment}}</td>
-    <td class="assignment-weighted">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.weighted_mark|float) if assignment.weighted_mark is not none else '0.00' }}{% endif %}</td>
-    <td class="assignment-unweighted">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}{% endif %}</td>
+    <td class="assignment-assessment">
+      {{assignment.assessment}}
+      {% if assignment.is_exam %}
+      <span class="badge badge-xs badge-info ml-1">Exam</span>
+      {% endif %}
+    </td>
+    <td class="assignment-weighted">
+      {% if assignment.is_exam and (assignment.weighted_mark is none or assignment.weighted_mark == 0) and required_exam_mark is not none %}
+        <span class="text-info font-bold" title="Target to reach goal">{{ '%.2f' % ((required_exam_mark / 100) * assignment.mark_weight) }}</span>
+      {% else %}
+        {% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.weighted_mark|float) if assignment.weighted_mark is not none else '0.00' }}{% endif %}
+      {% endif %}
+    </td>
+    <td class="assignment-unweighted">
+      {% if assignment.is_exam and (assignment.unweighted_mark is none or assignment.unweighted_mark == 0) and required_exam_mark is not none %}
+        <span class="text-info font-bold" title="Target to reach goal">{{ '%.2f' % (required_exam_mark / 100) }}</span>
+      {% else %}
+        {% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}{% endif %}
+      {% endif %}
+    </td>
     <td class="assignment-mark-weight">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.mark_weight|float) if assignment.mark_weight is not none else '0.00' }}{% endif %}</td>
     <td class="assignment-grade-type">{{assignment.grade_type}}</td>
     <td class="flex gap-1">
       <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/{{assignment.assessment}}/{{assignment.subject_code}}/{{assignment.semester_name}}/{{assignment.year}}/delete" onsubmit="return confirm('Delete assignment?');">
         <input type="hidden" name="year" value="{{year}}" />
+        {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}" />{% endif %}
         <button class="btn btn-xs btn-error" type="submit">✕</button>
       </form>
       <button class="btn btn-xs btn-outline" type="button" onclick="startInlineEditAssignment('{{ assignment.assessment }}','{{ assignment.subject_code }}','{{ assignment.semester_name }}','{{ assignment.year }}')">Edit</button>
@@ -197,7 +225,6 @@
     </div>
   </div>
   <div id="panel-summary" class="hidden">
-    <h4 class="text-2xl md:text-3xl font-bold mb-3 flex items-center gap-2 justify-center text-center">Summary</h4>
     <div class="overflow-x-auto p-2">
   <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
         <thead>
@@ -208,6 +235,8 @@
             <th>Final Exam Mark</th>
             <th>Final Exam Mark Weight</th>
             <th>Total Mark</th>
+            <th>S Grades</th>
+            <th>U Grades</th>
           </tr>
         </thead>
         <tbody>
@@ -215,12 +244,18 @@
             <td>{{ subject.subject_name }}</td>
             <td>{{ '%.2f' % assignment_weighted_sum }}</td>
             <td>{{ '%.0f' % assignment_weight_percent }}%</td>
-            <td>{{ '%.2f' % exam_mark if exam_mark is not none else '-' }}</td>
+            <td>
+              {% if required_exam_mark is not none and (exam_mark is none or exam_mark == 0) %}
+                <span class="text-info font-bold" title="Required to reach target (Weighted)">{{ '%.2f' % ((required_exam_mark * effective_exam_weight) / 100) }}</span>
+              {% else %}
+                {{ '%.2f' % exam_weighted_sum if exam_mark is not none else '-' }}
+              {% endif %}
+            </td>
             <td>{{ '%.0f' % effective_exam_weight if effective_exam_weight else 0 }}%</td>
             <td>{{ '%.0f' % subject.total_mark if subject.total_mark is not none else '-' }}</td>
+            <td>{{ count_s }}</td>
+            <td>{{ count_u }}</td>
           </tr>
-        </tbody>
-      </table>
     </div>
   </div>
 </div>
@@ -300,7 +335,8 @@ window.submitInlineEditAssignmentRow = function(assessment, code, semester, year
     const weighted_mark = row.querySelector("input[name='weighted_mark']")?.value || '';
     const mark_weight = row.querySelector("input[name='mark_weight']")?.value || '';
     const grade_type = row.querySelector("select[name='grade_type']")?.value || 'numeric';
-    console.log('[Edit] Form values', { weighted_mark, mark_weight, grade_type });
+    const is_exam = row.querySelector("input[name='is_exam']")?.checked || false;
+    console.log('[Edit] Form values', { weighted_mark, mark_weight, grade_type, is_exam });
     const formData = new FormData();
     formData.append('assessment', assessment);
     formData.append('subject_code', code);
@@ -309,6 +345,7 @@ window.submitInlineEditAssignmentRow = function(assessment, code, semester, year
     formData.append('weighted_mark', weighted_mark);
     formData.append('mark_weight', mark_weight);
     formData.append('grade_type', grade_type);
+    formData.append('is_exam', is_exam);
     fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/update`, { method: 'POST', body: formData })
         .then(r => {
             console.log('[Edit] AJAX response status', r.status);
