@@ -160,8 +160,9 @@ class GradeScale(SQLModel, table=True):
     label: str  # e.g. "High Distinction"
     min_mark: float  # e.g. 85.0
     gpa_point: float  # e.g. 4.0
+    band_type: str = Field(default="both", index=True, description="wam, gpa, or both")
     __table_args__ = (
-        UniqueConstraint("scale_name", "grade", name="uq_scale_grade"),
+        UniqueConstraint("scale_name", "grade", "band_type", name="uq_scale_grade_type"),
     )
 
 

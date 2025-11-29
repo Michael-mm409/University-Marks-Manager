@@ -45,7 +45,14 @@
         <strong>GPA:</strong> Uses the "GPA Point" assigned to each band (4.0 scale).
       </p>
 
-      <form action="/settings/grades/update" method="post">
+      <div class="flex mb-4 justify-center">
+        <div class="rounded-lg bg-base-200 p-1 flex w-fit border border-base-300 shadow-sm">
+          <a class="tab tab-lg font-semibold px-8 py-2 mx-1 transition-all duration-150 tab-active bg-primary text-primary-content rounded-md shadow-md border-2 border-primary cursor-pointer" id="wam-tab" onclick="showTab('wam')" style="margin-right: 0.5rem;" >WAM Bands</a>
+          <a class="tab tab-lg font-semibold px-8 py-2 mx-1 transition-all duration-150 bg-base-100 text-base-content rounded-md shadow border border-base-300 cursor-pointer" id="gpa-tab" onclick="showTab('gpa')">GPA Bands</a>
+        </div>
+      </div>
+      <form action="/settings/grades/update" method="post" id="wam-form">
+        <input type="hidden" name="band_type" value="wam" />
         <div class="mb-4 flex items-center">
           <label for="scale_name" class="mr-2 font-semibold">Scale Name:</label>
           <input type="text" id="scale_name" name="scale_name" class="input input-bordered input-sm w-48" value="{{ current_scale_name }}" list="all_scale_names" required />
@@ -63,12 +70,11 @@
                 <th>Grade (Code)</th>
                 <th>Label</th>
                 <th>Min Mark (%)</th>
-                <th>GPA Point</th>
                 <th></th>
               </tr>
             </thead>
-            <tbody id="grades-body">
-              {% for scale in scales %}
+            <tbody id="wam-grades-body">
+              {% for scale in wam_bands %}
               <tr>
                 <td>
                   <input type="text" name="grades" value="{{ scale.grade }}" class="input input-bordered input-sm w-20 font-bold" required />
@@ -78,6 +84,56 @@
                 </td>
                 <td>
                   <input type="number" name="min_marks" value="{{ scale.min_mark }}" step="0.01" min="0" max="100" class="input input-bordered input-sm w-24" required />
+                </td>
+                <td>
+                  <button type="button" class="btn btn-ghost btn-xs text-error" onclick="this.closest('tr').remove()">
+                    ✕
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-4 flex justify-between items-center">
+          <button type="button" class="btn btn-sm btn-outline" onclick="addGradeRow('wam-grades-body')">
+            + Add Grade Band
+          </button>
+          <button type="submit" class="btn btn-primary">
+            Save WAM Bands
+          </button>
+        </div>
+      </form>
+      <form action="/settings/grades/update" method="post" id="gpa-form" style="display:none;">
+        <input type="hidden" name="band_type" value="gpa" />
+        <div class="mb-4 flex items-center">
+          <label for="scale_name_gpa" class="mr-2 font-semibold">Scale Name:</label>
+          <input type="text" id="scale_name_gpa" name="scale_name" class="input input-bordered input-sm w-48" value="{{ current_scale_name }}" list="all_scale_names" required />
+          <datalist id="all_scale_names">
+            {% for scale in all_scale_names %}
+              <option value="{{ scale }}">{{ scale }}</option>
+            {% endfor %}
+          </datalist>
+          <span class="ml-2 text-xs opacity-60">(Type a new name to create a new scale)</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="table table-zebra w-full">
+            <thead>
+              <tr>
+                <th>Grade (Code)</th>
+                <th>Label</th>
+                <th>GPA Point</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="gpa-grades-body">
+              {% for scale in gpa_bands %}
+              <tr>
+                <td>
+                  <input type="text" name="grades" value="{{ scale.grade }}" class="input input-bordered input-sm w-20 font-bold" required />
+                </td>
+                <td>
+                  <input type="text" name="labels" value="{{ scale.label }}" class="input input-bordered input-sm w-full max-w-xs" required />
                 </td>
                 <td>
                   <input type="number" name="gpa_points" value="{{ scale.gpa_point }}" step="0.01" min="0" max="7" class="input input-bordered input-sm w-24" required />
@@ -92,13 +148,12 @@
             </tbody>
           </table>
         </div>
-
         <div class="mt-4 flex justify-between items-center">
-          <button type="button" class="btn btn-sm btn-outline" onclick="addGradeRow()">
+          <button type="button" class="btn btn-sm btn-outline" onclick="addGradeRow('gpa-grades-body')">
             + Add Grade Band
           </button>
           <button type="submit" class="btn btn-primary">
-            Save Changes
+            Save GPA Bands
           </button>
         </div>
       </form>
@@ -107,29 +162,35 @@
 </div>
 
 <script>
-function addGradeRow() {
-  const tbody = document.getElementById('grades-body');
+function showTab(tab) {
+  document.getElementById('wam-form').style.display = tab === 'wam' ? '' : 'none';
+  document.getElementById('gpa-form').style.display = tab === 'gpa' ? '' : 'none';
+  document.getElementById('wam-tab').classList.toggle('tab-active', tab === 'wam');
+  document.getElementById('gpa-tab').classList.toggle('tab-active', tab === 'gpa');
+}
+function addGradeRow(tbodyId) {
+  const tbody = document.getElementById(tbodyId);
   const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td>
-      <input type="text" name="grades" class="input input-bordered input-sm w-20 font-bold" required placeholder="Code" />
-    </td>
-    <td>
-      <input type="text" name="labels" class="input input-bordered input-sm w-full max-w-xs" required placeholder="Label" />
-    </td>
-    <td>
-      <input type="number" name="min_marks" step="0.01" min="0" max="100" class="input input-bordered input-sm w-24" required placeholder="0-100" />
-    </td>
-    <td>
-      <input type="number" name="gpa_points" step="0.01" min="0" max="7" class="input input-bordered input-sm w-24" required placeholder="0.0" />
-    </td>
-    <td>
-      <button type="button" class="btn btn-ghost btn-xs text-error" onclick="this.closest('tr').remove()">
-        ✕
-      </button>
-    </td>
-  `;
+  let html = '';
+  if (tbodyId === 'wam-grades-body') {
+    html = `
+      <td><input type="text" name="grades" class="input input-bordered input-sm w-20 font-bold" required placeholder="Code" /></td>
+      <td><input type="text" name="labels" class="input input-bordered input-sm w-full max-w-xs" required placeholder="Label" /></td>
+      <td><input type="number" name="min_marks" step="0.01" min="0" max="100" class="input input-bordered input-sm w-24" required placeholder="0-100" /></td>
+      <td><button type="button" class="btn btn-ghost btn-xs text-error" onclick="this.closest('tr').remove()">✕</button></td>
+    `;
+  } else {
+    html = `
+      <td><input type="text" name="grades" class="input input-bordered input-sm w-20 font-bold" required placeholder="Code" /></td>
+      <td><input type="text" name="labels" class="input input-bordered input-sm w-full max-w-xs" required placeholder="Label" /></td>
+      <td><input type="number" name="gpa_points" step="0.01" min="0" max="7" class="input input-bordered input-sm w-24" required placeholder="0.0" /></td>
+      <td><button type="button" class="btn btn-ghost btn-xs text-error" onclick="this.closest('tr').remove()">✕</button></td>
+    `;
+  }
+  tr.innerHTML = html;
   tbody.appendChild(tr);
 }
+// Default to show WAM tab
+showTab('wam');
 </script>
 {% endblock %}

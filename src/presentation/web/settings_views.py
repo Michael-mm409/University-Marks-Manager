@@ -53,14 +53,27 @@ def settings_page(request: Request, session: Session = Depends(get_session)):
     
     # Fetch all available scale names
     all_scale_names = session.exec(select(GradeScale.scale_name).distinct()).all()
-    # Fetch scales for the current scale name
-    scales = session.exec(
+    # Fetch WAM and GPA bands for the current scale name
+    from sqlalchemy import or_, and_
+    wam_bands = session.exec(
         select(GradeScale)
-        .where(GradeScale.scale_name == current_scale_name)
+        .where(
+            (GradeScale.scale_name == current_scale_name) &
+                (GradeScale.band_type.in_(["wam", "both"]))
+        )
+        .order_by(desc(GradeScale.min_mark))
+    ).all()
+    gpa_bands = session.exec(
+        select(GradeScale)
+        .where(
+            (GradeScale.scale_name == current_scale_name) &
+                (GradeScale.band_type.in_(["gpa", "both"]))
+        )
         .order_by(desc(GradeScale.min_mark))
     ).all()
     return _render(request, "settings.html", {
-        "scales": scales,
+        "wam_bands": wam_bands,
+        "gpa_bands": gpa_bands,
         "current_scale_name": current_scale_name,
         "course": course,
         "all_scale_names": all_scale_names
@@ -89,36 +102,53 @@ def update_course_scale(
             pass
     return RedirectResponse(url="/settings", status_code=303)
 
-@router.post("/settings/grades/update")
 def update_grades(
     request: Request,
     scale_name: str = Form(...),
     grades: List[str] = Form(...),
     labels: List[str] = Form(...),
-    min_marks: List[float] = Form(...),
-    gpa_points: List[float] = Form(...),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    min_marks: Optional[List[float]] = Form(None),
+    gpa_points: Optional[List[float]] = Form(None),
+    band_type: str = Form(...)
 ):
-    """Update grade scales for a specific scale name."""
-    # Remove existing scales for this scale_name
-    query = delete(GradeScale).where(GradeScale.scale_name == scale_name)  # type: ignore
+    """Update grade scales for a specific scale name and band type (wam/gpa)."""
+    # Remove existing bands for this scale_name and band_type
+    from sqlalchemy import delete as sa_delete
+    query = sa_delete(GradeScale).filter_by(scale_name=scale_name, band_type=band_type)
     session.execute(query)
-    
+
+    # Defensive: ensure min_marks/gpa_points are lists
+    min_marks = min_marks if min_marks is not None else []
+    gpa_points = gpa_points if gpa_points is not None else []
+
     # Re-insert
-    for g, l, m, p in zip(grades, labels, min_marks, gpa_points):
-        if not g.strip(): 
-            continue
-        
-        scale = GradeScale(
-            scale_name=scale_name,
-            grade=g.strip(), 
-            label=l.strip(), 
-            min_mark=m, 
-            gpa_point=p
-        )
-        session.add(scale)
-        
+    if band_type == "wam":
+        for g, l, m in zip(grades, labels, min_marks):
+            if not g.strip():
+                continue
+            scale = GradeScale(
+                scale_name=scale_name,
+                grade=g.strip(),
+                label=l.strip(),
+                min_mark=m,
+                gpa_point=0.0,
+                band_type="wam"
+            )
+            session.add(scale)
+    elif band_type == "gpa":
+        for g, l, p in zip(grades, labels, gpa_points):
+            if not g.strip():
+                continue
+            scale = GradeScale(
+                scale_name=scale_name,
+                grade=g.strip(),
+                label=l.strip(),
+                min_mark=0.0,
+                gpa_point=p,
+                band_type="gpa"
+            )
+            session.add(scale)
     session.commit()
-    
-    request.session["flash_message"] = f"Grade scales for '{scale_name}' updated successfully."
+    request.session["flash_message"] = f"{band_type.upper()} bands for '{scale_name}' updated successfully."
     return RedirectResponse(url="/settings", status_code=303)
