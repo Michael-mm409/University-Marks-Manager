@@ -113,7 +113,10 @@ def delete_semester(
 ) -> Response:
     """Delete a semester and all related data."""
     # Delete assignments, exams, settings, subjects for that semester/year
-    subs = session.exec(select(Subject).where(Subject.semester_name == semester, Subject.year == year)).all()
+    # First get the semester_id
+    sem = session.exec(select(Semester).where(Semester.name == semester, Semester.year == int(year))).first()
+    sem_id = getattr(sem, "id", None)
+    subs = session.exec(select(Subject).where(Subject.semester_id == sem_id)).all() if sem_id else []
     subject_ids = [getattr(s, "id", None) for s in subs if getattr(s, "id", None) is not None]
     # Direct delete via ORM load (simpler for small dataset), prefer subject_id-based lookups
     assignments = []
@@ -171,17 +174,23 @@ def update_semester(
 def build_semester_context(session: Session, semester: str, year: str) -> SemesterContext:
     """Build the context used by the semester detail page for rendering."""
     # Order at the database level by subject_code for predictable display
+    # First resolve semester_id
+    sem = session.exec(select(Semester).where(Semester.name == semester, Semester.year == int(year))).first()
+    sem_id = getattr(sem, "id", None)
     subjects_table = cast(Table, getattr(Subject, "__table__"))
     main_subjects = session.exec(
         select(Subject)
-        .where(Subject.year == year, Subject.semester_name == semester)
+        .where(Subject.semester_id == sem_id)
         .order_by(subjects_table.c.subject_code.asc())
-    ).all()
+    ).all() if sem_id else []
+    # Get synced subjects: same year but different semester
+    all_sems_for_year = session.exec(select(Semester).where(Semester.year == int(year))).all()
+    other_sem_ids = [s.id for s in all_sems_for_year if s.id != sem_id]
     synced_subjects = session.exec(
         select(Subject)
-        .where(Subject.year == year, Subject.sync_subject == True, Subject.semester_name != semester)  # noqa: E712
+        .where(Subject.semester_id.in_(other_sem_ids), Subject.sync_subject == True)  # noqa: E712
         .order_by(subjects_table.c.subject_code.asc())
-    ).all()
+    ).all() if other_sem_ids else []
     display_subjects = list(main_subjects) + list(synced_subjects)
     summaries: List[SemesterSummary] = []
     import logging
@@ -333,7 +342,7 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
         subjects_table = cast(Table, getattr(Subject, "__table__"))
         subjects = session.exec(
             select(Subject)
-            .where(Subject.year == sem.year, Subject.semester_name == sem.name)
+            .where(Subject.semester_id == sem.id)
             .order_by(subjects_table.c.subject_code.asc())
         ).all()
         for sub in subjects:

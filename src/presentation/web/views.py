@@ -327,44 +327,63 @@ def subject_detail_short(
     if offering:
         # Try exact match first
         candidate = session.exec(
-            select(Subject).where(Subject.year == str(year), Subject.subject_code == code, Subject.semester_name == offering)
+            select(Subject)
+            .join(Semester)
+            .where(
+                Semester.year == year,
+                Subject.subject_code == code,
+                Semester.name == offering
+            )
         ).all()
         if len(candidate) == 1:
-            sem = getattr(candidate[0], "semester_name", None)
-            if sem:
-                ctx = build_subject_context(session, semester=sem, year=year, code=code, return_to=return_to)
+            subj = candidate[0]
+            sem_obj = session.get(Semester, subj.semester_id)
+            if sem_obj:
+                ctx = build_subject_context(session, semester=sem_obj.name, year=year, code=code, return_to=return_to)
                 if ctx:
                     return _render(request, "subject.html", ctx)
 
-        # Token match: split offering and look for any token equal to semester_name
+        # Token match: split offering and look for any token equal to semester name
         parts = [p for p in offering.split("-") if p]
         if parts:
             for token in parts:
                 candidate = session.exec(
-                    select(Subject).where(Subject.year == str(year), Subject.subject_code == code, Subject.semester_name == token)
+                    select(Subject)
+                    .join(Semester)
+                    .where(
+                        Semester.year == year,
+                        Subject.subject_code == code,
+                        Semester.name == token
+                    )
                 ).all()
                 if len(candidate) == 1:
-                    sem = getattr(candidate[0], "semester_name", None)
-                    if sem:
-                        sem_str = str(sem)
-                        ctx = build_subject_context(session, semester=sem_str, year=year, code=code, return_to=return_to)
+                    subj = candidate[0]
+                    sem_obj = session.get(Semester, subj.semester_id)
+                    if sem_obj:
+                        ctx = build_subject_context(session, semester=sem_obj.name, year=year, code=code, return_to=return_to)
                         if ctx:
                             return _render(request, "subject.html", ctx)
 
     # No semester provided: find matching subjects for this year+code
     rows = session.exec(
-        select(Subject).where(Subject.year == str(year), Subject.subject_code == code)
+        select(Subject)
+        .join(Semester)
+        .where(
+            Semester.year == year,
+            Subject.subject_code == code
+        )
     ).all()
     if not rows:
         return HTMLResponse("Subject not found", status_code=404)
     if len(rows) == 1:
-        semester_name = getattr(rows[0], "semester_name", None)
-        if not semester_name:
+        subj = rows[0]
+        sem_obj = session.get(Semester, subj.semester_id)
+        if not sem_obj:
             return HTMLResponse("Subject not found", status_code=404)
         # Build context and render
         ctx = build_subject_context(
             session,
-            semester=semester_name,
+            semester=sem_obj.name,
             year=year,
             code=code,
             return_to=return_to,

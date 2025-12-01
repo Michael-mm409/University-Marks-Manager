@@ -34,29 +34,27 @@ def create_subject(
     Returns:
         RedirectResponse: Redirect to semester detail page.
     """
+    # Resolve semester_id for normalized schema
+    sem = session.exec(
+        select(Semester).where(
+            Semester.name == semester,
+            Semester.year == int(year) if str(year).isdigit() else Semester.year == Semester.year,
+        )
+    ).first()
+    semester_id = getattr(sem, "id", None)
+    
     exists = session.exec(
         select(Subject).where(
-            Subject.semester_name == semester,
-            Subject.year == year,
+            Subject.semester_id == semester_id,
             Subject.subject_code == subject_code,
         )
     ).first()
     if not exists:
-        # Resolve semester_id for normalized schema
-        sem = session.exec(
-            select(Semester).where(
-                Semester.name == semester,
-                Semester.year == int(year) if str(year).isdigit() else Semester.year == Semester.year,
-            )
-        ).first()
-        semester_id = getattr(sem, "id", None)
         session.add(
             Subject(
                 semester_id=semester_id,
                 subject_code=subject_code,
                 subject_name=subject_name,
-                semester_name=semester,
-                year=year,
                 credit_points=credit_points,
                 sync_subject=bool(sync_subject),
             )
@@ -79,9 +77,11 @@ def build_subject_context(
 ) -> Optional[SubjectContext]:
     """Build the SubjectContext for rendering the subject detail page."""
     subject = session.exec(
-        select(Subject).where(
-            Subject.semester_name == semester,
-            Subject.year == year,
+        select(Subject)
+        .join(Semester)
+        .where(
+            Semester.name == semester,
+            Semester.year == int(year),
             Subject.subject_code == code,
         )
     ).first()
@@ -328,9 +328,11 @@ def update_subject(
 ) -> RedirectResponse:
     """Update subject details."""
     subject = session.exec(
-        select(Subject).where(
-            Subject.semester_name == semester,
-            Subject.year == year,
+        select(Subject)
+        .join(Semester)
+        .where(
+            Semester.name == semester,
+            Semester.year == int(year),
             Subject.subject_code == code,
         )
     ).first()
@@ -371,9 +373,11 @@ def delete_subject(
 ) -> RedirectResponse:
     """Delete a subject and all its related data."""
     subject = session.exec(
-        select(Subject).where(
-            Subject.semester_name == semester,
-            Subject.year == year,
+        select(Subject)
+        .join(Semester)
+        .where(
+            Semester.name == semester,
+            Semester.year == int(year),
             Subject.subject_code == code,
         )
     ).first()

@@ -168,12 +168,10 @@ class CourseManager:
             self.session.add(semester)
             self.session.commit()
 
-            # Auto-link all subjects that belong to this semester/year to the course
+            # Auto-link all subjects that belong to this semester to the course
             subjects_in_semester = self.session.exec(
-                select(Subject).where(
-                    Subject.semester_name == semester.name,
-                    Subject.year == str(semester.year),
-                )
+                select(Subject)
+                .where(Subject.semester_id == semester.id)
             ).all()
 
             created = False
@@ -206,10 +204,8 @@ class CourseManager:
 
         # Remove subject links for this semester
         subjects_in_semester = self.session.exec(
-            select(Subject).where(
-                Subject.semester_name == semester.name,
-                Subject.year == str(semester.year),
-            )
+            select(Subject)
+            .where(Subject.semester_id == semester.id)
         ).all()
         removed = False
         for subj in subjects_in_semester:

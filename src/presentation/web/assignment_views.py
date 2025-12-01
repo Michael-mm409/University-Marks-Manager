@@ -70,10 +70,12 @@ def create_assignment(
         # Resolve subject_id first for normalized lookups
         logger.info("[DEBUG] Looking up subject with: subject_code=%s, semester_name=%s, year=%s", code, semester, year)
         subj = session.exec(
-            select(Subject).where(
+            select(Subject)
+            .join(Semester)
+            .where(
                 Subject.subject_code == code,
-                Subject.semester_name == semester,
-                Subject.year == year,
+                Semester.name == semester,
+                Semester.year == int(year),
             )
         ).first()
         logger.info("[DEBUG] Subject lookup result: %s", subj)
@@ -103,9 +105,6 @@ def create_assignment(
             )
         new_assignment = Assignment(
             subject_id=subject_id,
-            subject_code=code,
-            semester_name=semester,
-            year=year,
             assessment=assessment,
             # Persist numeric weighted marks as floats; S/U is tracked via grade_type.
             weighted_mark=(weighted_val if (grade_type == GradeType.NUMERIC.value and weighted_val is not None) else None),
@@ -134,9 +133,6 @@ def create_assignment(
                 session.add(
                     Examination(
                         subject_id=subject_id,
-                        subject_code=code,
-                        semester_name=semester,
-                        year=year,
                         exam_mark=exam_mark,
                         exam_weight=exam_weight,
                     )
@@ -215,9 +211,6 @@ def create_assignment(
                     session.add(
                         Examination(
                             subject_id=subject_id,
-                            subject_code=code,
-                            semester_name=semester,
-                            year=year,
                             exam_mark=round(weighted_contrib, 4),
                             exam_weight=exam_weight,
                         )
@@ -253,10 +246,12 @@ def delete_assignment(
     """
     # Resolve subject and delete by (subject_id, assessment)
     subj = session.exec(
-        select(Subject).where(
+        select(Subject)
+        .join(Semester)
+        .where(
             Subject.subject_code == code,
-            Subject.semester_name == semester,
-            Subject.year == year,
+            Semester.name == semester,
+            Semester.year == int(year),
         )
     ).first()
     sid = getattr(subj, "id", None)
@@ -304,10 +299,12 @@ def edit_assignment_form(
     """
     # Resolve subject to query by normalized ID
     subj = session.exec(
-        select(Subject).where(
+        select(Subject)
+        .join(Semester)
+        .where(
             Subject.subject_code == code,
-            Subject.semester_name == semester,
-            Subject.year == year,
+            Semester.name == semester,
+            Semester.year == int(year),
         )
     ).first()
     sid = getattr(subj, "id", None)
@@ -374,10 +371,12 @@ def update_assignment_ajax(
     try:
         # Resolve subject to use normalized ID-based lookups
         subj = session.exec(
-            select(Subject).where(
+            select(Subject)
+            .join(Semester)
+            .where(
                 Subject.subject_code == code,
-                Subject.semester_name == semester,
-                Subject.year == year,
+                Semester.name == semester,
+                Semester.year == int(year),
             )
         ).first()
         sid = getattr(subj, "id", None)
@@ -432,9 +431,6 @@ def update_assignment_ajax(
                 session.add(
                     Examination(
                         subject_id=sid,
-                        subject_code=code,
-                        semester_name=semester,
-                        year=year,
                         exam_mark=exam_mark,
                         exam_weight=exam_weight,
                     )

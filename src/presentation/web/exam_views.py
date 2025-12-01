@@ -35,9 +35,11 @@ def save_total_mark(
    
     # Resolve subject_id for normalized lookups
     subj = session.exec(
-        select(Subject).where(
-            Subject.semester_name == semester,
-            Subject.year == year,
+        select(Subject)
+        .join(Semester)
+        .where(
+            Semester.name == semester,
+            Semester.year == int(year),
             Subject.subject_code == code,
         )
     ).first()
@@ -148,9 +150,6 @@ def save_total_mark(
     else:
         new_exam = Examination(
             subject_id=sid,
-            subject_code=code,
-            semester_name=semester,
-            year=year,
             exam_mark=mark_to_save,
             exam_weight=current_exam_weight,
         )
@@ -171,9 +170,6 @@ def save_total_mark(
     else:
         new_settings = ExamSettings(
             subject_id=sid,
-            subject_code=code,
-            semester_name=semester,
-            year=year,
             ps_exam=ps_exam_bool,
             ps_factor=ps_factor_val
         )
@@ -181,9 +177,11 @@ def save_total_mark(
 
     # Save total_mark to Subject so it persists and displays correctly
     subject = session.exec(
-        select(Subject).where(
-            Subject.semester_name == semester,
-            Subject.year == year,
+        select(Subject)
+        .join(Semester)
+        .where(
+            Semester.name == semester,
+            Semester.year == int(year),
             Subject.subject_code == code,
         )
     ).first()
@@ -239,9 +237,11 @@ def delete_exam(
     """Delete the examination record for a subject (single exam model)."""
     # Prefer normalized lookup by subject_id; fallback to composite key for legacy rows
     subj = session.exec(
-        select(Subject).where(
-            Subject.semester_name == semester,
-            Subject.year == year,
+        select(Subject)
+        .join(Semester)
+        .where(
+            Semester.name == semester,
+            Semester.year == int(year),
             Subject.subject_code == code,
         )
     ).first()

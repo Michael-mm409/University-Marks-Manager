@@ -6,7 +6,7 @@ from typing import List, Optional, Sequence
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlmodel import Session, select
 
-from src.infrastructure.db.models import Examination, Assignment, Subject
+from src.infrastructure.db.models import Examination, Assignment, Subject, Semester
 from src.presentation.api.schemas import ExaminationCreate, ExaminationRead
 from src.presentation.api.deps import get_session
 
@@ -32,24 +32,19 @@ def list_exams(
     # Prefer normalized filtering when all three are provided
     if subject_code and semester_name and year:
         subj = session.exec(
-            select(Subject).where(
+            select(Subject)
+            .join(Semester)
+            .where(
                 Subject.subject_code == subject_code,
-                Subject.semester_name == semester_name,
-                Subject.year == year,
+                Semester.name == semester_name,
+                Semester.year == int(year),
             )
         ).first()
         sid = getattr(subj, "id", None)
         if sid is not None:
             return session.exec(select(Examination).where(Examination.subject_id == sid)).all()
-    # Fallback legacy partial filters
-    stmt = select(Examination)
-    if subject_code:
-        stmt = stmt.where(Examination.subject_code == subject_code)
-    if semester_name:
-        stmt = stmt.where(Examination.semester_name == semester_name)
-    if year:
-        stmt = stmt.where(Examination.year == year)
-    return session.exec(stmt).all()
+    # Without all three parameters, return all exams
+    return session.exec(select(Examination)).all()
 
 
 @router.post("/", response_model=ExaminationRead, status_code=status.HTTP_201_CREATED)
@@ -69,10 +64,12 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
     """
     # Resolve subject_id, enforce one-exam-per-subject
     subj = session.exec(
-        select(Subject).where(
+        select(Subject)
+        .join(Semester)
+        .where(
             Subject.subject_code == data.subject_code,
-            Subject.semester_name == data.semester_name,
-            Subject.year == data.year,
+            Semester.name == data.semester_name,
+            Semester.year == int(data.year),
         )
     ).first()
     sid = getattr(subj, "id", None)
@@ -118,10 +115,12 @@ def get_exam(
     """
     # Prefer normalized lookup by subject_id; fallback to composite if not found
     subj = session.exec(
-        select(Subject).where(
+        select(Subject)
+        .join(Semester)
+        .where(
             Subject.subject_code == subject_code,
-            Subject.semester_name == semester_name,
-            Subject.year == year,
+            Semester.name == semester_name,
+            Semester.year == int(year),
         )
     ).first()
     sid = getattr(subj, "id", None)
@@ -148,10 +147,12 @@ def update_exam(
     """
     # Prefer normalized lookup by subject_id; fallback to composite if not found
     subj = session.exec(
-        select(Subject).where(
+        select(Subject)
+        .join(Semester)
+        .where(
             Subject.subject_code == subject_code,
-            Subject.semester_name == semester_name,
-            Subject.year == year,
+            Semester.name == semester_name,
+            Semester.year == int(year),
         )
     ).first()
     sid = getattr(subj, "id", None)

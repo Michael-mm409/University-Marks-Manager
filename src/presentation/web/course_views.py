@@ -301,11 +301,9 @@ def get_course_detail_page(
     # Map assigned semester -> subjects within that term for optional display
     subjects_by_semester: dict[int, list[Subject]] = {}
     for sem in assigned_semesters:
-        year_col: Any = Subject.year
         candidates = session.exec(
             select(Subject).where(
-                Subject.semester_name == sem.name,
-                year_col == str(sem.year),
+                Subject.semester_id == sem.id,
             )
         ).all()
         subjects_by_semester[getattr(sem, "id")] = list(candidates)

@@ -6,7 +6,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlmodel import Session, select
 
-from src.infrastructure.db.models import Assignment, GradeType, Subject
+from src.infrastructure.db.models import Assignment, GradeType, Subject, Semester
 from src.presentation.api.schemas import AssignmentCreate, AssignmentRead
 from src.presentation.api.deps import get_session
 
@@ -36,23 +36,19 @@ def list_assignments(
     # Prefer normalized filtering when all three are provided
     if subject_code and semester_name and year:
         subj = session.exec(
-            select(Subject).where(
+            select(Subject)
+            .join(Semester)
+            .where(
                 Subject.subject_code == subject_code,
-                Subject.semester_name == semester_name,
-                Subject.year == year,
+                Semester.name == semester_name,
+                Semester.year == int(year),
             )
         ).first()
         sid = getattr(subj, "id", None)
         if sid is not None:
             stmt = select(Assignment).where(Assignment.subject_id == sid).order_by(Assignment.assessment)
             return session.exec(stmt).all()
-    # Fallback legacy filters (partial filters supported)
-    if subject_code:
-        stmt = stmt.where(Assignment.subject_code == subject_code)
-    if semester_name:
-        stmt = stmt.where(Assignment.semester_name == semester_name)
-    if year:
-        stmt = stmt.where(Assignment.year == year)
+    # Without all three parameters, return all assignments
     return session.exec(stmt).all()
 
 
@@ -96,11 +92,16 @@ def create_assignment(data: AssignmentCreate, session: Session = Depends(get_ses
             # If conversion fails, leave as-is and let the ORM/DB raise if invalid
             pass
     # Resolve subject_id and enforce duplicate by (subject_id, assessment)
+    year_val = payload.get("year")
+    if not year_val:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="year is required")
     subj = session.exec(
-        select(Subject).where(
+        select(Subject)
+        .join(Semester)
+        .where(
             Subject.subject_code == payload.get("subject_code"),
-            Subject.semester_name == payload.get("semester_name"),
-            Subject.year == payload.get("year"),
+            Semester.name == payload.get("semester_name"),
+            Semester.year == int(year_val),
         )
     ).first()
     sid = getattr(subj, "id", None)
@@ -186,11 +187,16 @@ def update_assignment(assignment_id: int, data: AssignmentCreate,
             pass
     # Guard against creating a duplicate natural key (exclude the current record)
     # Resolve subject_id for duplicate check and update the record's subject_id if changed
+    year_val = payload.get("year")
+    if not year_val:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="year is required")
     subj = session.exec(
-        select(Subject).where(
+        select(Subject)
+        .join(Semester)
+        .where(
             Subject.subject_code == payload.get("subject_code"),
-            Subject.semester_name == payload.get("semester_name"),
-            Subject.year == payload.get("year"),
+            Semester.name == payload.get("semester_name"),
+            Semester.year == int(year_val),
         )
     ).first()
     sid = getattr(subj, "id", None)
