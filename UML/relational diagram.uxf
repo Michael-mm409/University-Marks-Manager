@@ -7,7 +7,7 @@
       <x>0</x>
       <y>590</y>
       <w>240</w>
-      <h>180</h>
+      <h>160</h>
     </coordinates>
     <panel_attributes>Semester
 --
@@ -16,7 +16,8 @@ name: string
 year: int 
 course_id: int FK Ref Course(id)
 
-UNIQUE(course_id, name, year)</panel_attributes>
+UNIQUE(course_id, name, year)
+ON DELETE CASCADE via course_id</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
@@ -25,23 +26,20 @@ UNIQUE(course_id, name, year)</panel_attributes>
       <x>470</x>
       <y>580</y>
       <w>340</w>
-      <h>240</h>
+      <h>220</h>
     </coordinates>
     <panel_attributes>Subject
 --
 id: int PK
 subject_code: string  
 subject_name: string
-semester_id: int FK Ref Semester(id)
+semester_id: int FK Ref Semester(id) NOT NULL
 total_mark: float[0.0]
 credit_points: int[6]
 sync_subject: bool[false]
--- Exam source priority:
--- 1) Assignment where is_exam=true
--- 2) Examination (Legacy) row if present
--- 3) None =&gt; total_mark from assignments only
 
-UNIQUE(semester_id, subject_code)
+UNIQUE(subject_code, semester_id)
+ON DELETE CASCADE via semester_id
 </panel_attributes>
     <additional_attributes/>
   </element>
@@ -65,12 +63,12 @@ m2=1</panel_attributes>
       <x>490</x>
       <y>140</y>
       <w>390</w>
-      <h>300</h>
+      <h>270</h>
     </coordinates>
     <panel_attributes>Assignment
 --
 id: int PK
-subject_id: int FK Ref Subject(id)
+subject_id: int FK Ref Subject(id) NOT NULL
 assessment: string
 weighted_mark: float
 unweighted_mark: float
@@ -79,9 +77,6 @@ grade_type: enum[numeric, S, U]
 is_exam: bool[false]
 
 UNIQUE(assessment, subject_id)
--- Only one exam per subject (partial unique index or application check)
--- If is_exam=true, this row supplies the exam mark; its mark_weight represents computed exam weight.
-
 ON DELETE CASCADE via subject_id
 </panel_attributes>
     <additional_attributes/>
@@ -91,48 +86,45 @@ ON DELETE CASCADE via subject_id
     <coordinates>
       <x>940</x>
       <y>580</y>
-      <w>580</w>
-      <h>180</h>
+      <w>340</w>
+      <h>140</h>
     </coordinates>
     <panel_attributes>ExamSettings
 --
-subject_id: int PK FK Ref Subject(id)
+id: int PK
+subject_id: int FK Ref Subject(id) NOT NULL
 ps_exam: bool[false]
-ps_factor: float[40]
-exam_assignment_id: int FK Ref Assignment(id) NULL
--- Constraint: (exam_assignment_id IS NULL) OR (Assignment.subject_id = subject_id)
--- Ensures selected assignment belongs to same subject.
--- exam weight derived: 100 - SUM(mark_weight WHERE subject_id AND is_exam=false)
+ps_factor: float[40.0]
 
-UNIQUE(exam_assignment_id)  -- ensures an assignment is not tied to multiple settings
-</panel_attributes>
+UNIQUE(subject_id)
+ON DELETE CASCADE via subject_id</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
       <x>690</x>
-      <y>810</y>
+      <y>790</y>
       <w>50</w>
-      <h>110</h>
+      <h>130</h>
     </coordinates>
     <panel_attributes>lt=-
 m1=1
 m2=0..1</panel_attributes>
-    <additional_attributes>10.0;10.0;10.0;90.0</additional_attributes>
+    <additional_attributes>10.0;10.0;10.0;110.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>810</x>
-      <y>430</y>
-      <w>220</w>
-      <h>170</h>
+      <x>800</x>
+      <y>640</y>
+      <w>160</w>
+      <h>50</h>
     </coordinates>
     <panel_attributes>lt=-
 m1=1
 m2=0..1</panel_attributes>
-    <additional_attributes>190.0;150.0;190.0;90.0;10.0;90.0;10.0;10.0</additional_attributes>
+    <additional_attributes>10.0;20.0;140.0;20.0</additional_attributes>
   </element>
   <element>
     <id>UMLClass</id>
@@ -140,7 +132,7 @@ m2=0..1</panel_attributes>
       <x>10</x>
       <y>250</y>
       <w>270</w>
-      <h>190</h>
+      <h>160</h>
     </coordinates>
     <panel_attributes>Course
 --
@@ -149,35 +141,34 @@ code: string
 name: string
 grading_scale: string[Standard]
 
-UNIQUE(code)
-UNIQUE(name, code)</panel_attributes>
+UNIQUE(code)</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
       <x>100</x>
-      <y>430</y>
+      <y>400</y>
       <w>50</w>
-      <h>180</h>
+      <h>210</h>
     </coordinates>
     <panel_attributes>lt=-
 m1=1..*
 m2=1</panel_attributes>
-    <additional_attributes>10.0;160.0;10.0;10.0</additional_attributes>
+    <additional_attributes>10.0;190.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
       <x>270</x>
-      <y>390</y>
+      <y>360</y>
       <w>220</w>
-      <h>230</h>
+      <h>260</h>
     </coordinates>
     <panel_attributes>lt=-
-m1=1..*
-m2=1</panel_attributes>
-    <additional_attributes>200.0;200.0;90.0;200.0;90.0;10.0;10.0;10.0</additional_attributes>
+m1=*
+m2=*</panel_attributes>
+    <additional_attributes>200.0;230.0;90.0;230.0;90.0;10.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>UMLClass</id>
@@ -185,16 +176,16 @@ m2=1</panel_attributes>
       <x>470</x>
       <y>900</y>
       <w>340</w>
-      <h>200</h>
+      <h>170</h>
     </coordinates>
-    <panel_attributes>Examination (Legacy)
+    <panel_attributes>Examination
 --
-subject_id: int PK FK Ref Subject(id)
-exam_mark: float
-exam_weight: float
--- Ignored if an Assignment.is_exam=true exists for same subject.
--- Migration path: copy (exam_mark, exam_weight) into new assignment row then delete.
-1:1 with Subject(id)
+id: int PK
+subject_id: int FK Ref Subject(id) NOT NULL
+exam_mark: float[0.0]
+exam_weight: float[100.0]
+
+UNIQUE(subject_id)
 ON DELETE CASCADE via subject_id</panel_attributes>
     <additional_attributes/>
   </element>
@@ -204,9 +195,9 @@ ON DELETE CASCADE via subject_id</panel_attributes>
       <x>70</x>
       <y>0</y>
       <w>240</w>
-      <h>130</h>
+      <h>150</h>
     </coordinates>
-    <panel_attributes>Grade Scale
+    <panel_attributes>GradeScale
 --
 id: int PK
 scale_name: string[Standard]
@@ -214,8 +205,10 @@ grade: string
 label: string
 min_mark: float
 gpa_point: float
-bg=#f5f5f5
+band_type: string[both]
 
+UNIQUE(scale_name, grade, band_type)
+bg=#f5f5f5
 </panel_attributes>
     <additional_attributes/>
   </element>
@@ -223,14 +216,14 @@ bg=#f5f5f5
     <id>Relation</id>
     <coordinates>
       <x>120</x>
-      <y>120</y>
+      <y>140</y>
       <w>50</w>
-      <h>150</h>
+      <h>130</h>
     </coordinates>
     <panel_attributes>lt=-
-m1=0..*
-m2=1..*</panel_attributes>
-    <additional_attributes>10.0;130.0;10.0;10.0</additional_attributes>
+m1=*
+m2=*</panel_attributes>
+    <additional_attributes>10.0;110.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
