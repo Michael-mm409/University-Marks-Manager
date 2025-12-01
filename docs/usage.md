@@ -6,104 +6,96 @@
   - Python: use the project's supported version (see pyproject.toml or README).
   - pip: pip install -r requirements.txt
 - Using Uvicorn (typical):
-  - uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-  - If your entrypoint differs, replace `app.main:app` with the module that exposes the FastAPI `app`.
+  - uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
+  - If your entrypoint differs, replace `src.app.main:app` with the module that exposes the FastAPI `app`.
 - If a frontend or npm assets are included, follow its README (e.g., npm install && npm start).
 
 ## Accessing the web UI and API docs
 
 - Open the application in a browser:
-  - Main UI: http://localhost:8000/ (if provided)
+  - Main UI: http://localhost:8000/
   - Swagger UI: http://localhost:8000/docs
   - ReDoc: http://localhost:8000/redoc
 
 ## Key API endpoints (examples)
 
-Note: adapt paths to the actual API prefix in your code (e.g., /api/...). Replace host/port as needed.
+JSON API is mounted under `/api/<API_VERSION>` (default `/api/v1`). Replace host/port as needed.
 
-- List subjects
+### List subjects
 
-  - GET /subjects
-  - curl: curl -sS http://localhost:8000/subjects
+- GET /api/v1/subjects
+- curl: curl -sS http://localhost:8000/api/v1/subjects
 
-- Create a subject
+### Create a subject
 
-  - POST /subjects
-  - curl:
-    curl -X POST http://localhost:8000/subjects \
-     -H "Content-Type: application/json" \
-     -d '{"code":"COMP101","name":"Intro to Programming","sync":false}'
+- POST /api/v1/subjects
+- curl:
+  curl -X POST http://localhost:8000/api/v1/subjects \
+   -H "Content-Type: application/json" \
+   -d '{"code":"COMP101","name":"Intro to Programming","sync":false}'
 
-- Get subject by id
+### Get subject by id
 
-  - GET /subjects/{subject_id}
-  - curl: curl http://localhost:8000/subjects/1
+- GET /api/v1/subjects/{subject_id}
+- curl: curl http://localhost:8000/api/v1/subjects/1
 
-- Update subject
+### Update subject
 
-  - PUT or PATCH /subjects/{subject_id}
-  - curl:
-    curl -X PATCH http://localhost:8000/subjects/1 \
-     -H "Content-Type: application/json" \
-     -d '{"name":"Programming I"}'
+- PUT /api/v1/subjects/{subject_id}
+- curl:
+  curl -X PUT http://localhost:8000/api/v1/subjects/1 \
+   -H "Content-Type: application/json" \
+   -d '{"name":"Programming I"}'
 
-- Delete subject
+### Delete subject
 
-  - DELETE /subjects/{subject_id}
-  - curl: curl -X DELETE http://localhost:8000/subjects/1
+- DELETE /api/v1/subjects/{subject_id}
+- curl: curl -X DELETE http://localhost:8000/api/v1/subjects/1
 
-- List assessments for a subject
+### List assessments for a subject (API routes under /api/<API_VERSION>)
 
-  - GET /subjects/{subject_id}/assessments
-  - curl: curl http://localhost:8000/subjects/1/assessments
+- See /api docs at http://localhost:8000/docs for exact paths.
 
-- Add assessment entry
+### Add assessment entry
 
-  - POST /subjects/{subject_id}/assessments
-  - curl:
-    curl -X POST http://localhost:8000/subjects/1/assessments \
-     -H "Content-Type: application/json" \
-     -d '{"name":"Assignment 1","weighted_mark":85,"weight":10}'
+- Refer to the Swagger docs for the schema and paths.
 
-- Update/delete assessment
+### Update/delete assessment
 
-  - PATCH /assessments/{assessment_id} DELETE /assessments/{assessment_id}
+- See Swagger for exact endpoints.
 
-- Calculate exam mark / set total (if provided by API)
-  - POST /subjects/{subject_id}/calculate_exam
-  - POST /subjects/{subject_id}/set_total
-  - Check /docs for exact payloads.
+- Exam-related endpoints are grouped under `/api/<API_VERSION>/subjects/...`; check Swagger for payloads.
 
 Always inspect /docs for precise request/response schemas and available endpoints.
 
-## Example workflows
+## Web UI pretty routes (HTML)
 
-- Create subject → add assessment:
+- Year overview: `GET /year/{year}`
+- Semester overview: `GET /year/{year}/semester/{semester}`
+- Subject detail: `GET /year/{year}/semester/{semester}/subject/{code}`
 
-  1. POST /subjects
-  2. POST /subjects/{id}/assessments
-
-- Update marks or set totals:
-  1. PATCH /assessments/{id} or POST /subjects/{id}/set_total
-
-Refer to interactive docs for example bodies.
+For JSON workflows and request bodies, use the interactive docs at `/docs`.
 
 ## Configuration
 
 - Primary environment variables
 
-  - DATABASE_URL — e.g. sqlite: sqlite:///data/app.db or PostgreSQL: postgresql+asyncpg://user:pass@host/db
-  - HOST — hostname to bind (default 0.0.0.0)
-  - PORT — port to bind (default 8000)
-  - SECRET_KEY — app secret for any signed data
-  - DEBUG — enable debug behavior
+  - SESSION_SECRET_KEY — required for sessions
+  - DATABASE_URL — Postgres URL; otherwise falls back to SQLite file at `data/marks.db`
+  - APP_VERSION — footer version string (e.g., 0.6.0+<sha>)
+  - ENV — footer environment label (dev|staging|prod)
+  - ENABLE_DEBUG_ROUTES — optional debug endpoints
+  - API_VERSION — versioned API prefix (e.g., v1)
 
-- Example .env
-  DATABASE_URL=sqlite:///data/app.db
-  HOST=0.0.0.0
-  PORT=8000
-  SECRET_KEY=change-me
-  DEBUG=true
+- Example .env (local)
+  SESSION_SECRET_KEY=change-me
+
+  # DATABASE_URL=postgresql://user:pass@host/db # optional
+
+  APP_VERSION=0.6.0
+  ENV=dev
+  ENABLE_DEBUG_ROUTES=false
+  API_VERSION=v1
 
 - Load .env using python-dotenv or the project's configuration loader.
 
@@ -114,7 +106,7 @@ Refer to interactive docs for example bodies.
   - Generate migration: alembic revision --autogenerate -m "init"
   - Apply migrations: alembic upgrade head
 - If no migrations and the app auto-creates tables:
-  - Start the app; on first run it may create tables based on SQLModel models.
+  - Start the app; on first run it will create tables based on SQLModel models.
   - Or run a small init script if provided, e.g. python -m app.db.init (check repo).
 - Connection strings:
   - SQLite local file: sqlite:///data/app.db
