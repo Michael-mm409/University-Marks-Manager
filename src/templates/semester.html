@@ -13,19 +13,18 @@
   <div class="flex justify-center mb-3">
     <h3 class="add-subject-title text-center">Add Subject</h3>
   </div>
-  <form method="post" action="/semester/{{semester}}/subject/create" class="grid grid-cols-1 md:grid-cols-6 gap-x-4 gap-y-2 items-center justify-center">
+  <form method="post" action="/semester/{{semester}}/subject/create" class="grid grid-cols-1 md:grid-cols-12 gap-3 w-full items-end">
     <input type="hidden" name="year" value="{{year}}" />
-    <!-- Move Sync to the left and make it less clickable -->
-    <label class="form-control md:col-span-1">
+    <label class="form-control md:col-span-2">
       <span class="label-text">Subject Code</span>
-      <input name="subject_code" class="input input-bordered input-sm w-full" placeholder="CSCI101" required />
+      <input name="subject_code" class="input input-bordered input-sm w-full md:w-28" placeholder="CSCI101" required />
     </label>
-    <label class="form-control md:col-span-3">
+    <label class="form-control md:col-span-8">
       <span class="label-text">Subject Name</span>
       <input name="subject_name" class="input input-bordered input-sm w-full" placeholder="Intro to ..." required />
     </label>
-    <button class="btn btn-sm btn-primary md:col-span-1" type="submit">Add</button>
-    <div class="md:col-span-1 flex flex-col items-start">
+    <button class="btn btn-sm btn-primary md:col-span-1 md:justify-self-end" type="submit">Add</button>
+    <div class="md:col-span-1 md:justify-self-start flex items-center gap-2">
       <label for="sync_subject" class="label-text text-xs">Sync</label>
       <input id="sync_subject" type="checkbox" name="sync_subject" class="checkbox checkbox-sm" value="1" title="Enable subject sync (advanced)" />
     </div>
@@ -97,29 +96,29 @@
       </tr>
       <tr id="manage-{{ row.code }}-{{ loop.index }}" class="hidden">
         <td colspan="7" class="p-4 bg-base-100/60">
-          <div class="flex flex-wrap gap-2 items-end">
-            <form method="post" action="/semester/{{ row.semester_name }}/subject/{{ row.code }}/update" class="flex flex-wrap gap-2 items-end">
+          <div class="flex flex-wrap gap-2 items-end w-full">
+            <form method="post" action="/semester/{{ row.semester_name }}/subject/{{ row.code }}/update" class="flex flex-wrap gap-2 items-end flex-1">
               <input type="hidden" name="year" value="{{year}}" />
               <input type="hidden" name="return_to" value="{{semester}}-{{year}}" />
               <label class="label cursor-pointer flex gap-2 items-center w-28">
                 <span class="label-text text-xs">Sync</span>
                 <input type="checkbox" name="sync_subject" class="checkbox checkbox-xs" value="1" {% if row.sync_subject %}checked{% endif %} />
               </label>
-              <label class="form-control w-28">
+              <label class="form-control w-28 shrink-0">
                 <span class="label-text text-xs">Code</span>
                 <input name="subject_code" value="{{ row.code }}" class="input input-bordered input-xs" required />
               </label>
-              <label class="form-control w-72">
+              <label class="form-control flex-1 min-w-[16rem]">
                 <span class="label-text text-xs">Name</span>
-                <input name="subject_name" value="{{ row.name }}" class="input input-bordered input-xs" required />
+                <input name="subject_name" value="{{ row.name }}" class="input input-bordered input-xs w-full" required />
               </label>
-              <label class="form-control w-20">
+              <label class="form-control w-20 shrink-0">
                 <span class="label-text text-xs">CP</span>
                 <input type="number" name="credit_points" value="{{ row.credit_points if row.credit_points is not none else 6 }}" class="input input-bordered input-xs" />
               </label>
-              <button class="btn btn-xs btn-primary" type="submit">Save</button>
+              <button class="btn btn-xs btn-primary shrink-0" type="submit">Save</button>
             </form>
-            <form method="post" action="/semester/{{ row.semester_name }}/subject/{{ row.code }}/delete" onsubmit="return confirm('Delete {{ row.code }} and all its data?');" class="ml-auto">
+            <form method="post" action="/semester/{{ row.semester_name }}/subject/{{ row.code }}/delete" onsubmit="return confirm('Delete {{ row.code }} and all its data?');" class="ml-auto shrink-0">
               <input type="hidden" name="year" value="{{year}}" />
               <input type="hidden" name="return_to" value="{{semester}}-{{year}}" />
               <button class="btn btn-xs btn-error btn-outline" type="submit">Delete</button>
