@@ -10,7 +10,7 @@
 /* Subject page main title (code and name) */
 body .subject-title { font-size: 1.7rem !important; margin-bottom: 0.1rem !important; }
 /* Semester title */
-body .semester-title { font-size: 1.3rem !important; }
+body .semester-title { font-size: 1.5rem !important; }
 body .semester-title .semester-year {
   font-size: 1.1rem !important;
   font-weight: 600 !important;
