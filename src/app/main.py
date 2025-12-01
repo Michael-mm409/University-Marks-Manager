@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 
 # Local imports
 from src.infrastructure.db import models  # noqa: F401
-from src.infrastructure.db.engine import engine
+from src.infrastructure.db.engine import engine, wait_for_database
 from src.presentation.api.routers import api_router as api
 from src.presentation.web.views import views
 
@@ -46,6 +46,8 @@ async def lifespan(fastapi_app: FastAPI):
     Shutdown: currently no actions (placeholder for future resource cleanup).
     """
     # Startup
+    # Ensure the database is reachable before creating tables (handles container races)
+    wait_for_database()
     # For development: drop and recreate tables on each startup
     # SQLModel.metadata.drop_all(engine)
     SQLModel.metadata.create_all(engine)

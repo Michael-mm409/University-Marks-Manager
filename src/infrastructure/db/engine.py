@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import os
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
 from sqlmodel import Session, create_engine
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 from fastapi import Depends
 
 # Read the database URL from the environment variable.
@@ -15,7 +18,12 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL:
     # Use PostgreSQL
-    engine = create_engine(DATABASE_URL, echo=False)
+    # Enable pool_pre_ping to validate connections before use (helps during restarts)
+    engine = create_engine(
+        DATABASE_URL,
+        echo=False,
+        pool_pre_ping=True,
+    )
 else:
     # Use SQLite as a fallback
     DB_PATH = Path("data/marks.db")
@@ -91,4 +99,41 @@ def session_scope() -> Generator[Session, None, None]:
     finally:
         session.close()
 
-__all__ = ["engine", "get_session", "session_scope"]
+
+def wait_for_database(max_attempts: int = 30, delay_seconds: float = 2.0) -> None:
+    """Block until the database is reachable or raise after retries.
+
+    Attempts a lightweight `SELECT 1` using the configured engine. This is
+    primarily useful in containerized deployments where the application may
+    start before the database is ready to accept connections.
+
+    Args:
+        max_attempts: How many attempts before giving up.
+        delay_seconds: Delay between attempts.
+    """
+    # For SQLite, the engine is local and doesn't need waiting.
+    if not DATABASE_URL or DATABASE_URL.startswith("sqlite"):
+        return
+
+    attempt = 0
+    last_error: Exception | None = None
+    while attempt < max_attempts:
+        attempt += 1
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return
+        except OperationalError as exc:  # DB not ready yet
+            last_error = exc
+            time.sleep(delay_seconds)
+        except Exception as exc:  # other transient errors
+            last_error = exc
+            time.sleep(delay_seconds)
+
+    # If we get here, all attempts failed
+    if last_error:
+        raise last_error
+    # Provide a non-None orig (Exception) to satisfy the OperationalError constructor typing.
+    raise OperationalError("Database not reachable after retries", params=None, orig=Exception("Database not reachable after retries"))
+
+__all__ = ["engine", "get_session", "session_scope", "wait_for_database"]
