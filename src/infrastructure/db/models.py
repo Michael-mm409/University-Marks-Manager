@@ -89,11 +89,9 @@ class Course(SQLModel, table=True):
     grading_scale: str = Field(default="Standard")
     __table_args__ = (
         UniqueConstraint("code", name="uq_course_code"),
-        UniqueConstraint("name", "code", name="uq_course_name_code"),
     )
 
-    # NOTE: The unique constraint on (name, code) is redundant if `code` is globally unique.
-    # It can be dropped in a future migration to simplify the schema.
+    # NOTE: Redundant (name, code) constraint removed via migration 005.
 
     # Relationships are attached after class definitions to avoid forward-ref issues
     # semesters: list[Semester] = Relationship(back_populates="course")
