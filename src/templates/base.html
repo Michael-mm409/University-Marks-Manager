@@ -26,15 +26,15 @@
   <div class="max-w-7xl mx-auto px-2 sm:px-3 lg:px-4 py-6">
     <header class="mb-8 flex flex-col items-center gap-3 text-center">
       <div>
-  <h1 class="text-5xl md:text-6xl font-black tracking-tighter drop-shadow">University Marks Manager</h1>
-        <p class="text-base md:text-lg opacity-80">FastAPI · SQLModel · HTMX · Jinja2</p>
-      </div>
-      <div class="flex items-center gap-4">
-        <label class="swap swap-rotate theme-toggle">
-          <input type="checkbox" id="themeToggle" />
-          <svg class="swap-on fill-current w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.64 17l-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0L7 18.37A8 8 0 0 0 17 7l1.29-1.29a1 1 0 1 0-1.41-1.41L15.59 5A8 8 0 0 0 5.64 17z"/></svg>
-          <svg class="swap-off fill-current w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.05 11H1a1 1 0 0 0 0 2h4.05a7 7 0 0 0 13.9 0H23a1 1 0 0 0 0-2h-4.05a7 7 0 0 0-13.9 0z"/></svg>
-        </label>
+        <h1 class="site-title text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tighter drop-shadow leading-tight">University Marks Manager</h1>
+              <!-- <p class="text-base md:text-lg opacity-80">FastAPI · SQLModel · HTMX · Jinja2</p> -->
+            </div>
+            <div class="flex items-center gap-4">
+              <label class="swap swap-rotate theme-toggle">
+                <input type="checkbox" id="themeToggle" />
+                <svg class="swap-on fill-current w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.64 17l-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0L7 18.37A8 8 0 0 0 17 7l1.29-1.29a1 1 0 1 0-1.41-1.41L15.59 5A8 8 0 0 0 5.64 17z"/></svg>
+                <svg class="swap-off fill-current w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.05 11H1a1 1 0 0 0 0 2h4.05a7 7 0 0 0 13.9 0H23a1 1 0 0 0 0-2h-4.05a7 7 0 0 0-13.9 0z"/></svg>
+            </label>
       </div>
     </header>
     {% if flash_message %}
@@ -73,7 +73,9 @@
     <main id="main" class="space-y-6">
       {% block content %}{% endblock %}
     </main>
-    {% include 'partials/footer.html' %}
+    {% block footer %}
+      {% include 'partials/footer_mini.html' %}
+    {% endblock %}
   </div>
   <script>
     const toggle = document.getElementById('themeToggle');
