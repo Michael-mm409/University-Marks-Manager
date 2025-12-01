@@ -22,6 +22,7 @@
   <link rel="icon" href="/static/images/favicon.ico" type="image/x-icon" />
 </head>
 <body class="min-h-screen bg-base-200">
+  <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 btn btn-xs">Skip to content</a>
   <div class="max-w-7xl mx-auto px-2 sm:px-3 lg:px-4 py-6">
     <header class="mb-8 flex flex-col items-center gap-3 text-center">
       <div>
@@ -69,10 +70,10 @@
   <div id="course-selector-container" class="flex-shrink-0"></div>
       </div>
     </div>
-    <main class="space-y-6">
+    <main id="main" class="space-y-6">
       {% block content %}{% endblock %}
     </main>
-    <footer class="mt-12 pt-6 text-xs opacity-60 text-center">Prototype interface — customize further as needed.</footer>
+    {% include 'partials/footer.html' %}
   </div>
   <script>
     const toggle = document.getElementById('themeToggle');
