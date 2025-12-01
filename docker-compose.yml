@@ -39,7 +39,8 @@ services:
       retries: 5
       start_period: 10s
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   db:
     container_name: marks-manager-db
@@ -53,6 +54,12 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -h 127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
 
 volumes:
   postgres_data_nas:
