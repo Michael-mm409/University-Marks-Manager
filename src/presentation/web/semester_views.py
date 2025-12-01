@@ -1,7 +1,8 @@
 from fastapi import Depends, Form, Request, APIRouter, Response
-from typing import List
+from typing import List, cast
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session, select
+from sqlalchemy import Table
 from src.presentation.api.deps import get_session
 from src.infrastructure.db.models import Semester, Subject, Assignment, Examination, ExamSettings, GradeType
 from .template_helpers import _render
@@ -169,10 +170,19 @@ def update_semester(
 
 def build_semester_context(session: Session, semester: str, year: str) -> SemesterContext:
     """Build the context used by the semester detail page for rendering."""
-    subjects = session.exec(select(Subject).where(Subject.year == year)).all()
-    main_subjects = [s for s in subjects if s.semester_name == semester]
-    synced_subjects = [s for s in subjects if s.sync_subject and s.semester_name != semester]
-    display_subjects = main_subjects + synced_subjects
+    # Order at the database level by subject_code for predictable display
+    subjects_table = cast(Table, getattr(Subject, "__table__"))
+    main_subjects = session.exec(
+        select(Subject)
+        .where(Subject.year == year, Subject.semester_name == semester)
+        .order_by(subjects_table.c.subject_code.asc())
+    ).all()
+    synced_subjects = session.exec(
+        select(Subject)
+        .where(Subject.year == year, Subject.sync_subject == True, Subject.semester_name != semester)  # noqa: E712
+        .order_by(subjects_table.c.subject_code.asc())
+    ).all()
+    display_subjects = list(main_subjects) + list(synced_subjects)
     summaries: List[SemesterSummary] = []
     import logging
     logger = logging.getLogger("uvicorn.error")
@@ -239,6 +249,7 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
                 "code": sub.subject_code,
                 "name": sub.subject_name,
                 "semester_name": sub.semester_name,
+                "credit_points": getattr(sub, "credit_points", None),
                 "assessment_mark": round(assess_weighted_total, 2),
                 "assessment_weight": assess_weight_sum,
                 "exam_mark": exam_mark,
@@ -319,7 +330,12 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
     summaries = []
     for sem in semesters:
         # Use the same logic as build_semester_context to get subject_summaries for each semester
-        subjects = session.exec(select(Subject).where(Subject.year == sem.year, Subject.semester_name == sem.name)).all()
+        subjects_table = cast(Table, getattr(Subject, "__table__"))
+        subjects = session.exec(
+            select(Subject)
+            .where(Subject.year == sem.year, Subject.semester_name == sem.name)
+            .order_by(subjects_table.c.subject_code.asc())
+        ).all()
         for sub in subjects:
             sid = getattr(sub, "id", None)
             assignments = session.exec(select(Assignment).where(Assignment.subject_id == sid).order_by(Assignment.assessment)).all()

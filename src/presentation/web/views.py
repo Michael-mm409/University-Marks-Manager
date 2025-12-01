@@ -271,7 +271,8 @@ def subject_detail_pretty(
                 exam_weight=parsed_exam_weight,
                 final_total=final_total,
                 total_mark=total_mark,
-                return_to=qp.get("return_to"),
+            return_to=qp.get("return_to"),
+            error_message=qp.get("error"),
         )
         if ctx is None:
                 return HTMLResponse("Subject not found", status_code=404)
@@ -312,6 +313,7 @@ def subject_detail_short(
             final_total=None,
             total_mark=None,
             return_to=return_to,
+            error_message=qp.get("error"),
         )
         if ctx is None:
             return HTMLResponse("Subject not found", status_code=404)

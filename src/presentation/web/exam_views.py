@@ -89,9 +89,9 @@ def save_total_mark(
             factor_val = float(ps_factor)
         except ValueError:
             factor_val = 40.0
-    scaling = factor_val / 100.0 if ps_enabled else 1.0
-    effective_exam_weight = current_exam_weight * scaling if ps_enabled else current_exam_weight
-    logger.info(f"[DEBUG] ps_enabled={ps_enabled}, factor_val={factor_val}, scaling={scaling}, effective_exam_weight={effective_exam_weight}")
+    # PS exam is a hurdle: weight is NOT scaled; factor is the minimum raw % required
+    effective_exam_weight = current_exam_weight
+    logger.info(f"[DEBUG] ps_enabled={ps_enabled}, factor_val={factor_val}, effective_exam_weight={effective_exam_weight}")
 
 
     goal = None
@@ -101,35 +101,43 @@ def save_total_mark(
         except ValueError:
             goal = None
 
-    # mark_to_save will be set below based on PS logic
+    # Compute a raw exam percentage when possible; store WEIGHTED contribution consistently
+    derived_exam_raw = None  # 0..100 scale
     if goal is not None and effective_exam_weight:
         needed_weighted = (goal / 100.0) * (assignment_weight_percent + effective_exam_weight) - assignment_weighted_sum
         logger.info(f"[DEBUG] needed_weighted={needed_weighted}")
-        derived_exam_mark = (needed_weighted * 100.0) / effective_exam_weight
-        logger.info(f"[DEBUG] derived_exam_mark (from goal)={derived_exam_mark}")
+        derived_exam_raw = (needed_weighted * 100.0) / effective_exam_weight
+        logger.info(f"[DEBUG] derived_exam_raw (from goal)={derived_exam_raw}")
     elif exam_mark not in (None, ""):
         try:
-            derived_exam_mark = float(exam_mark)
-            logger.info(f"[DEBUG] derived_exam_mark (from manual input)={derived_exam_mark}")
+            derived_exam_raw = float(exam_mark)
+            logger.info(f"[DEBUG] derived_exam_raw (from manual input)={derived_exam_raw}")
         except ValueError:
-            derived_exam_mark = None
+            derived_exam_raw = None
     else:
-        # No target or manual mark: set to available mark (PS Factor × exam weight, or exam weight)
-        derived_exam_mark = current_exam_weight * scaling
-        logger.info(f"[DEBUG] derived_exam_mark (fallback)={derived_exam_mark}")
+        # No target or manual mark; fallback: weighted contribution defaults to the available scoring weight
+        derived_exam_raw = None
+        logger.info("[DEBUG] No goal/manual exam mark; will fallback to weighted contribution default")
 
-    # Clamp exam mark to [0, 100] and ensure it's a float
-    if derived_exam_mark is None:
-        derived_exam_mark = 0.0
-    derived_exam_mark = float(derived_exam_mark)
-    derived_exam_mark = max(0.0, min(100.0, derived_exam_mark))
+    # Clamp raw to [0,100] if present
+    if derived_exam_raw is not None:
+        try:
+            derived_exam_raw = float(derived_exam_raw)
+        except ValueError:
+            derived_exam_raw = 0.0
+        derived_exam_raw = max(0.0, min(100.0, derived_exam_raw))
 
-    # For PS exams, save the weighted exam mark as exam_weight * ps_factor (as a fraction)
-    if ps_enabled:
-        mark_to_save = current_exam_weight * scaling
+    # Persist weighted exam mark for consistency with assignment-based exams
+    if derived_exam_raw is not None:
+        # Enforce PS hurdle: raw must be at least factor_val when PS enabled
+        if ps_enabled and derived_exam_raw < factor_val:
+            logger.info(f"[DEBUG] PS hurdle applied: raising raw from {derived_exam_raw} to {factor_val}")
+            derived_exam_raw = factor_val
+        mark_to_save = (derived_exam_raw / 100.0) * current_exam_weight
     else:
-        mark_to_save = derived_exam_mark
-    logger.info(f"[DEBUG] mark_to_save={mark_to_save}, exam_weight={current_exam_weight}, total_mark={total_mark}, assignment_weighted_sum={assignment_weighted_sum}, assignment_weight_percent={assignment_weight_percent}, ps_exam={ps_exam}, ps_factor={ps_factor}")
+        # Fallback: if no target/manual raw provided, treat as 0 contribution (until an exam raw exists)
+        mark_to_save = 0.0
+    logger.info(f"[DEBUG] mark_to_save (weighted)={mark_to_save}, exam_weight={current_exam_weight}, total_mark={total_mark}, assignment_weighted_sum={assignment_weighted_sum}, assignment_weight_percent={assignment_weight_percent}, ps_exam={ps_exam}, ps_factor={ps_factor}")
     # Resolve subject to set subject_id for normalized schema
     if existing:
         existing.exam_mark = mark_to_save
@@ -209,7 +217,8 @@ def save_total_mark(
 
     if is_ajax(request):
         from fastapi.responses import JSONResponse
-        return JSONResponse({"success": True, "exam_mark": derived_exam_mark, "exam_weight": current_exam_weight})
+        # Return both raw (if computed) and weighted for clarity
+        return JSONResponse({"success": True, "exam_mark_raw": derived_exam_raw, "exam_mark_weighted": mark_to_save, "exam_weight": current_exam_weight})
     else:
         url = f"/semester/{semester}/subject/{code}?year={year}"
         if total_mark not in (None, ""):

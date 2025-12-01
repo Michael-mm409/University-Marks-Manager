@@ -1,0 +1,26 @@
+/* Headings and heading-adjacent helpers */
+/* Subject/Semester heading shared styling */
+.subject-title,
+.semester-title {
+  font-weight: 900 !important;
+  letter-spacing: -0.01em !important;
+  line-height: 1.1 !important;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+}
+/* Subject page main title (code and name) */
+body .subject-title { font-size: 1.7rem !important; margin-bottom: 0.1rem !important; }
+/* Semester title */
+body .semester-title { font-size: 1.3rem !important; }
+body .semester-title .semester-year {
+  font-size: 1.1rem !important;
+  font-weight: 600 !important;
+  opacity: 0.7 !important;
+  margin-left: 0.35rem !important;
+}
+/* Utility: add space to the right of headings when adjacent to badges/icons */
+.heading-right { margin-right: 0.5rem !important; }
+.heading-badge { margin-left: 0.5rem !important; }
+/* Subject top-line code/name spacing */
+#subject-code-display { margin-right: 0.5rem !important; }
+/* Year cards */
+.year-card .semester-year { margin-left: 0.35rem !important; }

@@ -9,8 +9,8 @@
   <div class="sem-card relative p-5 rounded-lg bg-base-100 border border-base-300 hover:border-primary/70 transition-shadow shadow-sm hover:shadow-md card-glow flex flex-col gap-3 group text-center items-center max-w-md w-full">
     <!-- Header row: centered title with cog adjacent and spaced -->
     <div class="flex items-center justify-center gap-2 w-full">
-      <h3 class="text-lg md:text-xl font-bold"><a class="link link-hover" href="/year/{{semester.year}}/semester/{{semester.name}}">{{semester.name}}</a></h3>
-      <span class="badge badge-outline ml-2 sm:ml-3">{{semester.year}}</span>
+      <h3 class="text-lg md:text-xl font-bold heading-right"><a class="link link-hover" href="/year/{{semester.year}}/semester/{{semester.name}}">{{semester.name}}</a></h3>
+      <span class="badge badge-outline heading-badge">{{semester.year}}</span>
       <button class="btn btn-ghost btn-xs ml-3 shrink-0" onclick="this.closest('.sem-card').querySelector('.manage-panel').classList.toggle('hidden');" title="Manage">⚙️</button>
     </div>
     <p class="text-xs opacity-70">View subjects & assignments</p>
@@ -39,7 +39,7 @@
             <th>Subject Title</th>
             <th>Assessment Mark</th>
             <th>Assessment Weight</th>
-            <th>Final Exam Mark</th>
+            <th>Exam Contribution</th>
             <th>Final Exam Weight</th>
             <th>Total Mark</th>
           </tr>

@@ -1,6 +1,8 @@
 """Service layer for managing semesters."""
 from __future__ import annotations
 
+from typing import cast
+from sqlalchemy import Table
 from sqlmodel import Session, select, desc
 
 from src.infrastructure.db.models import Semester
@@ -24,8 +26,10 @@ class SemesterManager:
         return list(results)
 
     def get_distinct_years(self) -> list[int]:
-        """Return all distinct semester years sorted descending."""
-        stmt = select(Semester.year).distinct().order_by(desc(Semester.year))
+        """Return all distinct semester years sorted ascending (smallest → biggest)."""
+        # Use the model's Table column to satisfy static type checkers
+        semesters_table = cast(Table, getattr(Semester, "__table__"))
+        stmt = select(Semester.year).distinct().order_by(semesters_table.c.year.asc())
         years = [row for row in self.session.exec(stmt).all()]
         # Ensure ints
         return [int(y) for y in years]
@@ -40,12 +44,13 @@ class SemesterManager:
         return list(self.session.exec(stmt).all())
 
     def get_distinct_years_for_course(self, course_id: int) -> list[int]:
-        """Return distinct years for semesters assigned to a specific course, sorted desc."""
+        """Return distinct years for semesters assigned to a specific course, sorted ascending."""
+        semesters_table = cast(Table, getattr(Semester, "__table__"))
         stmt = (
             select(Semester.year)
             .where(Semester.course_id == course_id)
             .distinct()
-            .order_by(desc(Semester.year))
+            .order_by(semesters_table.c.year.asc())
         )
         years = [row for row in self.session.exec(stmt).all()]
         return [int(y) for y in years]

@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlmodel import Session, select
 from src.infrastructure.db.models import Assignment, ExamSettings, Examination, GradeType, Subject
 from src.presentation.api.deps import get_session
-from html import escape
+from urllib.parse import quote_plus
 
 assignment_router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -17,8 +17,9 @@ def create_assignment(
     code: str,
     year: str = Form(...),
     assessment: str = Form(...),
-    weighted_mark: Optional[float] = Form(None),
-    mark_weight: Optional[float] = Form(None),
+    # Accept empty strings from form without validation errors; parse manually below
+    weighted_mark: Optional[str] = Form(None),
+    mark_weight: Optional[str] = Form(None),
     grade_type: str = Form("numeric"),
     is_exam: bool = Form(False),
     total_mark: Optional[str] = Form(None),  # propagate desired final total to trigger recompute
@@ -51,9 +52,9 @@ def create_assignment(
     try:
         if grade_type == GradeType.NUMERIC.value:
             try:
-                if weighted_mark is not None:
+                if weighted_mark not in (None, ""):
                     weighted_val = float(weighted_mark)
-                if mark_weight is not None:
+                if mark_weight not in (None, ""):
                     mark_weight_val = float(mark_weight)
                 # Only calculate unweighted if both are provided
                 if weighted_val is not None and mark_weight_val is not None and mark_weight_val:
@@ -94,7 +95,12 @@ def create_assignment(
         logger.info("[DEBUG] Existing assignment lookup: %s", existing_assignment)
         if existing_assignment:
             logger.warning("[DEBUG] Assignment with this name already exists for subject_id=%s, assessment=%s", subject_id, assessment)
-            return HTMLResponse("An assignment with this name already exists for this subject/semester/year.", status_code=400)
+            # Redirect back to the subject page with an inline error so the user stays on the page
+            msg = quote_plus("An assignment with this name already exists for this subject.")
+            return RedirectResponse(
+                url=f"/year/{year}/semester/{semester}/subject/{code}?error={msg}",
+                status_code=303,
+            )
         new_assignment = Assignment(
             subject_id=subject_id,
             subject_code=code,
@@ -111,9 +117,36 @@ def create_assignment(
         logger.info("[DEBUG] Creating new assignment: %s", new_assignment)
         session.add(new_assignment)
         session.commit()
+
+        # If this assignment is marked as the exam, sync the Examination table immediately
+        if is_exam:
+            exam = session.exec(
+                select(Examination).where(
+                    Examination.subject_id == subject_id,
+                )
+            ).first()
+            exam_mark = new_assignment.weighted_mark if new_assignment.weighted_mark is not None else 0.0
+            exam_weight = new_assignment.mark_weight if new_assignment.mark_weight is not None else 0.0
+            if exam:
+                exam.exam_mark = exam_mark
+                exam.exam_weight = exam_weight
+            else:
+                session.add(
+                    Examination(
+                        subject_id=subject_id,
+                        subject_code=code,
+                        semester_name=semester,
+                        year=year,
+                        exam_mark=exam_mark,
+                        exam_weight=exam_weight,
+                    )
+                )
+            session.commit()
     except Exception as e:
         logger.exception("[DEBUG] Exception during assignment creation: %s", e)
-        return HTMLResponse("Internal server error during assignment creation. See logs for details.", status_code=500)
+        # On server errors, keep user on the page with an inline error
+        msg = quote_plus("Internal error while creating assignment. Please try again.")
+        return RedirectResponse(url=f"/year/{year}/semester/{semester}/subject/{code}?error={msg}", status_code=303)
 
     # If total_mark is not provided or is empty, use the subject's stored total_mark
     if total_mark in (None, ""):
@@ -155,7 +188,7 @@ def create_assignment(
                 )
             ).first()
             exam_weight = existing_exam.exam_weight if existing_exam else max(0.0, 100.0 - assign_weight_sum)
-            # Apply PS scaling based on persisted settings (if any)
+            # PS is a hurdle, not a weight scaler
             setting = session.exec(
                 select(ExamSettings).where(
                     ExamSettings.subject_id == subject_id,
@@ -163,18 +196,21 @@ def create_assignment(
             ).first()
             ps_enabled = bool(setting.ps_exam) if setting else False
             factor_val = setting.ps_factor if (setting and setting.ps_factor) else 40.0
-            scaling = (factor_val / 100.0) if ps_enabled else 1.0
-            effective_exam_weight = exam_weight * scaling
+            effective_exam_weight = exam_weight
             if effective_exam_weight > 0:
-                needed_exam = (
-                    (goal / 100.0) * (assign_weight_sum + effective_exam_weight) - assign_weighted_total
-                ) * 100.0 / effective_exam_weight
-                if needed_exam < 0:
-                    needed_exam = 0.0
-                if needed_exam > 100:
-                    needed_exam = 100.0
+                needed_weighted = (goal / 100.0) * (assign_weight_sum + effective_exam_weight) - assign_weighted_total
+                needed_raw = (needed_weighted * 100.0) / effective_exam_weight
+                # Clamp 0..100 and enforce PS hurdle if enabled
+                if needed_raw < 0:
+                    needed_raw = 0.0
+                if needed_raw > 100:
+                    needed_raw = 100.0
+                if ps_enabled and needed_raw < factor_val:
+                    needed_raw = float(factor_val)
+                weighted_contrib = (needed_raw / 100.0) * exam_weight
                 if existing_exam:
-                    existing_exam.exam_mark = round(needed_exam, 4)
+                    existing_exam.exam_mark = round(weighted_contrib, 4)
+                    existing_exam.exam_weight = exam_weight
                 else:
                     session.add(
                         Examination(
@@ -182,8 +218,8 @@ def create_assignment(
                             subject_code=code,
                             semester_name=semester,
                             year=year,
-                            exam_mark=round(needed_exam, 4),
-                            exam_weight=exam_weight,  # store original weight; scaling is conceptual
+                            exam_mark=round(weighted_contrib, 4),
+                            exam_weight=exam_weight,
                         )
                     )
                 session.commit()
@@ -312,8 +348,9 @@ def update_assignment_ajax(
     code: str,
     semester: str,
     year: str,
-    weighted_mark: Optional[float] = Form(None),
-    mark_weight: Optional[float] = Form(None),
+    # Accept blanks from form; parse manually
+    weighted_mark: Optional[str] = Form(None),
+    mark_weight: Optional[str] = Form(None),
     grade_type: str = Form("numeric"),
     is_exam: bool = Form(False),
     session: Session = Depends(get_session),

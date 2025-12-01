@@ -16,7 +16,8 @@
     position: relative;
     display: flex;
     align-items: center;
-    justify-content: center; /* Center the title text */
+    justify-content: center;
+    /* Remove font and spacing overrides so .add-subject-title and others work */
   }
   .custom-chevron {
     position: absolute;
@@ -26,10 +27,10 @@
   /* Hide the checkbox toggle visually but keep it functional */
   .collapse > input[type="checkbox"].sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 </style>
-<div class="flex flex-col items-center text-center gap-2 mb-4">
-  <h2 class="text-3xl md:text-4xl font-extrabold flex items-center gap-3 justify-center">
+<div class="flex flex-col items-center text-center gap-3 md:gap-4 mb-8">
+  <h2 class="subject-title flex items-center gap-3 justify-center">
     <span id="subject-code-display">{{subject.subject_code}}</span>
-    <span class="text-lg md:text-xl font-normal opacity-70" id="subject-name-display">{{subject.subject_name}}</span>
+    <span id="subject-name-display">{{subject.subject_name}}</span>
     <button id="edit-subject-btn" class="btn btn-xs btn-circle btn-ghost" type="button" onclick="showSubjectEditForm()" title="Edit subject">&#9881;</button>
   </h2>
   <form id="subject-edit-form" method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/update" class="flex gap-2 mt-2 hidden justify-center" onsubmit="return submitSubjectEditForm(event)">
@@ -40,7 +41,7 @@
     <button type="submit" class="btn btn-xs btn-primary">Save</button>
     <button type="button" class="btn btn-xs" onclick="hideSubjectEditForm()">Cancel</button>
   </form>
-  <p class="mt-1 text-xs opacity-70 uppercase tracking-wide">Semester {{semester}} — {{year}}</p>
+  <p class="semester-title mt-1"><span>{{semester}}</span> <span class="semester-year">{{year}}</span></p>
   <div class="flex gap-2 justify-center">
     {% if return_to %}
       {% set ret = return_to.split('-') %}
@@ -57,13 +58,13 @@
   </div>
 </div>
 
-<div class="form-panels mb-6">
+<div class="form-panels mb-8">
   <!-- Add Assignment (collapsible) -->
   <div class="collapse bg-base-100 rounded-xl shadow card-glow">
     <input id="toggle-add" type="checkbox" class="sr-only" />
-    <label for="toggle-add" class="collapse-title font-semibold cursor-pointer">
+    <label for="toggle-add" class="collapse-title cursor-pointer border-b border-base-300 pb-2">
       <span class="flex items-center gap-2">
-        Add Assignment <span class="badge badge-outline badge-sm">{{ assignments|length }} existing</span>
+        <span class="section-card-title">Add Assignment</span> <span class="badge badge-outline badge-sm">{{ assignments|length }} existing</span>
       </span>
       <svg class="custom-chevron chev" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.5a1 1 0 0 1-.71-.29l-7-7a1 1 0 1 1 1.42-1.42L12 13.09l6.29-6.3a1 1 0 1 1 1.42 1.42l-7 7a1 1 0 0 1-.71.29z"/></svg>
     </label>
@@ -99,15 +100,24 @@
         </div>
         <button class="btn btn-xs btn-primary col-span-1 md:col-span-2" type="submit">Add</button>
       </form>
+      {% if error_messages and error_messages|length %}
+      <script>
+        // Auto-open the Add Assignment panel when there are errors
+        (function(){
+          const cb = document.getElementById('toggle-add');
+          if (cb) cb.checked = true;
+        })();
+      </script>
+      {% endif %}
     </div>
   </div>
 
   <!-- Total Mark (collapsible) -->
   <div class="collapse bg-base-100 rounded-xl shadow card-glow">
     <input id="toggle-total" type="checkbox" class="sr-only" />
-    <label for="toggle-total" class="collapse-title font-semibold cursor-pointer">
+    <label for="toggle-total" class="collapse-title cursor-pointer border-b border-base-300 pb-2">
       <span class="flex items-center gap-2">
-        Total Mark
+        <span class="section-card-title">Total Mark</span>
         {% if subject.total_mark is not none and subject.total_mark != 0 %}
           <span class="badge badge-outline badge-sm">Saved</span>
         {% else %}
@@ -152,12 +162,12 @@
         </div>
         <div class="col-span-1 sm:col-span-2 md:col-span-4 flex items-end">
           <div class="flex gap-2 w-full">
-            <button class="btn btn-xs btn-secondary w-full" type="submit">Save Target</button>
+            <button class="btn btn-xs btn-secondary w-full" type="submit">Save Total Mark</button>
             <button id="confirm-reset-btn" class="btn btn-xs btn-ghost" type="button">Confirm Reset</button>
           </div>
         </div>
       </form>
-      <p class="mt-2 text-xs opacity-70">Provide a desired overall final %; the system derives and stores the required raw exam mark. Exam weight is automatically set to the remaining percentage after assignments (or retained if already created).{% if ps_exam %} PS mode: only {{ effective_scoring_exam_weight }}% (factor {{ ps_factor if ps_factor is not none else 40 }}%) of this weight counts toward the average.{% endif %}</p>
+      <p class="mt-2 text-xs opacity-70">Provide a desired overall final %; the system derives and stores the weighted exam contribution based on the required raw exam %. Exam weight is automatically set to the remaining percentage after assignments (or retained if already created).{% if ps_exam %} PS mode: you must score at least {{ ps_factor if ps_factor is not none else 40 }}% raw on the exam to pass (the exam weight is unchanged).{% endif %}</p>
     </div>
   </div>
 </div>
@@ -203,7 +213,7 @@
         {% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}{% endif %}
       {% endif %}
     </td>
-    <td class="assignment-mark-weight">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.mark_weight|float) if assignment.mark_weight is not none else '0.00' }}{% endif %}</td>
+    <td class="assignment-mark-weight">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.mark_weight|float) if assignment.mark_weight is not none else '0.00' }}{% endif %}%</td>
     <td class="assignment-grade-type">{{assignment.grade_type}}</td>
     <td class="flex gap-1">
       <form method="post" action="/semester/{{ assignment.semester_name }}/subject/{{ assignment.subject_code }}/assignment/{{ assignment.assessment }}/{{ assignment.year }}/delete" onsubmit="return confirm('Delete assignment?');">
@@ -232,7 +242,7 @@
             <th>Subject Title</th>
             <th>Assignment Mark</th>
             <th>Assessment Weight</th>
-            <th>Final Exam Mark</th>
+            <th>Exam Contribution</th>
             <th>Final Exam Mark Weight{% if ps_exam %} (PS Factor Applied){% endif %}</th>
             <th>Total Mark</th>
             {% if count_s %}<th>S Grades</th>{% endif %}
@@ -245,7 +255,7 @@
             <td>{{ '%.2f' % assignment_weighted_sum }}</td>
             <td>{{ '%.0f' % assignment_weight_percent }}%</td>
             <td>
-              {{ '%.2f' % summary_exam_mark if summary_exam_mark is not none else '-' }}
+              {{ '%.2f' % exam_weighted_sum if exam_weighted_sum is not none else '-' }}
             </td>
             <td>
               {{ '%.0f' % final_exam_mark_weight }}%

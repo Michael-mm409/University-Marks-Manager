@@ -33,6 +33,7 @@ class SemesterSummary(TypedDict):
     code: str
     name: str
     semester_name: str
+    credit_points: Optional[int]
     assessment_mark: float
     assessment_weight: float
     exam_mark: Optional[float]
@@ -97,6 +98,7 @@ class SubjectContext(TypedDict):
     count_u: int
     final_exam_mark_weight: Optional[float]
     summary_exam_mark: Optional[float]
+    error_messages: List[str]
 
 
 TemplateContext = Union[IndexContext, SemesterContext, SubjectContext, Mapping[str, object]]

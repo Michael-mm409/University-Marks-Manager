@@ -1,0 +1,9 @@
+/* WAM/GPA and grade metric styles */
+.wam-gpa-value { font-size: 1.35rem; font-weight: 700; letter-spacing: 0; }
+.grade-count { font-size: 1.05rem; font-weight: 600; letter-spacing: 0; }
+/* Spacing between section title and stats cards */
+.grade-stats { margin-top: 1.75rem !important; }
+/* Ensure only stat title is bold, not entire card */
+.stats .stat { font-weight: 400 !important; }
+.stats .stat-title { font-weight: 700 !important; }
+.stats .stat-value { font-weight: 600 !important; }

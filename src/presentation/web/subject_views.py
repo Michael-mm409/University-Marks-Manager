@@ -62,7 +62,8 @@ def create_subject(
             )
         )
         session.commit()
-    return RedirectResponse(f"?year={year}", status_code=303)
+    # Redirect back to the selected semester page explicitly (avoid relative query-only redirects)
+    return RedirectResponse(f"/year/{year}/semester/{semester}", status_code=303)
 
 
 def build_subject_context(
@@ -74,6 +75,7 @@ def build_subject_context(
     final_total: Optional[str] = None,
     total_mark: Optional[str] = None,
     return_to: Optional[str] = None,
+    error_message: Optional[str] = None,
 ) -> Optional[SubjectContext]:
     """Build the SubjectContext for rendering the subject detail page."""
     subject = session.exec(
@@ -163,9 +165,10 @@ def build_subject_context(
             existing_exam_weight = float(exam_assignment.mark_weight)
             
     elif single_exam:
-        # Fallback to legacy
-        exam_raw_percent = legacy_exam_mark
+        # Fallback to legacy: exam may be stored as RAW% (old) or WEIGHTED (new)
         existing_exam_weight = legacy_exam_weight
+        # Defer deciding raw vs weighted until we know effective scoring weight and desired goal
+        exam_raw_percent = None  # will compute below once weights/goals known
 
     inferred_remaining = 0.0
     if not exam_assignment and not examinations:
@@ -180,10 +183,20 @@ def build_subject_context(
     ).first()
     ps_exam = bool(setting.ps_exam) if setting else False
     parsed_factor = setting.ps_factor if setting else 40.0
-    scaling = (parsed_factor / 100.0) if ps_exam else 1.0
-    effective_scoring_exam_weight = effective_exam_weight * scaling
+    # PS is a hurdle: weight is not scaled; factor is the minimum raw % required to pass
+    scaling = 1.0
+    effective_scoring_exam_weight = effective_exam_weight
 
-    if exam_raw_percent is not None and effective_scoring_exam_weight > 0:
+    # Interpret Examination.exam_mark as a WEIGHTED contribution (no inference)
+    if single_exam and not exam_assignment:
+        exam_contribution = float(legacy_exam_mark or 0.0)
+        if effective_scoring_exam_weight > 0:
+            exam_raw_percent = (exam_contribution / effective_scoring_exam_weight) * 100.0
+        else:
+            exam_raw_percent = 0.0
+
+    # If exam_raw_percent was already set (assignment-based), compute contribution normally
+    if exam_raw_percent is not None and exam_contribution == 0.0 and effective_scoring_exam_weight > 0:
         exam_contribution = (exam_raw_percent / 100.0) * effective_scoring_exam_weight
 
     total_weighted = assignment_weighted_sum + exam_contribution
@@ -217,8 +230,11 @@ def build_subject_context(
                 is_exam_taken = exam_raw_percent is not None and exam_raw_percent > 0
                 effective_exam_score = effective_scoring_exam_weight
                 if effective_exam_score > 0:
-                    # Calculate required exam mark as a percentage of the scaled exam weight
+                    # Calculate required exam raw % based on full exam weight
                     required_exam_mark = ((goal - assignment_weighted_sum) / effective_exam_score) * 100.0
+                    # Enforce PS hurdle minimum raw if PS is enabled
+                    if ps_exam and required_exam_mark is not None and required_exam_mark < parsed_factor:
+                        required_exam_mark = parsed_factor
                     # Clamp to 0–100
                     if required_exam_mark < 0:
                         required_exam_mark = 0.0
@@ -246,12 +262,10 @@ def build_subject_context(
     import logging
     logger = logging.getLogger("uvicorn.error")
     summary_exam_mark = None
-    if exam_assignment and hasattr(exam_assignment, "weighted_mark") and exam_assignment.weighted_mark is not None:
-        summary_exam_mark = float(exam_assignment.weighted_mark)
-        logger.info(f"[DEBUG] Using assignment-based exam mark for summary: {summary_exam_mark}")
-    elif single_exam and single_exam.exam_mark is not None:
-        summary_exam_mark = float(single_exam.exam_mark)
-        logger.info(f"[DEBUG] Using Examination table exam mark for summary: {summary_exam_mark}")
+    # For compatibility, keep a summary value, but align with contribution
+    if exam_contribution is not None:
+        summary_exam_mark = float(exam_contribution)
+        logger.info(f"[DEBUG] Using weighted exam contribution for summary: {summary_exam_mark}")
 
     ctx: SubjectContext = {
         "semester": semester,
@@ -285,6 +299,7 @@ def build_subject_context(
         "count_u": count_u,
         "final_exam_mark_weight": round(effective_exam_weight, 2),
         "summary_exam_mark": summary_exam_mark,
+        "error_messages": [error_message] if error_message else [],
     }
     return ctx
 
@@ -307,6 +322,7 @@ def update_subject(
     subject_code: str = Form(...),
     subject_name: str = Form(...),
     credit_points: int = Form(6),
+    sync_subject: Optional[str] = Form(None),
     return_to: Optional[str] = Form(None),
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
@@ -323,6 +339,8 @@ def update_subject(
         subject.subject_code = subject_code
         subject.subject_name = subject_name
         subject.credit_points = credit_points
+        # Update sync flag (checkbox posts when checked; absent means False)
+        subject.sync_subject = bool(sync_subject)
         session.add(subject)
         session.commit()
         session.refresh(subject)
@@ -332,11 +350,14 @@ def update_subject(
     else:
         new_code = code
 
-    # Redirect back to the subject page
+    # Redirect logic: if return_to encodes a semester context (e.g., "Autumn-2025"), go back there; else go to subject page
+    if return_to:
+        parts = str(return_to).split('-')
+        if len(parts) == 2:
+            return RedirectResponse(url=f"/year/{parts[1]}/semester/{parts[0]}", status_code=303)
     url = f"/subjects/{year}/{new_code}?semester={semester}"
     if return_to:
-         url += f"&return_to={return_to}"
-
+        url += f"&return_to={return_to}"
     return RedirectResponse(url=url, status_code=303)
 
 
