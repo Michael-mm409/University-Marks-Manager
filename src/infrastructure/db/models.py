@@ -58,7 +58,7 @@ class Subject(SQLModel, table=True):
     # New: FK to semesters.id for normalized schema (backfilled by migration)
     semester_id: Optional[int] = Field(default=None, foreign_key="semesters.id", index=True)
     semester_name: str = Field(index=True)
-    year: str = Field(index=True)
+    year: int = Field(index=True)
     subject_name: str
     total_mark: Optional[float] = 0.0
     credit_points: int = Field(default=6)
@@ -71,9 +71,8 @@ class Subject(SQLModel, table=True):
 
     # NOTE:
     # 1) The (subject_code, semester_name, year) triple behaves like a natural key across the app.
-    #    Consider adding a UniqueConstraint on these three columns in a schema migration to prevent duplicates.
-    # 2) `year` here (and in related tables) is typed as str whereas `Semester.year` is int.
-    #    Aligning these to int would reduce subtle bugs but requires a data migration.
+    #    UniqueConstraint added via migration 001_add_subject_unique_constraint.sql.
+    # 2) Year type aligned to int via migration 004_convert_year_to_integer.sql.
 
     # Define many-to-many only on Course side to avoid forward-ref generic issues here
     # If needed later, reintroduce with list[Course] once mapping is stable
@@ -111,7 +110,7 @@ class Assignment(SQLModel, table=True):
     subject_id: int = Field(foreign_key="subjects.id", index=True)
     subject_code: str = Field(index=True)
     semester_name: str = Field(index=True)
-    year: str = Field(index=True)
+    year: int = Field(index=True)
     # Store numeric weighted marks as floats. Grade type tracks S/U separately.
     weighted_mark: Optional[float] = None
     unweighted_mark: Optional[float] = None
@@ -132,7 +131,7 @@ class Examination(SQLModel, table=True):
     subject_id: Optional[int] = Field(default=None, foreign_key="subjects.id", index=True)
     subject_code: str = Field(primary_key=True, index=True)
     semester_name: str = Field(primary_key=True, index=True)
-    year: str = Field(primary_key=True, index=True)
+    year: int = Field(primary_key=True, index=True)
     exam_mark: float = 0
     exam_weight: float = 100
 
@@ -149,7 +148,7 @@ class ExamSettings(SQLModel, table=True):
     subject_id: Optional[int] = Field(default=None, foreign_key="subjects.id", index=True)
     subject_code: str = Field(primary_key=True, index=True)
     semester_name: str = Field(primary_key=True, index=True)
-    year: str = Field(primary_key=True, index=True)
+    year: int = Field(primary_key=True, index=True)
     ps_exam: bool = False
     ps_factor: float = 40.0
 
