@@ -1,7 +1,7 @@
 """FastAPI entrypoint providing an HTMX + Jinja2 interface.
 
 Run with:
-    uvicorn src.fastapi_main:app --reload
+    uvicorn src.app.main:app --reload
 """
 from __future__ import annotations
 
@@ -11,12 +11,13 @@ import os
 from contextlib import asynccontextmanager
 
 # Third-party imports
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlmodel import SQLModel
 from starlette.middleware.sessions import SessionMiddleware
+from dotenv import load_dotenv
 
 # Local imports
 from src.infrastructure.db import models  # noqa: F401
@@ -25,8 +26,17 @@ from src.presentation.api.routers import api_router as api
 from src.presentation.web.views import views
 
 BASE_DIR = Path(__file__).resolve().parent
+# Repo root is two levels up from src/app
+ROOT_DIR = BASE_DIR.parent.parent
 TEMPLATES_DIR = BASE_DIR.parent / "templates"
 TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
+
+# Load environment variables from .env at repo root (safe in dev/local)
+try:
+    load_dotenv(dotenv_path=ROOT_DIR / ".env")
+except Exception:
+    # Proceed without .env if loading fails
+    pass
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
@@ -46,8 +56,12 @@ async def lifespan(fastapi_app: FastAPI):
         auto_reload=True,
         cache_size=0,  # avoid template caching during active development
     )
-    # Provide a global current_year for all templates (used for Home link building)
-    fastapi_app.state.jinja_env.globals.update(current_year=str(datetime.now().year))
+    # Provide global template variables
+    fastapi_app.state.jinja_env.globals.update(
+        current_year=str(datetime.now().year),
+        app_version=os.getenv("APP_VERSION", "dev"),
+        env_name=os.getenv("ENV", "dev"),
+    )
     # Debug routes gating (off by default). Enable by setting ENABLE_DEBUG_ROUTES to a truthy value.
     fastapi_app.state.enable_debug_routes = str(os.getenv("ENABLE_DEBUG_ROUTES", "")).lower() in {
         "1",
@@ -64,7 +78,11 @@ async def lifespan(fastapi_app: FastAPI):
 APPLICATION = FastAPI(title="University Marks Manager API", lifespan=lifespan)
 
 
-APPLICATION.include_router(api, prefix="/api")
+# Configure API version prefix from environment (default: v1)
+API_VERSION = os.getenv("API_VERSION", "v1").strip().lstrip("/") or "v1"
+API_PREFIX = f"/api/{API_VERSION}"
+
+APPLICATION.include_router(api, prefix=API_PREFIX)
 APPLICATION.include_router(views)
 
 # Enable server-side sessions for lightweight state (e.g., selected course)
@@ -84,8 +102,6 @@ static_dir.mkdir(exist_ok=True)
 APPLICATION.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Mount original assets (icons) if present at repo root / assets
-# BASE_DIR = src/app -> repo root is two levels up
-ROOT_DIR = BASE_DIR.parent.parent
 assets_dir = ROOT_DIR / "assets"
 if assets_dir.exists():
     APPLICATION.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
@@ -118,3 +134,15 @@ def healthz():
         Description.
     """
     return {"status": "ok"}
+
+# Backward compatibility: redirect legacy /api and /api/* to versioned prefix
+@APPLICATION.api_route("/api", methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])  # type: ignore[arg-type]
+async def api_root_redirect(request: Request) -> RedirectResponse:
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(url=f"{API_PREFIX}{qs}", status_code=308)
+
+@APPLICATION.api_route("/api/{full_path:path}", methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])  # type: ignore[arg-type]
+async def api_legacy_redirect(full_path: str, request: Request) -> RedirectResponse:
+    qs = ("?" + request.url.query) if request.url.query else ""
+    return RedirectResponse(url=f"{API_PREFIX}/{full_path}{qs}", status_code=308)
+
