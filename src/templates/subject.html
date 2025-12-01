@@ -236,7 +236,7 @@
   </div>
   <div id="panel-summary" class="hidden">
     <div class="overflow-x-auto p-2">
-  <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
+      <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
         <thead>
           <tr>
             <th>Subject Title</th>
@@ -257,12 +257,13 @@
             <td>
               {{ '%.2f' % exam_weighted_sum if exam_weighted_sum is not none else '-' }}
             </td>
-            <td>
-              {{ '%.0f' % final_exam_mark_weight }}%
+            <td>{{ '%.0f' % final_exam_mark_weight }}%</td>
             <td>{{ '%.0f' % subject.total_mark if subject.total_mark is not none else '-' }}</td>
             {% if count_s %}<td>{{ count_s }}</td>{% endif %}
             {% if count_u %}<td>{{ count_u }}</td>{% endif %}
           </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
