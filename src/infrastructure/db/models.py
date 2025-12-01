@@ -50,31 +50,25 @@ class Semester(SQLModel, table=True):
 
 
 class Subject(SQLModel, table=True):
-    """Subject/course within a semester/year."""
+    """Subject/course within a semester."""
 
     __tablename__: ClassVar[str] = "subjects"
     id: Optional[int] = Field(default=None, primary_key=True)
     subject_code: str = Field(index=True)
-    # New: FK to semesters.id for normalized schema (backfilled by migration)
-    semester_id: Optional[int] = Field(default=None, foreign_key="semesters.id", index=True)
-    semester_name: str = Field(index=True)
-    year: int = Field(index=True)
+    semester_id: int = Field(foreign_key="semesters.id", index=True)
     subject_name: str
     total_mark: Optional[float] = 0.0
     credit_points: int = Field(default=6)
     sync_subject: bool = False
 
     __table_args__ = (
-        # Natural key uniqueness to prevent duplicate subjects per semester/year
-        UniqueConstraint("subject_code", "semester_name", "year", name="uq_subject_code_semester_year"),
+        # Uniqueness: one subject_code per semester
+        UniqueConstraint("subject_code", "semester_id", name="uq_subject_code_semester"),
     )
 
     # NOTE:
-    # 1) The (subject_code, semester_name, year) triple behaves like a natural key across the app.
-    #    UniqueConstraint added via migration 001_add_subject_unique_constraint.sql.
-    # 2) Year type aligned to int via migration 004_convert_year_to_integer.sql.
-    # 3) semester_id FK is normalized; semester_name/year kept for query convenience and unique constraint.
-    #    Future: Could remove denormalized columns after refactoring to use JOINs everywhere.
+    # Fully normalized schema via migrations 001-007.
+    # semester_name/year denormalization removed in migration 007.
 
     # Define many-to-many only on Course side to avoid forward-ref generic issues here
     # If needed later, reintroduce with list[Course] once mapping is stable
@@ -106,11 +100,7 @@ class Assignment(SQLModel, table=True):
     __tablename__: ClassVar[str] = "assignments"
     id: int = Field(default=None, primary_key=True)
     assessment: str = Field(index=True)
-    # New: FK to subjects.id (backfilled by migration; NOT NULL after migration)
     subject_id: int = Field(foreign_key="subjects.id", index=True)
-    subject_code: str = Field(index=True)
-    semester_name: str = Field(index=True)
-    year: int = Field(index=True)
     # Store numeric weighted marks as floats. Grade type tracks S/U separately.
     weighted_mark: Optional[float] = None
     unweighted_mark: Optional[float] = None
@@ -118,10 +108,8 @@ class Assignment(SQLModel, table=True):
     grade_type: str = Field(default=GradeType.NUMERIC.value)
     is_exam: bool = Field(default=False)
     __table_args__ = (
-        # Ensure one assessment name per subject+semester+year
-        # subject_id FK is normalized; subject_code/semester_name/year kept for query convenience
-        # Future: Refactor unique constraint to use (assessment, subject_id) after removing denormalized columns
-        UniqueConstraint("assessment", "subject_code", "semester_name", "year", name="uq_assignment"),
+        # Ensure one assessment name per subject (fully normalized via migration 007)
+        UniqueConstraint("assessment", "subject_id", name="uq_assignment_subject"),
     )
 
 
@@ -129,12 +117,8 @@ class Examination(SQLModel, table=True):
     """Single exam record per subject."""
 
     __tablename__: ClassVar[str] = "examinations"
-    # subject_id FK is normalized; natural key (subject_code, semester_name, year) kept as PRIMARY KEY
-    # Future: Replace natural key PRIMARY KEY with surrogate id, use subject_id as unique FK
-    subject_id: Optional[int] = Field(default=None, foreign_key="subjects.id", index=True)
-    subject_code: str = Field(primary_key=True, index=True)
-    semester_name: str = Field(primary_key=True, index=True)
-    year: int = Field(primary_key=True, index=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    subject_id: int = Field(foreign_key="subjects.id", index=True, unique=True)
     exam_mark: float = 0
     exam_weight: float = 100
 
@@ -147,12 +131,8 @@ class ExamSettings(SQLModel, table=True):
     """
 
     __tablename__: ClassVar[str] = "exam_settings"
-    # subject_id FK is normalized; natural key (subject_code, semester_name, year) kept as PRIMARY KEY
-    # Future: Replace natural key PRIMARY KEY with surrogate id, use subject_id as unique FK
-    subject_id: Optional[int] = Field(default=None, foreign_key="subjects.id", index=True)
-    subject_code: str = Field(primary_key=True, index=True)
-    semester_name: str = Field(primary_key=True, index=True)
-    year: int = Field(primary_key=True, index=True)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    subject_id: int = Field(foreign_key="subjects.id", index=True, unique=True)
     ps_exam: bool = False
     ps_factor: float = 40.0
 
