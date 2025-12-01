@@ -103,7 +103,7 @@ class Assignment(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True)
     assessment: str = Field(index=True)
     # New: FK to subjects.id (backfilled by migration; NOT NULL after migration)
-    subject_id: Optional[int] = Field(default=None, foreign_key="subjects.id", index=True)
+    subject_id: int = Field(foreign_key="subjects.id", index=True)
     subject_code: str = Field(index=True)
     semester_name: str = Field(index=True)
     year: str = Field(index=True)

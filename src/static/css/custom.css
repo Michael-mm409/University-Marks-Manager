@@ -1,0 +1,63 @@
+/* Ensure margin between semester name and year in year cards */
+.year-card .semester-year {
+  margin-left: 0.35rem;
+}
+/* Add spacing between subject code and name */
+#subject-code-display {
+  margin-right: 0.5rem;
+}
+/* Subject page main title (code and name) */
+.subject-title {
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  margin-bottom: 0.1rem;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+/* Subject page semester sub-title (e.g. SEMESTER AUTUMN — 2025) */
+.subject-semester-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  opacity: 0.85;
+  margin-bottom: 0.5rem;
+}
+/* Main WAM/GPA value style */
+.wam-gpa-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+/* WAM/GPA grade count style */
+.grade-count {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+/* Custom heading styles for semester and add subject headings */
+.semester-title {
+  font-size: 1.2rem !important;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.semester-title .semester-year {
+  font-size: 1.1rem;
+  font-weight: 600;
+  opacity: 0.7;
+  margin-left: 0.35rem;
+}
+.add-subject-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.5rem;
+}
+.add-semester-card-title {
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  margin-bottom: 0.25rem;
+  letter-spacing: -0.01em;
+}

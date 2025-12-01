@@ -37,6 +37,10 @@ class SemesterSummary(TypedDict):
     assessment_weight: float
     exam_mark: Optional[float]
     exam_weight: Optional[float]
+    final_exam_mark_weight: Optional[float]
+    effective_scoring_exam_weight: Optional[float]
+    ps_exam: bool
+    ps_factor: Optional[float]
     total_mark: Optional[float]
     sync_subject: bool
     is_exam_required: bool
@@ -91,6 +95,8 @@ class SubjectContext(TypedDict):
     has_assignment_exam: bool
     count_s: int
     count_u: int
+    final_exam_mark_weight: Optional[float]
+    summary_exam_mark: Optional[float]
 
 
 TemplateContext = Union[IndexContext, SemesterContext, SubjectContext, Mapping[str, object]]

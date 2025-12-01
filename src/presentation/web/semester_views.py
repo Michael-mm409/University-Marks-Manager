@@ -174,6 +174,8 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
     synced_subjects = [s for s in subjects if s.sync_subject and s.semester_name != semester]
     display_subjects = main_subjects + synced_subjects
     summaries: List[SemesterSummary] = []
+    import logging
+    logger = logging.getLogger("uvicorn.error")
     for sub in display_subjects:
         sid = getattr(sub, "id", None)
         assignments = session.exec(
@@ -186,11 +188,21 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
                 Examination.subject_id == sid
             )
         ).first()
+        # Fetch PS Factor settings
+        setting = session.exec(
+            select(ExamSettings).where(
+                ExamSettings.subject_id == sid
+            )
+        ).first()
+        ps_exam = bool(setting.ps_exam) if setting else False
+        ps_factor = setting.ps_factor if setting else 40.0
+        scaling = (ps_factor / 100.0) if ps_exam else 1.0
         # Identify assignment-based exam
         exam_assignment = next((a for a in assignments if getattr(a, "is_exam", False)), None)
 
         assess_weight_sum = 0.0
         assess_weighted_total = 0.0
+        assignment_weights = []
         for a in assignments:
             # Skip assignment-based exam in assessment totals
             if getattr(a, "is_exam", False):
@@ -199,7 +211,9 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
             if a.grade_type == GradeType.NUMERIC.value:
                 if a.mark_weight not in (None, ""):
                     try:
-                        assess_weight_sum += float(a.mark_weight)
+                        w = float(a.mark_weight)
+                        assess_weight_sum += w
+                        assignment_weights.append(w)
                     except ValueError:
                         pass
                 if a.weighted_mark not in (None, ""):
@@ -207,52 +221,19 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
                         assess_weighted_total += float(a.weighted_mark)
                     except ValueError:
                         pass
-        
-        exam_mark = None
-        exam_weight = None
-        is_exam_required = False
-        
-        # Legacy exam data
-        legacy_exam_mark = None
-        legacy_exam_weight = None
-        if exam:
-            try:
-                legacy_exam_mark = float(exam.exam_mark)
-            except (TypeError, ValueError):
-                pass
-            try:
-                legacy_exam_weight = float(exam.exam_weight)
-            except (TypeError, ValueError):
-                pass
+        print(f"[SEMESTER_SUMMARY_DEBUG] Subject: {sub.subject_code} | Assignment Weights: {assignment_weights} | Sum: {assess_weight_sum}")
 
-        # Determine active exam source
-        if exam_assignment:
-            # Use assignment based exam
-            if exam_assignment.weighted_mark is not None:
-                 exam_mark = float(exam_assignment.weighted_mark)
-            
-            if exam_assignment.mark_weight is not None:
-                exam_weight = float(exam_assignment.mark_weight)
-                
-            # If exam mark is missing (0 or None) but we have a target total, calculate required
-            if (exam_mark is None or exam_mark == 0) and sub.total_mark not in (None, 0, 0.0) and exam_weight:
-                 try:
-                    goal = float(sub.total_mark)
-                    # Required weighted exam mark = Goal - Assessment Weighted Total
-                    required_weighted = goal - assess_weighted_total
-                    
-                    # Use weighted mark for display as requested by user
-                    exam_mark = required_weighted
-                    is_exam_required = True
-                 except Exception:
-                     pass
-
-        elif exam:
-            # Fallback to legacy
-            exam_mark = legacy_exam_mark
-            exam_weight = legacy_exam_weight
-
+        # Always calculate exam_weight for summary
         total_mark = sub.total_mark if sub.total_mark not in (None, 0) else None
+        exam_weight = exam.exam_weight if exam else None
+        final_exam_mark_weight = exam_weight
+        effective_scoring_exam_weight = exam_weight * scaling if exam_weight is not None else None
+        # Use the exam_mark from the Examination table (database)
+        exam_mark = exam.exam_mark if exam else None
+        is_exam_required = False
+        # Debug logging for exam_weight
+        logger.info(f"[DEBUG] Subject: {sub.subject_code} | Exam Weight: {exam_weight} | Exam Mark: {exam_mark} | Assessment Weight: {assess_weight_sum} | Assessment Mark: {assess_weighted_total}")
+
         summaries.append(
             {
                 "code": sub.subject_code,
@@ -262,6 +243,10 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
                 "assessment_weight": assess_weight_sum,
                 "exam_mark": exam_mark,
                 "exam_weight": exam_weight,
+                "final_exam_mark_weight": final_exam_mark_weight,
+                "effective_scoring_exam_weight": effective_scoring_exam_weight,
+                "ps_exam": ps_exam,
+                "ps_factor": ps_factor,
                 "total_mark": total_mark,
                 "sync_subject": sub.sync_subject,
                 "is_exam_required": is_exam_required,
@@ -330,7 +315,62 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
             "name": sess.get("current_course_name"),
             "code": sess.get("current_course_code"),
         }
-    ctx = {"semesters": semesters, "selected_year": y_int, "years": years, "course_filter": course_filter}
+    # Build subject_summaries for all semesters in this year
+    summaries = []
+    for sem in semesters:
+        # Use the same logic as build_semester_context to get subject_summaries for each semester
+        subjects = session.exec(select(Subject).where(Subject.year == sem.year, Subject.semester_name == sem.name)).all()
+        for sub in subjects:
+            sid = getattr(sub, "id", None)
+            assignments = session.exec(select(Assignment).where(Assignment.subject_id == sid).order_by(Assignment.assessment)).all()
+            exam = session.exec(select(Examination).where(Examination.subject_id == sid)).first()
+            setting = session.exec(select(ExamSettings).where(ExamSettings.subject_id == sid)).first()
+            ps_exam = bool(setting.ps_exam) if setting else False
+            ps_factor = setting.ps_factor if setting else 40.0
+            scaling = (ps_factor / 100.0) if ps_exam else 1.0
+            exam_assignment = next((a for a in assignments if getattr(a, "is_exam", False)), None)
+            assess_weight_sum = 0.0
+            assess_weighted_total = 0.0
+            assignment_weights = []
+            for a in assignments:
+                if getattr(a, "is_exam", False):
+                    continue
+                if a.grade_type == GradeType.NUMERIC.value:
+                    if a.mark_weight not in (None, ""):
+                        try:
+                            w = float(a.mark_weight)
+                            assess_weight_sum += w
+                            assignment_weights.append(w)
+                        except ValueError:
+                            pass
+                    if a.weighted_mark not in (None, ""):
+                        try:
+                            assess_weighted_total += float(a.weighted_mark)
+                        except ValueError:
+                            pass
+            total_mark = sub.total_mark if sub.total_mark not in (None, 0) else None
+            exam_weight = exam.exam_weight if exam else None
+            final_exam_mark_weight = exam_weight
+            effective_scoring_exam_weight = exam_weight * scaling if exam_weight is not None else None
+            exam_mark = exam.exam_mark if exam else None
+            is_exam_required = False
+            summaries.append({
+                "code": sub.subject_code,
+                "name": sub.subject_name,
+                "semester_name": sub.semester_name,
+                "assessment_mark": round(assess_weighted_total, 2),
+                "assessment_weight": assess_weight_sum,
+                "exam_mark": exam_mark,
+                "exam_weight": exam_weight,
+                "final_exam_mark_weight": final_exam_mark_weight,
+                "effective_scoring_exam_weight": effective_scoring_exam_weight,
+                "ps_exam": ps_exam,
+                "ps_factor": ps_factor,
+                "total_mark": total_mark,
+                "sync_subject": sub.sync_subject,
+                "is_exam_required": is_exam_required,
+            })
+    ctx = {"semesters": semesters, "selected_year": y_int, "years": years, "course_filter": course_filter, "subject_summaries": summaries}
     return _render(request, "partials/semesters_section.html", ctx)
 
 

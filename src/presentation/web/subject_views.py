@@ -171,10 +171,8 @@ def build_subject_context(
     if not exam_assignment and not examinations:
         inferred_remaining = max(0.0, 100.0 - assignment_weight_percent)
 
-    effective_exam_weight = (
-        existing_exam_weight
-        or (exam_weight if (exam_weight and not examinations and not exam_assignment) else inferred_remaining)
-    )
+    # Always calculate exam weight as 100 - assignment_weight_percent for summary
+    effective_exam_weight = 100.0 - assignment_weight_percent
     setting = session.exec(
         select(ExamSettings).where(
             ExamSettings.subject_id == sid
@@ -216,26 +214,25 @@ def build_subject_context(
             if goal <= 0 or goal > 100:
                 requirement_status = "invalid"
             else:
-                # If exam is 0, we treat it as not taken yet for the purpose of calculating requirement
                 is_exam_taken = exam_raw_percent is not None and exam_raw_percent > 0
-                
-                # Calculate required mark regardless of whether exam is taken or not, 
-                # if the current average is not enough or exam is not taken.
                 effective_exam_score = effective_scoring_exam_weight
                 if effective_exam_score > 0:
-                     required_exam_mark = (
-                        (goal / 100.0) * (assignment_weight_percent + effective_exam_score) - assignment_weighted_sum
-                    ) * 100.0 / effective_exam_score
-
+                    # Calculate required exam mark as a percentage of the scaled exam weight
+                    required_exam_mark = ((goal - assignment_weighted_sum) / effective_exam_score) * 100.0
+                    # Clamp to 0–100
+                    if required_exam_mark < 0:
+                        required_exam_mark = 0.0
+                    elif required_exam_mark > 100:
+                        required_exam_mark = 100.0
                 if average is not None and is_exam_taken and average >= goal:
                     requirement_status = "achieved"
                 else:
                     if effective_exam_score <= 0:
                         requirement_status = "impossible"
                     elif required_exam_mark is not None:
-                        if required_exam_mark < 0:
+                        if required_exam_mark == 0:
                             requirement_status = "achieved"
-                        elif required_exam_mark > 100:
+                        elif required_exam_mark == 100:
                             requirement_status = "impossible"
                         else:
                             requirement_status = "feasible"
@@ -243,6 +240,18 @@ def build_subject_context(
                             projected_total_weighted = round(goal, 2)
         except ValueError:
             requirement_status = "invalid"
+
+
+    # For summary: if there is an assignment-based exam, use its mark; otherwise, use the Examination table value
+    import logging
+    logger = logging.getLogger("uvicorn.error")
+    summary_exam_mark = None
+    if exam_assignment and hasattr(exam_assignment, "weighted_mark") and exam_assignment.weighted_mark is not None:
+        summary_exam_mark = float(exam_assignment.weighted_mark)
+        logger.info(f"[DEBUG] Using assignment-based exam mark for summary: {summary_exam_mark}")
+    elif single_exam and single_exam.exam_mark is not None:
+        summary_exam_mark = float(single_exam.exam_mark)
+        logger.info(f"[DEBUG] Using Examination table exam mark for summary: {summary_exam_mark}")
 
     ctx: SubjectContext = {
         "semester": semester,
@@ -262,7 +271,7 @@ def build_subject_context(
         "ps_exam": ps_exam,
         "ps_factor": parsed_factor if ps_exam else None,
         "raw_exam_percent": exam_raw_percent,
-        "exam_mark": exam_raw_percent,
+        "exam_mark": summary_exam_mark,
         "assignment_weighted_sum": round(assignment_weighted_sum, 2),
         "assignment_weight_percent": round(assignment_weight_percent, 2),
         "exam_weighted_sum": round(exam_contribution, 2),
@@ -274,6 +283,8 @@ def build_subject_context(
         "has_assignment_exam": bool(exam_assignment),
         "count_s": count_s,
         "count_u": count_u,
+        "final_exam_mark_weight": round(effective_exam_weight, 2),
+        "summary_exam_mark": summary_exam_mark,
     }
     return ctx
 

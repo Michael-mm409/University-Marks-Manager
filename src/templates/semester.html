@@ -64,7 +64,7 @@
             -
           {% endif %}
         </td>
-        <td class="p-4 text-right">{% if row.exam_weight is not none %}{{ '%.0f' % row.exam_weight }}%{% else %}-{% endif %}</td>
+        <td class="p-4 text-right">{% if row.final_exam_mark_weight is not none %}{{ '%.0f' % row.final_exam_mark_weight }}%{% else %}-{% endif %}</td>
         <td class="p-4 text-right font-bold">{{ '%.0f' % row.total_mark if row.total_mark is not none else '-' }}</td>
         <td class="p-4 text-right">
           {% if row.sync_subject and row.semester_name != semester %}

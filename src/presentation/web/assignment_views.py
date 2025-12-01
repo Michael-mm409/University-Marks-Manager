@@ -47,56 +47,73 @@ def create_assignment(
     unweighted_val = None
     weighted_val = None
     mark_weight_val = None
-    if grade_type == GradeType.NUMERIC.value:
-        try:
-            if weighted_mark is not None:
-                weighted_val = float(weighted_mark)
-            if mark_weight is not None:
-                mark_weight_val = float(mark_weight)
-            # Only calculate unweighted if both are provided
-            if weighted_val is not None and mark_weight_val is not None and mark_weight_val:
-                unweighted_val = round(weighted_val / mark_weight_val, 4)
-        except ValueError:
+    logger.info("[DEBUG] Assignment creation requested: code=%s, semester=%s, year=%s, assessment=%s, weighted_mark=%s, mark_weight=%s, grade_type=%s, is_exam=%s", code, semester, year, assessment, weighted_mark, mark_weight, grade_type, is_exam)
+    try:
+        if grade_type == GradeType.NUMERIC.value:
+            try:
+                if weighted_mark is not None:
+                    weighted_val = float(weighted_mark)
+                if mark_weight is not None:
+                    mark_weight_val = float(mark_weight)
+                # Only calculate unweighted if both are provided
+                if weighted_val is not None and mark_weight_val is not None and mark_weight_val:
+                    unweighted_val = round(weighted_val / mark_weight_val, 4)
+            except ValueError:
+                weighted_val = None
+                mark_weight_val = None
+                unweighted_val = None
+        if grade_type in (GradeType.SATISFACTORY.value, GradeType.UNSATISFACTORY.value):
             weighted_val = None
             mark_weight_val = None
             unweighted_val = None
-    if grade_type in (GradeType.SATISFACTORY.value, GradeType.UNSATISFACTORY.value):
-        weighted_val = None
-        mark_weight_val = None
-        unweighted_val = None
-    # Resolve subject_id first for normalized lookups
-    subj = session.exec(
-        select(Subject).where(
-            Subject.subject_code == code,
-            Subject.semester_name == semester,
-            Subject.year == year,
+        # Resolve subject_id first for normalized lookups
+        logger.info("[DEBUG] Looking up subject with: subject_code=%s, semester_name=%s, year=%s", code, semester, year)
+        subj = session.exec(
+            select(Subject).where(
+                Subject.subject_code == code,
+                Subject.semester_name == semester,
+                Subject.year == year,
+            )
+        ).first()
+        logger.info("[DEBUG] Subject lookup result: %s", subj)
+        if subj is None:
+            logger.error("[DEBUG] Subject not found for code=%s, semester=%s, year=%s", code, semester, year)
+            return HTMLResponse("Subject not found for the given code, semester, and year. Cannot create assignment.", status_code=400)
+        subject_id = getattr(subj, "id", None)
+        logger.info("[DEBUG] subject_id resolved: %s", subject_id)
+        if subject_id is None:
+            logger.error("[DEBUG] Subject found but has no valid ID. Database may be corrupted. subj=%s", subj)
+            return HTMLResponse("Subject found but has no valid ID. Database may be corrupted. Cannot create assignment.", status_code=500)
+        # Check duplicate by (subject_id, assessment)
+        existing_assignment = session.exec(
+            select(Assignment).where(
+                Assignment.subject_id == subject_id,
+                Assignment.assessment == assessment,
+            )
+        ).first()
+        logger.info("[DEBUG] Existing assignment lookup: %s", existing_assignment)
+        if existing_assignment:
+            logger.warning("[DEBUG] Assignment with this name already exists for subject_id=%s, assessment=%s", subject_id, assessment)
+            return HTMLResponse("An assignment with this name already exists for this subject/semester/year.", status_code=400)
+        new_assignment = Assignment(
+            subject_id=subject_id,
+            subject_code=code,
+            semester_name=semester,
+            year=year,
+            assessment=assessment,
+            # Persist numeric weighted marks as floats; S/U is tracked via grade_type.
+            weighted_mark=(weighted_val if (grade_type == GradeType.NUMERIC.value and weighted_val is not None) else None),
+            unweighted_mark=unweighted_val,
+            mark_weight=mark_weight_val,
+            grade_type=grade_type,
+            is_exam=is_exam,
         )
-    ).first()
-    subject_id = getattr(subj, "id", None)
-    # Check duplicate by (subject_id, assessment)
-    existing_assignment = session.exec(
-        select(Assignment).where(
-            Assignment.subject_id == subject_id,
-            Assignment.assessment == assessment,
-        )
-    ).first()
-    if existing_assignment:
-        return HTMLResponse("An assignment with this name already exists for this subject/semester/year.", status_code=400)
-    new_assignment = Assignment(
-        subject_id=subject_id,
-        subject_code=code,
-        semester_name=semester,
-        year=year,
-        assessment=assessment,
-        # Persist numeric weighted marks as floats; S/U is tracked via grade_type.
-        weighted_mark=(weighted_val if (grade_type == GradeType.NUMERIC.value and weighted_val is not None) else None),
-        unweighted_mark=unweighted_val,
-        mark_weight=mark_weight_val,
-        grade_type=grade_type,
-        is_exam=is_exam,
-    )
-    session.add(new_assignment)
-    session.commit()
+        logger.info("[DEBUG] Creating new assignment: %s", new_assignment)
+        session.add(new_assignment)
+        session.commit()
+    except Exception as e:
+        logger.exception("[DEBUG] Exception during assignment creation: %s", e)
+        return HTMLResponse("Internal server error during assignment creation. See logs for details.", status_code=500)
 
     # If total_mark is not provided or is empty, use the subject's stored total_mark
     if total_mark in (None, ""):
@@ -216,7 +233,11 @@ def delete_assignment(
     if existing:
         session.delete(existing)
         session.commit()
+    # Always include total_mark in redirect to ensure summary recalculates
+    total_mark = getattr(subj, "total_mark", None)
     url = f"/semester/{semester}/subject/{code}?year={year}"
+    if total_mark not in (None, ""):
+        url += f"&total_mark={total_mark}"
     if return_to:
         url += f"&return_to={return_to}"
     return RedirectResponse(url, status_code=303)
@@ -355,7 +376,39 @@ def update_assignment_ajax(
         assignment.grade_type = grade_type
         assignment.is_exam = is_exam
         session.commit()
-        # Recalculate and update subject total_mark after assignment edit
+
+        # --- Sync Examination table if assignment is (un)marked as exam ---
+        # Only one exam per subject is supported (by design)
+        exam = session.exec(
+            select(Examination).where(
+                Examination.subject_id == sid,
+            )
+        ).first()
+        if is_exam:
+            # Use assignment's weighted_mark for the exam (Final Exam Mark)
+            exam_mark = assignment.weighted_mark if assignment.weighted_mark is not None else 0.0
+            exam_weight = assignment.mark_weight if assignment.mark_weight is not None else 0.0
+            if exam:
+                exam.exam_mark = exam_mark
+                exam.exam_weight = exam_weight
+            else:
+                session.add(
+                    Examination(
+                        subject_id=sid,
+                        subject_code=code,
+                        semester_name=semester,
+                        year=year,
+                        exam_mark=exam_mark,
+                        exam_weight=exam_weight,
+                    )
+                )
+            session.commit()
+        else:
+            # If unmarking as exam, remove the Examination record if it matches this assignment
+            if exam:
+                session.delete(exam)
+                session.commit()
+        # Recalculate and update subject total_mark after assignment edit (display only)
         subject = subj
         if subject:
             assignments = session.exec(
@@ -382,22 +435,7 @@ def update_assignment_ajax(
                             assess_weighted_total += float(a.weighted_mark)
                         except ValueError:
                             pass
-            # Prepare escaped/display values for the updated row (prevent stored XSS)
-            assessment_value = escape(assignment.assessment or "")
-            weighted_value = "-" if assignment.grade_type in ("S", "U") else (
-                f"{float(assignment.weighted_mark):.2f}" if assignment.weighted_mark is not None else "0.00"
-            )
-            unweighted_value = "-" if assignment.grade_type in ("S", "U") else (
-                f"{float(assignment.unweighted_mark):.2f}" if assignment.unweighted_mark is not None else "0.00"
-            )
-            mark_weight_value = "-" if assignment.grade_type in ("S", "U") else (
-                f"{float(assignment.mark_weight):.2f}" if assignment.mark_weight is not None else "0.00"
-            )
-            grade_type_value = escape(assignment.grade_type or "")
-            assessment_key = escape(assessment)
-            code_key = escape(code)
-            semester_key = escape(semester)
-            year_key = escape(year)
+            # ...existing code...
 
             exam_mark = None
             exam_weight = None

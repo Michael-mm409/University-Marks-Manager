@@ -206,8 +206,8 @@
     <td class="assignment-mark-weight">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.mark_weight|float) if assignment.mark_weight is not none else '0.00' }}{% endif %}</td>
     <td class="assignment-grade-type">{{assignment.grade_type}}</td>
     <td class="flex gap-1">
-      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/{{assignment.assessment}}/{{assignment.subject_code}}/{{assignment.semester_name}}/{{assignment.year}}/delete" onsubmit="return confirm('Delete assignment?');">
-        <input type="hidden" name="year" value="{{year}}" />
+      <form method="post" action="/semester/{{ assignment.semester_name }}/subject/{{ assignment.subject_code }}/assignment/{{ assignment.assessment }}/{{ assignment.year }}/delete" onsubmit="return confirm('Delete assignment?');">
+        <input type="hidden" name="year" value="{{ assignment.year }}" />
         {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}" />{% endif %}
         <button class="btn btn-xs btn-error" type="submit">✕</button>
       </form>
@@ -233,10 +233,10 @@
             <th>Assignment Mark</th>
             <th>Assessment Weight</th>
             <th>Final Exam Mark</th>
-            <th>Final Exam Mark Weight</th>
+            <th>Final Exam Mark Weight{% if ps_exam %} (PS Factor Applied){% endif %}</th>
             <th>Total Mark</th>
-            <th>S Grades</th>
-            <th>U Grades</th>
+            {% if count_s %}<th>S Grades</th>{% endif %}
+            {% if count_u %}<th>U Grades</th>{% endif %}
           </tr>
         </thead>
         <tbody>
@@ -245,16 +245,13 @@
             <td>{{ '%.2f' % assignment_weighted_sum }}</td>
             <td>{{ '%.0f' % assignment_weight_percent }}%</td>
             <td>
-              {% if required_exam_mark is not none and (exam_mark is none or exam_mark == 0) %}
-                <span class="text-info font-bold" title="Required to reach target (Weighted)">{{ '%.2f' % ((required_exam_mark * effective_exam_weight) / 100) }}</span>
-              {% else %}
-                {{ '%.2f' % exam_weighted_sum if exam_mark is not none else '-' }}
-              {% endif %}
+              {{ '%.2f' % summary_exam_mark if summary_exam_mark is not none else '-' }}
             </td>
-            <td>{{ '%.0f' % effective_exam_weight if effective_exam_weight else 0 }}%</td>
+            <td>
+              {{ '%.0f' % final_exam_mark_weight }}%
             <td>{{ '%.0f' % subject.total_mark if subject.total_mark is not none else '-' }}</td>
-            <td>{{ count_s }}</td>
-            <td>{{ count_u }}</td>
+            {% if count_s %}<td>{{ count_s }}</td>{% endif %}
+            {% if count_u %}<td>{{ count_u }}</td>{% endif %}
           </tr>
     </div>
   </div>
