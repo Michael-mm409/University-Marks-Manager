@@ -64,6 +64,11 @@ class Subject(SQLModel, table=True):
     credit_points: int = Field(default=6)
     sync_subject: bool = False
 
+    __table_args__ = (
+        # Natural key uniqueness to prevent duplicate subjects per semester/year
+        UniqueConstraint("subject_code", "semester_name", "year", name="uq_subject_code_semester_year"),
+    )
+
     # NOTE:
     # 1) The (subject_code, semester_name, year) triple behaves like a natural key across the app.
     #    Consider adding a UniqueConstraint on these three columns in a schema migration to prevent duplicates.
@@ -114,6 +119,7 @@ class Assignment(SQLModel, table=True):
     grade_type: str = Field(default=GradeType.NUMERIC.value)
     is_exam: bool = Field(default=False)
     __table_args__ = (
+        # Ensure one assessment name per subject+semester+year; subject_code kept while subject_id transitions
         UniqueConstraint("assessment", "subject_code", "semester_name", "year", name="uq_assignment"),
     )
 
