@@ -10,12 +10,15 @@
 /* Site hero title (base.html) */
 body .site-title {
   /* Responsive clamp: min 2rem (~text-3xl), scale with viewport, max 4rem (~text-6xl) */
-  font-size: clamp(2rem, 4.5vw, 4rem) !important;
+  /* Dialed down: min ~1.75rem, softer slope, max ~3rem */
+  font-size: clamp(1.6rem, 2.6vw, 2.75rem) !important;
 }
 /* Subject page main title (code and name) */
-body .subject-title { font-size: 1.7rem !important; margin-bottom: 0.1rem !important; }
+/* Responsive: min ~1.1rem, scales with viewport, max ~1.7rem */
+body .subject-title { font-size: clamp(1.1rem, 1.6vw, 1.7rem) !important; margin-bottom: 0.1rem !important; }
 /* Semester title */
-body .semester-title { font-size: 1.5rem !important; }
+/* Responsive: min ~1rem, scales with viewport, max ~1.5rem */
+body .semester-title { font-size: clamp(1rem, 1.4vw, 1.5rem) !important; }
 body .semester-title .semester-year {
   font-size: 1.1rem !important;
   font-weight: 600 !important;
