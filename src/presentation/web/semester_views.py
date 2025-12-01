@@ -257,7 +257,7 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
             {
                 "code": sub.subject_code,
                 "name": sub.subject_name,
-                "semester_name": sub.semester_name,
+                "semester_name": semester,
                 "credit_points": getattr(sub, "credit_points", None),
                 "assessment_mark": round(assess_weighted_total, 2),
                 "assessment_weight": assess_weight_sum,
@@ -379,10 +379,13 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
             effective_scoring_exam_weight = exam_weight * scaling if exam_weight is not None else None
             exam_mark = exam.exam_mark if exam else None
             is_exam_required = False
+            # Get semester name via FK lookup
+            sem_obj = session.get(Semester, sub.semester_id)
+            sem_name = sem_obj.name if sem_obj else "Unknown"
             summaries.append({
                 "code": sub.subject_code,
                 "name": sub.subject_name,
-                "semester_name": sub.semester_name,
+                "semester_name": sem_name,
                 "assessment_mark": round(assess_weighted_total, 2),
                 "assessment_weight": assess_weight_sum,
                 "exam_mark": exam_mark,
