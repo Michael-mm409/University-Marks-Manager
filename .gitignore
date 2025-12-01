@@ -17,3 +17,6 @@ __pycache__/
 .coverage
 .env
 .env.local
+
+# Scripts
+/scripts
