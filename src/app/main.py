@@ -137,14 +137,3 @@ def healthz():
     """
     return {"status": "ok"}
 
-# Backward compatibility: redirect legacy /api and /api/* to versioned prefix
-@APPLICATION.api_route("/api", methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])  # type: ignore[arg-type]
-async def api_root_redirect(request: Request) -> RedirectResponse:
-    qs = ("?" + request.url.query) if request.url.query else ""
-    return RedirectResponse(url=f"{API_PREFIX}{qs}", status_code=308)
-
-@APPLICATION.api_route("/api/{full_path:path}", methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])  # type: ignore[arg-type]
-async def api_legacy_redirect(full_path: str, request: Request) -> RedirectResponse:
-    qs = ("?" + request.url.query) if request.url.query else ""
-    return RedirectResponse(url=f"{API_PREFIX}/{full_path}{qs}", status_code=308)
-

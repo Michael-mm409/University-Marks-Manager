@@ -14,6 +14,7 @@ router = APIRouter()
 @router.get("/", response_model=List[ExaminationRead])
 def list_exams(
     session: Session = Depends(get_session),
+    subject_id: Optional[int] = None,
     subject_code: Optional[str] = None,
     semester_name: Optional[str] = None,
     year: Optional[str] = None,
@@ -29,7 +30,10 @@ def list_exams(
     Returns:
         Sequence[Examination]: List of examinations.
     """
-    # Prefer normalized filtering when all three are provided
+    # Prefer normalized filtering when subject_id provided
+    if subject_id is not None:
+        return session.exec(select(Examination).where(Examination.subject_id == subject_id)).all()
+    # Legacy: composite provided
     if subject_code and semester_name and year:
         subj = session.exec(
             select(Subject)
@@ -63,16 +67,26 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
         Examination: The created examination.
     """
     # Resolve subject_id, enforce one-exam-per-subject
-    subj = session.exec(
-        select(Subject)
-        .join(Semester)
-        .where(
-            Subject.subject_code == data.subject_code,
-            Semester.name == data.semester_name,
-            Semester.year == int(data.year),
-        )
-    ).first()
-    sid = getattr(subj, "id", None)
+    sid = getattr(data, "subject_id", None)
+    if sid is None:
+        # Legacy resolution requires all fields
+        if data.subject_code is None or data.semester_name is None or data.year is None:
+            raise HTTPException(
+                status_code=400,
+                detail="subject_id or (subject_code, semester_name, year) is required",
+            )
+        subj = session.exec(
+            select(Subject)
+            .join(Semester)
+            .where(
+                Subject.subject_code == data.subject_code,
+                Semester.name == data.semester_name,
+                Semester.year == int(data.year),
+            )
+        ).first()
+        sid = getattr(subj, "id", None)
+        if sid is None:
+            raise HTTPException(status_code=404, detail="subject not found")
     existing = session.exec(select(Examination).where(Examination.subject_id == sid)).first()
     if existing:
         raise HTTPException(status_code=409, detail="Exam already exists for subject")

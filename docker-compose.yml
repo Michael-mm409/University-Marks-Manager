@@ -1,7 +1,7 @@
 services:
   nginx:
     container_name: marks-manager-nginx
-    image: nginx:latest
+    image: nginx:1.25.3-alpine
     ports:
       - "18000:80"
     volumes:
@@ -16,7 +16,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: university-marks-manager:fastapi
     # Development-friendly command: enables live reload for Python/template changes
     command: uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --reload --reload-dir /app/src --reload-dir /app/src/templates --log-level debug
     restart: unless-stopped
@@ -44,7 +43,7 @@ services:
 
   db:
     container_name: marks-manager-db
-    image: postgres:13
+    image: postgres:16.1-alpine
     restart: unless-stopped
     volumes:
       - postgres_data_nas:/var/lib/postgresql/data/

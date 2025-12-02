@@ -38,6 +38,25 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
     """Render Home with a concrete parsed_year (None means All years)."""
     sm = SemesterManager(session)
     cm = CourseManager(session)
+    
+    # Check if any courses exist - show warning if empty
+    all_courses = cm.get_all_courses()
+    if not all_courses:
+        # No courses exist - show a message prompting course creation
+        ctx: IndexContext = {
+            "semesters": [],
+            "years": [],
+            "selected_year": parsed_year,
+            "current_year": str(datetime.now().year),
+            "flash_message": None,
+            "course_filter": None,
+            "wam": None,
+            "gpa": None,
+            "grade_counts": None,
+            "no_courses_warning": True,
+        }
+        return _render(request, "index.html", ctx)
+    
     # If a course is selected, restrict semesters and years to that course
     # Resolve active course id robustly (fallback to code lookup)
     sess = request.session
@@ -109,6 +128,7 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
         "wam": wam,
         "gpa": gpa,
         "grade_counts": grade_counts,
+        "no_courses_warning": False,
     }
     return _render(request, "index.html", ctx)
 

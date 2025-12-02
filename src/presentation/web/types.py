@@ -21,6 +21,7 @@ class IndexContext(TypedDict):
     wam: Optional[float]
     gpa: Optional[float]
     grade_counts: Optional[dict[str, int]]
+    no_courses_warning: Optional[bool]
 
 
 class SemesterSummary(TypedDict):

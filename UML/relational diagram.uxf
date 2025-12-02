@@ -4,15 +4,17 @@
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>0</x>
-      <y>590</y>
+      <x>390</x>
+      <y>640</y>
       <w>240</w>
       <h>160</h>
     </coordinates>
     <panel_attributes>Semester
 --
+Academic term within a course (e.g., Autumn 2025)
+--
 id: int PK
-name: string
+name: string  (e.g., "Autumn", "Spring")
 year: int 
 course_id: int FK Ref Course(id)
 
@@ -23,20 +25,23 @@ ON DELETE CASCADE via course_id</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>470</x>
-      <y>580</y>
+      <x>860</x>
+      <y>630</y>
       <w>340</w>
       <h>220</h>
     </coordinates>
     <panel_attributes>Subject
 --
+Course unit enrolled in a semester (e.g., CSCI203)
+total_mark computed from assignments + exam
+--
 id: int PK
-subject_code: string  
+subject_code: string  (e.g., "CSCI203")
 subject_name: string
 semester_id: int FK Ref Semester(id) NOT NULL
-total_mark: float[0.0]
+total_mark: float[0.0]  (computed)
 credit_points: int[6]
-sync_subject: bool[false]
+sync_subject: bool[false]  (show in all semesters)
 
 UNIQUE(subject_code, semester_id)
 ON DELETE CASCADE via semester_id
@@ -46,8 +51,8 @@ ON DELETE CASCADE via semester_id
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>230</x>
-      <y>650</y>
+      <x>620</x>
+      <y>700</y>
       <w>260</w>
       <h>50</h>
     </coordinates>
@@ -60,21 +65,24 @@ m2=1</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>490</x>
-      <y>140</y>
+      <x>880</x>
+      <y>220</y>
       <w>390</w>
       <h>270</h>
     </coordinates>
     <panel_attributes>Assignment
 --
+Assessment item for a subject (quiz, lab, exam, etc.)
+Supports numeric grades and pass/fail (S/U)
+--
 id: int PK
 subject_id: int FK Ref Subject(id) NOT NULL
-assessment: string
-weighted_mark: float
-unweighted_mark: float
-mark_weight: float
+assessment: string  (e.g., "Quiz 1", "Lab 3")
+weighted_mark: float  (contribution to total)
+unweighted_mark: float  (raw score)
+mark_weight: float  (% of total, e.g., 15)
 grade_type: enum[numeric, S, U]
-is_exam: bool[false]
+is_exam: bool[false]  (flags final exam)
 
 UNIQUE(assessment, subject_id)
 ON DELETE CASCADE via subject_id
@@ -84,27 +92,30 @@ ON DELETE CASCADE via subject_id
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>940</x>
-      <y>580</y>
+      <x>1330</x>
+      <y>630</y>
       <w>340</w>
       <h>140</h>
     </coordinates>
     <panel_attributes>ExamSettings
 --
+Pass-scale (PS) exam configuration
+PS exams require min 40% to pass
+--
 id: int PK
 subject_id: int FK Ref Subject(id) NOT NULL
-ps_exam: bool[false]
-ps_factor: float[40.0]
+ps_exam: bool[false]  (is this a PS exam?)
+ps_factor: float[40.0]  (min % required)
 
-UNIQUE(subject_id)
+UNIQUE(subject_id)  (1:1 with Subject)
 ON DELETE CASCADE via subject_id</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>690</x>
-      <y>790</y>
+      <x>1080</x>
+      <y>840</y>
       <w>50</w>
       <h>130</h>
     </coordinates>
@@ -116,25 +127,27 @@ m2=0..1</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>800</x>
-      <y>640</y>
+      <x>1190</x>
+      <y>700</y>
       <w>160</w>
-      <h>50</h>
+      <h>40</h>
     </coordinates>
     <panel_attributes>lt=-
 m1=1
 m2=0..1</panel_attributes>
-    <additional_attributes>10.0;20.0;140.0;20.0</additional_attributes>
+    <additional_attributes>10.0;10.0;140.0;10.0</additional_attributes>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>10</x>
-      <y>250</y>
+      <x>400</x>
+      <y>300</y>
       <w>270</w>
       <h>160</h>
     </coordinates>
     <panel_attributes>Course
+--
+Degree/program of study (e.g., Bachelor of CS)
 --
 id: int PK
 code: string
@@ -147,8 +160,8 @@ UNIQUE(code)</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>100</x>
-      <y>400</y>
+      <x>490</x>
+      <y>450</y>
       <w>50</w>
       <h>210</h>
     </coordinates>
@@ -160,8 +173,8 @@ m2=1</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>270</x>
-      <y>360</y>
+      <x>660</x>
+      <y>410</y>
       <w>220</w>
       <h>260</h>
     </coordinates>
@@ -173,39 +186,45 @@ m2=*</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>470</x>
-      <y>900</y>
+      <x>860</x>
+      <y>950</y>
       <w>340</w>
       <h>170</h>
     </coordinates>
     <panel_attributes>Examination
 --
+Final exam record (alternative to Assignment.is_exam)
+One exam per subject maximum
+--
 id: int PK
 subject_id: int FK Ref Subject(id) NOT NULL
-exam_mark: float[0.0]
-exam_weight: float[100.0]
+exam_mark: float[0.0]  (score achieved)
+exam_weight: float[100.0]  (% of total)
 
-UNIQUE(subject_id)
+UNIQUE(subject_id)  (1:1 with Subject)
 ON DELETE CASCADE via subject_id</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>70</x>
-      <y>0</y>
+      <x>420</x>
+      <y>70</y>
       <w>240</w>
       <h>150</h>
     </coordinates>
     <panel_attributes>GradeScale
 --
+Grade bands and GPA mappings
+(e.g., HD=85-100=4.0, D=75-84=3.5)
+--
 id: int PK
 scale_name: string[Standard]
-grade: string
-label: string
-min_mark: float
-gpa_point: float
-band_type: string[both]
+grade: string  (e.g., "HD", "D", "P")
+label: string  (e.g., "High Distinction")
+min_mark: float  (threshold, e.g., 85.0)
+gpa_point: float  (e.g., 4.0)
+band_type: string[both]  (wam/gpa/both)
 
 UNIQUE(scale_name, grade, band_type)
 bg=#f5f5f5
@@ -215,21 +234,21 @@ bg=#f5f5f5
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>120</x>
-      <y>140</y>
-      <w>50</w>
-      <h>130</h>
+      <x>510</x>
+      <y>210</y>
+      <w>30</w>
+      <h>110</h>
     </coordinates>
     <panel_attributes>lt=-
 m1=*
 m2=*</panel_attributes>
-    <additional_attributes>10.0;110.0;10.0;10.0</additional_attributes>
+    <additional_attributes>10.0;90.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>640</x>
-      <y>430</y>
+      <x>1030</x>
+      <y>480</y>
       <w>50</w>
       <h>170</h>
     </coordinates>

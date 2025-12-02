@@ -16,6 +16,7 @@ router = APIRouter()
 @router.get("/", response_model=List[SubjectRead])
 def list_subjects(
     session: Session = Depends(get_session),
+    semester_id: Optional[int] = None,
     semester_name: Optional[str] = None,
     year: Optional[int] = None,
     code: Optional[str] = None,
@@ -32,7 +33,11 @@ def list_subjects(
         Sequence[Subject]: List of subjects.
     """
     stmt = select(Subject)
-    if semester_name or year:
+    # Prefer normalized filter by semester_id
+    if semester_id is not None:
+        stmt = stmt.where(Subject.semester_id == semester_id)
+    elif semester_name or year:
+        # Legacy filters via JOIN on Semester
         stmt = stmt.join(Semester)
         if semester_name:
             stmt = stmt.where(Semester.name == semester_name)
@@ -46,9 +51,9 @@ def list_subjects(
 @router.post("/", response_model=SubjectRead, status_code=status.HTTP_201_CREATED)
 def create_subject(data: SubjectCreate, session: Session = Depends(get_session)) -> Subject:
     """
-	Create a new subject if it does not already exist in the specified semester.
-	
-	Args:
+    Create a new subject in a specific semester (normalized: uses semester_id).
+
+    Args:
         data (Subject): Subject data to create.
         session (Session): Database session dependency.
     
@@ -59,12 +64,12 @@ def create_subject(data: SubjectCreate, session: Session = Depends(get_session))
     Returns:
         Subject: The created subject.
     """
-    # Verify semester exists
-    semester = session.get(Semester, data.semester_id)
-    if not semester:
-        raise HTTPException(status_code=400, detail="Invalid semester_id")
-    
-    # Check if subject already exists in this semester
+    # Validate semester exists
+    sem = session.get(Semester, data.semester_id)
+    if not sem:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="semester not found")
+
+    # Enforce uniqueness: (subject_code, semester_id)
     exists = session.exec(
         select(Subject).where(
             Subject.subject_code == data.subject_code,
@@ -72,20 +77,19 @@ def create_subject(data: SubjectCreate, session: Session = Depends(get_session))
         )
     ).first()
     if exists:
-        raise HTTPException(status_code=409, detail="Subject already exists in semester")
-    
-    subj = Subject(
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="subject already exists for semester")
+
+    sub = Subject(
         subject_code=data.subject_code,
         subject_name=data.subject_name,
         semester_id=data.semester_id,
-        total_mark=data.total_mark if data.total_mark is not None else 0.0,
-        credit_points=data.credit_points if hasattr(data, 'credit_points') else 6,
-        sync_subject=data.sync_subject if hasattr(data, 'sync_subject') else False,
+        sync_subject=data.sync_subject,
+        total_mark=data.total_mark,
     )
-    session.add(subj)
+    session.add(sub)
     session.commit()
-    session.refresh(subj)
-    return subj
+    session.refresh(sub)
+    return sub
 
 
 @router.get("/{subject_id}", response_model=SubjectRead)
@@ -152,8 +156,7 @@ def update_subject(subject_id: int, data: SubjectCreate, session: Session = Depe
     subj.subject_name = data.subject_name
     subj.semester_id = data.semester_id
     subj.total_mark = data.total_mark if data.total_mark is not None else subj.total_mark
-    if hasattr(data, 'credit_points'):
-        subj.credit_points = data.credit_points
+    # credit_points is not part of SubjectCreate (normalized); keep existing value
     if hasattr(data, 'sync_subject'):
         subj.sync_subject = data.sync_subject
     session.add(subj)

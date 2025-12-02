@@ -16,6 +16,7 @@ router = APIRouter()
 @router.api_route("/", response_model=List[AssignmentRead], methods=["GET", "HEAD"])
 def list_assignments(
     session: Session = Depends(get_session),
+    subject_id: Optional[int] = None,
     subject_code: Optional[str] = None,
     semester_name: Optional[str] = None,
     year: Optional[str] = None,
@@ -33,7 +34,11 @@ def list_assignments(
         Sequence[Assignment]: List of assignments.
     """
     stmt = select(Assignment).order_by(Assignment.assessment)
-    # Prefer normalized filtering when all three are provided
+    # Prefer normalized filtering when subject_id provided
+    if subject_id is not None:
+        stmt = select(Assignment).where(Assignment.subject_id == subject_id).order_by(Assignment.assessment)
+        return session.exec(stmt).all()
+    # Legacy filtering when composite provided
     if subject_code and semester_name and year:
         subj = session.exec(
             select(Subject)
@@ -92,20 +97,25 @@ def create_assignment(data: AssignmentCreate, session: Session = Depends(get_ses
             # If conversion fails, leave as-is and let the ORM/DB raise if invalid
             pass
     # Resolve subject_id and enforce duplicate by (subject_id, assessment)
-    year_val = payload.get("year")
-    if not year_val:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="year is required")
-    subj = session.exec(
-        select(Subject)
-        .join(Semester)
-        .where(
-            Subject.subject_code == payload.get("subject_code"),
-            Semester.name == payload.get("semester_name"),
-            Semester.year == int(year_val),
-        )
-    ).first()
-    sid = getattr(subj, "id", None)
-    payload["subject_id"] = sid
+    sid = payload.get("subject_id")
+    if sid is None:
+        # Attempt legacy resolution via code/semester/year
+        year_val = payload.get("year")
+        if not year_val:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="subject_id or (subject_code, semester_name, year) is required")
+        subj = session.exec(
+            select(Subject)
+            .join(Semester)
+            .where(
+                Subject.subject_code == payload.get("subject_code"),
+                Semester.name == payload.get("semester_name"),
+                Semester.year == int(year_val),
+            )
+        ).first()
+        sid = getattr(subj, "id", None)
+        if sid is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="subject not found")
+        payload["subject_id"] = sid
     duplicate = session.exec(
         select(Assignment).where(
             Assignment.subject_id == sid,
@@ -187,20 +197,24 @@ def update_assignment(assignment_id: int, data: AssignmentCreate,
             pass
     # Guard against creating a duplicate natural key (exclude the current record)
     # Resolve subject_id for duplicate check and update the record's subject_id if changed
-    year_val = payload.get("year")
-    if not year_val:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="year is required")
-    subj = session.exec(
-        select(Subject)
-        .join(Semester)
-        .where(
-            Subject.subject_code == payload.get("subject_code"),
-            Semester.name == payload.get("semester_name"),
-            Semester.year == int(year_val),
-        )
-    ).first()
-    sid = getattr(subj, "id", None)
-    payload["subject_id"] = sid
+    sid = payload.get("subject_id")
+    if sid is None:
+        year_val = payload.get("year")
+        if not year_val:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="subject_id or (subject_code, semester_name, year) is required")
+        subj = session.exec(
+            select(Subject)
+            .join(Semester)
+            .where(
+                Subject.subject_code == payload.get("subject_code"),
+                Semester.name == payload.get("semester_name"),
+                Semester.year == int(year_val),
+            )
+        ).first()
+        sid = getattr(subj, "id", None)
+        if sid is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="subject not found")
+        payload["subject_id"] = sid
     duplicate = session.exec(
         select(Assignment).where(
             Assignment.id != assignment_id,
