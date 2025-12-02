@@ -6,7 +6,7 @@ from typing import Optional, Iterable
 from sqlmodel import Session, select
 from sqlalchemy import func
 
-from src.infrastructure.db.models import Course, Subject, Semester, CourseSubjectLink
+from src.infrastructure.db.models import Course, Subject, Semester
 
 
 class CourseManager:
@@ -81,36 +81,19 @@ class CourseManager:
         return []
 
     def add_subject_to_course(self, course_id: int, subject_id: int) -> Optional[Course]:
-        """Add an existing subject to a course.
+        """Add an existing subject to a course (deprecated - subjects belong to semesters).
+
+        This method is deprecated as subjects are implicitly associated with courses
+        through their semester relationship. Use assign_semester_to_course instead.
 
         Args:
             course_id: The ID of the course.
             subject_id: The ID of the subject to add.
 
         Returns:
-            The updated Course object or None if not found.
+            The Course object (no-op for backward compatibility).
         """
         course = self.get_course_by_id(course_id)
-        subject = self.session.get(Subject, subject_id)
-
-        if not course or not subject:
-            return None
-
-        # Check if the link already exists
-        existing_link = self.session.exec(
-            select(CourseSubjectLink).where(
-                CourseSubjectLink.course_id == course_id,
-                CourseSubjectLink.subject_id == subject_id,
-            )
-        ).first()
-
-        if existing_link:
-            return course  # Subject is already in the course
-
-        link = CourseSubjectLink(course_id=course_id, subject_id=subject_id)
-        self.session.add(link)
-        self.session.commit()
-        self.session.refresh(course)
         return course
 
     def assign_semester_to_course(
@@ -158,8 +141,9 @@ class CourseManager:
 
     # Internal helpers
     def _link_semester_and_subjects(self, course: Course, semester: Semester) -> None:
-        """Link only unassigned semesters to a course and attach subjects via link table.
+        """Link only unassigned semesters to a course.
 
+        Subjects are implicitly associated with the course through their semester.
         Note: We do not steal semesters from other courses; only semesters with course_id=None are linked.
         """
         # Link the semester to the course (one Course -> many Semesters)
@@ -168,28 +152,11 @@ class CourseManager:
             self.session.add(semester)
             self.session.commit()
 
-            # Auto-link all subjects that belong to this semester to the course
-            subjects_in_semester = self.session.exec(
-                select(Subject)
-                .where(Subject.semester_id == semester.id)
-            ).all()
-
-            created = False
-            for subj in subjects_in_semester:
-                exists = self.session.exec(
-                    select(CourseSubjectLink).where(
-                        CourseSubjectLink.course_id == course.id,
-                        CourseSubjectLink.subject_id == subj.id,
-                    )
-                ).first()
-                if not exists:
-                    self.session.add(CourseSubjectLink(course_id=course.id, subject_id=subj.id))
-                    created = True
-            if created:
-                self.session.commit()
-
     def unassign_semester_from_course(self, course_id: int, semester_id: int) -> Optional[Course]:
-        """Remove a semester from a course and unlink its subjects from the course."""
+        """Remove a semester from a course.
+        
+        Subjects in this semester are implicitly unlinked from the course.
+        """
         course = self.get_course_by_id(course_id)
         semester = self.session.get(Semester, semester_id)
         if not course or not semester:
@@ -201,25 +168,6 @@ class CourseManager:
         semester.course_id = None
         self.session.add(semester)
         self.session.commit()
-
-        # Remove subject links for this semester
-        subjects_in_semester = self.session.exec(
-            select(Subject)
-            .where(Subject.semester_id == semester.id)
-        ).all()
-        removed = False
-        for subj in subjects_in_semester:
-            link = self.session.exec(
-                select(CourseSubjectLink).where(
-                    CourseSubjectLink.course_id == course.id,
-                    CourseSubjectLink.subject_id == subj.id,
-                )
-            ).first()
-            if link:
-                self.session.delete(link)
-                removed = True
-        if removed:
-            self.session.commit()
         return self.get_course_by_id(course_id)
 
     def unassign_year_from_course(self, course_id: int, year: int) -> Optional[Course]:
@@ -259,8 +207,9 @@ class CourseManager:
         return course
 
     def delete_course(self, course_id: int) -> bool:
-        """Delete a course: unlink semesters and remove subject associations first.
+        """Delete a course: unlink semesters first.
 
+        Subjects are implicitly unlinked when their semesters are unassigned.
         Returns True if deleted, False if not found.
         """
         course = self.get_course_by_id(course_id)
@@ -271,10 +220,6 @@ class CourseManager:
         for sem in semesters:
             sem.course_id = None
             self.session.add(sem)
-        # Remove subject links
-        links = self.session.exec(select(CourseSubjectLink).where(CourseSubjectLink.course_id == course_id)).all()
-        for link in links:
-            self.session.delete(link)
         self.session.commit()
         # Now delete course
         self.session.delete(course)

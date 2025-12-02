@@ -17,22 +17,11 @@ class GradeType(str, Enum):
     UNSATISFACTORY = "U"
 
 
-class CourseSubjectLink(SQLModel, table=True):
-    """Link table for the many-to-many relationship between Course and Subject."""
-
-    __tablename__: ClassVar[str] = "course_subject_link"
-    course_id: Optional[int] = Field(
-        default=None, foreign_key="courses.id", primary_key=True
-    )
-    subject_id: Optional[int] = Field(
-        default=None, foreign_key="subjects.id", primary_key=True
-    )
-    # NOTE: Consider adding DB-level ON DELETE CASCADE on both foreign keys via a migration
-    # so that removing a Course or Subject cleans up association rows automatically.
-    
-
 class Semester(SQLModel, table=True):
-    """Academic semester (e.g., Autumn 2025)."""
+    """Academic semester (e.g., Autumn 2025).
+    
+    Candidate key: (course_id, name, year) - no duplicate semesters per course
+    """
 
     __tablename__: ClassVar[str] = "semesters"
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -42,7 +31,7 @@ class Semester(SQLModel, table=True):
     # Target uniqueness per UML: one (name, year) per course
     # NOTE: Applying this change requires a DB migration (updates constraint name and keys)
     __table_args__ = (
-        UniqueConstraint("course_id", "name", "year", name="uq_semester_course_name_year"),
+        UniqueConstraint("course_id", "name", "year", name="uq_semester_course_name_year"),  # Candidate key
     )
 
     # Relationship is attached after class definitions to avoid forward-ref issues
@@ -50,7 +39,10 @@ class Semester(SQLModel, table=True):
 
 
 class Subject(SQLModel, table=True):
-    """Subject/course within a semester."""
+    """Subject/course within a semester.
+    
+    Candidate key: (subject_code, semester_id) - one subject code per semester
+    """
 
     __tablename__: ClassVar[str] = "subjects"
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -63,20 +55,19 @@ class Subject(SQLModel, table=True):
 
     __table_args__ = (
         # Uniqueness: one subject_code per semester
-        UniqueConstraint("subject_code", "semester_id", name="uq_subject_code_semester"),
+        UniqueConstraint("subject_code", "semester_id", name="uq_subject_code_semester"),  # Candidate key
     )
 
     # NOTE:
     # Fully normalized schema via migrations 001-007.
     # semester_name/year denormalization removed in migration 007.
 
-    # Define many-to-many only on Course side to avoid forward-ref generic issues here
-    # If needed later, reintroduce with list[Course] once mapping is stable
-    # courses: list["Course"] = Relationship(back_populates="subjects", link_model=CourseSubjectLink)
-
 
 class Course(SQLModel, table=True):
-    """Represents a degree or program of study."""
+    """Represents a degree or program of study.
+    
+    Candidate key: code (unique course identifier)
+    """
 
     __tablename__: ClassVar[str] = "courses"
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -84,18 +75,20 @@ class Course(SQLModel, table=True):
     code: str = Field(index=True)
     grading_scale: str = Field(default="Standard")
     __table_args__ = (
-        UniqueConstraint("code", name="uq_course_code"),
+        UniqueConstraint("code", name="uq_course_code"),  # Candidate key
     )
 
     # NOTE: Redundant (name, code) constraint removed via migration 005.
 
     # Relationships are attached after class definitions to avoid forward-ref issues
     # semesters: list[Semester] = Relationship(back_populates="course")
-    # subjects: list[Subject] = Relationship(back_populates="courses", link_model=CourseSubjectLink)
 
 
 class Assignment(SQLModel, table=True):
-    """Assessment item belonging to a subject (numeric or S/U)."""
+    """Assessment item belonging to a subject (numeric or S/U).
+    
+    Candidate key: (assessment, subject_id) - unique assessment names per subject
+    """
 
     __tablename__: ClassVar[str] = "assignments"
     id: int = Field(default=None, primary_key=True)
@@ -109,16 +102,19 @@ class Assignment(SQLModel, table=True):
     is_exam: bool = Field(default=False)
     __table_args__ = (
         # Ensure one assessment name per subject (fully normalized via migration 007)
-        UniqueConstraint("assessment", "subject_id", name="uq_assignment_subject"),
+        UniqueConstraint("assessment", "subject_id", name="uq_assignment_subject"),  # Candidate key
     )
 
 
 class Examination(SQLModel, table=True):
-    """Single exam record per subject."""
+    """Single exam record per subject.
+    
+    Candidate key: subject_id (1:1 relationship with Subject)
+    """
 
     __tablename__: ClassVar[str] = "examinations"
     id: Optional[int] = Field(default=None, primary_key=True)
-    subject_id: int = Field(foreign_key="subjects.id", index=True, unique=True)
+    subject_id: int = Field(foreign_key="subjects.id", index=True, unique=True)  # Candidate key
     exam_mark: float = 0
     exam_weight: float = 100
 
@@ -128,11 +124,13 @@ class ExamSettings(SQLModel, table=True):
     Stores pass-scale (PS) exam configuration separately to avoid altering existing tables.
 
     This allows persisting ps_exam flag and ps_factor without a migration altering the Examination table already present in user data.
+    
+    Candidate key: subject_id (1:1 relationship with Subject)
     """
 
     __tablename__: ClassVar[str] = "exam_settings"
     id: Optional[int] = Field(default=None, primary_key=True)
-    subject_id: int = Field(foreign_key="subjects.id", index=True, unique=True)
+    subject_id: int = Field(foreign_key="subjects.id", index=True, unique=True)  # Candidate key
     ps_exam: bool = False
     ps_factor: float = 40.0
 
@@ -141,6 +139,8 @@ class GradeScale(SQLModel, table=True):
     """
     Configuration for grade bands (e.g. HD, D, C, P, F).
     Allows customizing thresholds and GPA points.
+    
+    Candidate key: (scale_name, grade, band_type) - unique grade per scale/band combination
     """
     __tablename__: ClassVar[str] = "grade_scales"
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -151,7 +151,7 @@ class GradeScale(SQLModel, table=True):
     gpa_point: float  # e.g. 4.0
     band_type: str = Field(default="both", index=True, description="wam, gpa, or both")
     __table_args__ = (
-        UniqueConstraint("scale_name", "grade", "band_type", name="uq_scale_grade_type"),
+        UniqueConstraint("scale_name", "grade", "band_type", name="uq_scale_grade_type"),  # Candidate key
     )
 
 
@@ -163,7 +163,6 @@ __all__ = [
 	"Examination",
     "ExamSettings",
     "Course",
-    "CourseSubjectLink",
     "GradeScale",
 ]
 
@@ -171,9 +170,6 @@ __all__ = [
 # SQLAlchemy trying to resolve generic strings like "Optional['Course']" or "list['Semester']".
 Semester.course = sa_relationship("Course", back_populates="semesters")
 Course.semesters = sa_relationship("Semester", back_populates="course")
-# Many-to-many: expose a bidirectional convenience relationship between Course and Subject via link table
-Course.subjects = sa_relationship("Subject", secondary="course_subject_link", back_populates="courses")
-Subject.courses = sa_relationship("Course", secondary="course_subject_link", back_populates="subjects")
 
 # Manually update forward references to resolve circular dependencies
 Course.model_rebuild()
