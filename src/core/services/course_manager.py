@@ -153,9 +153,9 @@ class CourseManager:
             self.session.commit()
 
     def unassign_semester_from_course(self, course_id: int, semester_id: int) -> Optional[Course]:
-        """Remove a semester from a course.
+        """Remove a semester from a course (sets course_id to NULL).
         
-        Subjects in this semester are implicitly unlinked from the course.
+        Semester and its subjects remain in the database but become unassigned.
         """
         course = self.get_course_by_id(course_id)
         semester = self.session.get(Semester, semester_id)
@@ -164,7 +164,7 @@ class CourseManager:
         if semester.course_id != course.id:
             return course
 
-        # Unlink course from semester
+        # Unlink course from semester (semester becomes unassigned)
         semester.course_id = None
         self.session.add(semester)
         self.session.commit()
@@ -207,21 +207,15 @@ class CourseManager:
         return course
 
     def delete_course(self, course_id: int) -> bool:
-        """Delete a course: unlink semesters first.
+        """Delete a course and all associated semesters, subjects, assignments, and exams.
 
-        Subjects are implicitly unlinked when their semesters are unassigned.
+        Relies on database ON DELETE CASCADE to automatically remove all dependent records.
         Returns True if deleted, False if not found.
         """
         course = self.get_course_by_id(course_id)
         if not course:
             return False
-        # Unlink semesters
-        semesters = self.session.exec(select(Semester).where(Semester.course_id == course_id)).all()
-        for sem in semesters:
-            sem.course_id = None
-            self.session.add(sem)
-        self.session.commit()
-        # Now delete course
+        # Database CASCADE handles deletion of semesters and all their children
         self.session.delete(course)
         self.session.commit()
         return True
