@@ -15,13 +15,13 @@
   {% endif %}
   
   <!-- Page heading -->
-  <div class="flex flex-col items-center text-center gap-3">
-    <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight">Home — Semesters for {{ selected_year or 'All years' }}</h2>
-    <a href="/courses" class="btn btn-sm md:btn-md btn-outline">Manage Courses</a>
+  <div class="flex flex-col items-center text-center gap-2 sm:gap-3">
+    <h2 class="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight">Home — Semesters for {{ selected_year or 'All years' }}</h2>
+    <a href="/courses" class="btn btn-xs sm:btn-sm md:btn-md btn-outline">Manage Courses</a>
   </div>
   
   {% if not no_courses_warning %}
-  <section class="flex justify-center">
+  <section class="flex justify-center px-2">
     {% include 'partials/add_semester_card.html' %}
   </section>
 

@@ -43,6 +43,10 @@ def create_subject(
     ).first()
     semester_id = getattr(sem, "id", None)
     
+    if semester_id is None:
+        # Semester not found, redirect with error
+        return RedirectResponse(f"/year/{year}/semester/{semester}?error=Semester+not+found", status_code=303)
+    
     exists = session.exec(
         select(Subject).where(
             Subject.semester_id == semester_id,
@@ -90,6 +94,9 @@ def build_subject_context(
 
     # Now that the DB has surrogate keys, prefer subject_id for child lookups
     sid = getattr(subject, "id", None)
+    if sid is None:
+        return None
+    
     # Order assignments by their numeric id so the UI shows them in creation/order sequence
     # Use .asc() to produce a SQL expression that static type-checkers (Pylance) accept
     # Use the model's Table column expression so static checkers see a SQL column element

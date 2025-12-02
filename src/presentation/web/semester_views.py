@@ -1,7 +1,7 @@
 from fastapi import Depends, Form, Request, APIRouter, Response
 from typing import List, cast
 from fastapi.responses import RedirectResponse
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 from sqlalchemy import Table
 from src.presentation.api.deps import get_session
 from src.infrastructure.db.models import Semester, Subject, Assignment, Examination, ExamSettings, GradeType
@@ -178,20 +178,21 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
     sem = session.exec(select(Semester).where(Semester.name == semester, Semester.year == int(year))).first()
     sem_id = getattr(sem, "id", None)
     subjects_table = cast(Table, getattr(Subject, "__table__"))
-    main_subjects = session.exec(
-        select(Subject)
-        .where(Subject.semester_id == sem_id)
-        .order_by(subjects_table.c.subject_code.asc())
-    ).all() if sem_id else []
     # Get synced subjects: same year but different semester
     all_sems_for_year = session.exec(select(Semester).where(Semester.year == int(year))).all()
     other_sem_ids = [s.id for s in all_sems_for_year if s.id != sem_id]
-    synced_subjects = session.exec(
+    # Fetch all subjects (main + synced) in a single SQL query with ORDER BY
+    from sqlalchemy import or_, false
+    display_subjects = session.exec(
         select(Subject)
-        .where(Subject.semester_id.in_(other_sem_ids), Subject.sync_subject == True)  # noqa: E712
+        .where(
+            or_(
+                Subject.semester_id == sem_id,
+                ((col(Subject.semester_id).in_(other_sem_ids)) & (Subject.sync_subject == True)) if other_sem_ids else false()
+            )
+        )
         .order_by(subjects_table.c.subject_code.asc())
-    ).all() if other_sem_ids else []
-    display_subjects = list(main_subjects) + list(synced_subjects)
+    ).all() if sem_id else []
     summaries: List[SemesterSummary] = []
     import logging
     logger = logging.getLogger("uvicorn.error")
@@ -335,17 +336,22 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
             "name": sess.get("current_course_name"),
             "code": sess.get("current_course_code"),
         }
-    # Build subject_summaries for all semesters in this year
+    # Build subject_summaries for all semesters in this year, ordered by subject_code
     summaries = []
-    for sem in semesters:
-        # Use the same logic as build_semester_context to get subject_summaries for each semester
-        subjects_table = cast(Table, getattr(Subject, "__table__"))
-        subjects = session.exec(
-            select(Subject)
-            .where(Subject.semester_id == sem.id)
-            .order_by(subjects_table.c.subject_code.asc())
-        ).all()
-        for sub in subjects:
+    subjects_table = cast(Table, getattr(Subject, "__table__"))
+    semester_ids = [sem.id for sem in semesters]
+    # Fetch all subjects for these semesters in one query, already sorted by subject_code
+    all_subjects = session.exec(
+        select(Subject)
+        .where(col(Subject.semester_id).in_(semester_ids))
+        .order_by(subjects_table.c.subject_code.asc())
+    ).all() if semester_ids else []
+    
+    # Build semester lookup for getting semester names
+    semester_lookup = {sem.id: sem.name for sem in semesters}
+    
+    # Iterate through subjects in their already-sorted order (by subject_code)
+    for sub in all_subjects:
             sid = getattr(sub, "id", None)
             assignments = session.exec(select(Assignment).where(Assignment.subject_id == sid).order_by(Assignment.assessment)).all()
             exam = session.exec(select(Examination).where(Examination.subject_id == sid)).first()
@@ -379,9 +385,8 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
             effective_scoring_exam_weight = exam_weight * scaling if exam_weight is not None else None
             exam_mark = exam.exam_mark if exam else None
             is_exam_required = False
-            # Get semester name via FK lookup
-            sem_obj = session.get(Semester, sub.semester_id)
-            sem_name = sem_obj.name if sem_obj else "Unknown"
+            # Get semester name from lookup
+            sem_name = semester_lookup.get(sub.semester_id, "Unknown")
             summaries.append({
                 "code": sub.subject_code,
                 "name": sub.subject_name,

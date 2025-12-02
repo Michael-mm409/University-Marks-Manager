@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 import logging
 
 from src.infrastructure.db.engine import get_session
-from src.infrastructure.db.models import Assignment, ExamSettings, Examination, GradeType, Subject
+from src.infrastructure.db.models import Assignment, ExamSettings, Examination, GradeType, Semester, Subject
 
 logger = logging.getLogger("uvicorn.error")
 exam_router = APIRouter()
@@ -45,6 +45,14 @@ def save_total_mark(
     ).first()
     sid = getattr(subj, "id", None)
     logger.info(f"[DEBUG] Looked up subject_id: {sid} for subject_code={code}, semester={semester}, year={year}")
+    
+    if sid is None:
+        logger.error(f"[DEBUG] Subject not found: code={code}, semester={semester}, year={year}")
+        url = f"/semester/{semester}/subject/{code}?year={year}&error=Subject+not+found"
+        if return_to:
+            url += f"&return_to={return_to}"
+        return RedirectResponse(url, status_code=303)
+    
     # Fetch existing exam (single allowed)
     existing = session.exec(
         select(Examination).where(

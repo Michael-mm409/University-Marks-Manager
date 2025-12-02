@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlmodel import Session, select
-from src.infrastructure.db.models import Assignment, ExamSettings, Examination, GradeType, Subject
+from src.infrastructure.db.models import Assignment, ExamSettings, Examination, GradeType, Semester, Subject
 from src.presentation.api.deps import get_session
 from urllib.parse import quote_plus
 
@@ -346,6 +346,7 @@ def update_assignment_ajax(
     semester: str,
     year: str,
     # Accept blanks from form; parse manually
+    new_assessment: Optional[str] = Form(None),
     weighted_mark: Optional[str] = Form(None),
     mark_weight: Optional[str] = Form(None),
     grade_type: str = Form("numeric"),
@@ -380,6 +381,8 @@ def update_assignment_ajax(
             )
         ).first()
         sid = getattr(subj, "id", None)
+        if sid is None:
+            return JSONResponse({"success": False, "error": "Subject not found."}, status_code=404)
         assignment = session.exec(
             select(Assignment).where(
                 Assignment.subject_id == sid,
@@ -388,6 +391,20 @@ def update_assignment_ajax(
         ).first()
         if not assignment:
             return JSONResponse({"success": False, "error": "Assignment not found."}, status_code=404)
+        
+        # Update assignment name if changed
+        if new_assessment and new_assessment != assessment:
+            # Check for duplicate name
+            existing = session.exec(
+                select(Assignment).where(
+                    Assignment.subject_id == sid,
+                    Assignment.assessment == new_assessment,
+                )
+            ).first()
+            if existing:
+                return JSONResponse({"success": False, "error": "An assignment with this name already exists."}, status_code=400)
+            assignment.assessment = new_assessment
+        
         # Update fields
         if grade_type == GradeType.NUMERIC.value:
             try:
@@ -497,23 +514,31 @@ def update_assignment_ajax(
                         total_mark = None
         # Return updated row HTML for table
         exam_badge = "<span class='badge badge-xs badge-info ml-1'>Exam</span>" if getattr(assignment, "is_exam", False) else ""
+        # Use assignment.assessment (the current/new name) for URLs and data attributes
+        current_assessment = assignment.assessment
         row_html = (
-            f"<td class='assignment-assessment'>{assignment.assessment}{exam_badge}</td>"
+            f"<td class='assignment-assessment'>{current_assessment}{exam_badge}</td>"
             f"<td class='assignment-weighted'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.weighted_mark) if assignment.weighted_mark is not None else '0.00')}</td>"
             f"<td class='assignment-unweighted'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.unweighted_mark) if assignment.unweighted_mark is not None else '0.00')}</td>"
             f"<td class='assignment-mark-weight'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.mark_weight) if assignment.mark_weight is not None else '0.00')}</td>"
             f"<td class='assignment-grade-type'>{assignment.grade_type}</td>"
             f"<td class='flex gap-1'>"
-            f"<form method='post' action='/semester/{semester}/subject/{code}/assignment/{assessment}/{year}/delete'>"
+            f"<form method='post' action='/semester/{semester}/subject/{code}/assignment/{current_assessment}/{year}/delete'>"
             f"<input type='hidden' name='year' value='{year}' />"
             f"<button class='btn btn-xs btn-error' type='submit'>✕</button>"
             f"</form>"
-            f"<button class='btn btn-xs btn-outline' type='button' onclick=\"window.startInlineEditAssignment('{assessment}','{code}','{semester}','{year}')\">Edit</button>"
+            f"<button class='btn btn-xs btn-outline' type='button' onclick=\"window.startInlineEditAssignment('{current_assessment}','{code}','{semester}','{year}')\">Edit</button>"
             f"</td>"
         )
-        # Instruct client to fully reload the subject page so summary/averages recalculate consistently
-        reload_url = f"/subjects/{year}/{code}?semester={semester}"
-        return JSONResponse({"success": True, "row_html": row_html, "reload_url": reload_url})
+        # If assignment name changed, force full reload to update all references
+        # Otherwise return row HTML for inline update without reload
+        if new_assessment and new_assessment.strip() and new_assessment != assessment:
+            logger.info(f"[ASSIGNMENT_UPDATE] Name changed from '{assessment}' to '{new_assessment}' - forcing reload")
+            reload_url = f"/subjects/{year}/{code}?semester={semester}"
+            return JSONResponse({"success": True, "reload_url": reload_url})
+        else:
+            logger.info(f"[ASSIGNMENT_UPDATE] Values updated for '{assessment}' - inline update")
+            return JSONResponse({"success": True, "row_html": row_html})
     except Exception:
         logger.exception("update_assignment_ajax failed")
         return JSONResponse({"success": False, "error": "Internal server error"}, status_code=500)

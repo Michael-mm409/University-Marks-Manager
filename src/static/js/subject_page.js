@@ -50,17 +50,22 @@
   window.submitInlineEditAssignmentRow = function(assessment, code, semester, year) {
     const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
     if (!row) return false;
+    const new_assessment = row.querySelector("input[name='assessment']")?.value || assessment;
     const weighted_mark = row.querySelector("input[name='weighted_mark']")?.value || '';
     const mark_weight = row.querySelector("input[name='mark_weight']")?.value || '';
     const grade_type = row.querySelector("select[name='grade_type']")?.value || 'numeric';
+    const is_exam = row.querySelector("input[name='is_exam']")?.checked || false;
+    console.log('Submitting assignment update:', {old: assessment, new: new_assessment, changed: new_assessment !== assessment});
     const formData = new FormData();
     formData.append('assessment', assessment);
+    formData.append('new_assessment', new_assessment);
     formData.append('subject_code', code);
     formData.append('semester_name', semester);
     formData.append('year', year);
     formData.append('weighted_mark', weighted_mark);
     formData.append('mark_weight', mark_weight);
     formData.append('grade_type', grade_type);
+    formData.append('is_exam', is_exam);
     fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/update`, { method: 'POST', body: formData })
       .then(r => r.json())
       .then(data => {

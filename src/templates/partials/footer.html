@@ -1,37 +1,37 @@
-<footer class="mt-12 pt-6 border-t border-base-300">
-  <div class="text-sm overflow-x-auto">
-    <table class="table table-compact">
+<footer class="mt-8 sm:mt-12 pt-4 sm:pt-6 border-t border-base-300">
+  <div class="text-xs sm:text-sm overflow-x-auto px-2">
+    <table class="table table-compact table-xs sm:table-sm">
       <caption class="sr-only">Footer navigation</caption>
       <thead>
         <tr>
-          <th class="font-semibold">University Marks Manager</th>
-          <th class="font-semibold">Version</th>
-          <th class="font-semibold">Environment</th>
-          <th class="font-semibold">Resources</th>
-          <th class="font-semibold">About</th>
+          <th class="font-semibold text-xs sm:text-sm">University Marks Manager</th>
+          <th class="font-semibold text-xs sm:text-sm hidden md:table-cell">Version</th>
+          <th class="font-semibold text-xs sm:text-sm hidden md:table-cell">Environment</th>
+          <th class="font-semibold text-xs sm:text-sm">Resources</th>
+          <th class="font-semibold text-xs sm:text-sm hidden sm:table-cell">About</th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td>
+          <td class="text-xs">
             <div class="opacity-70">FastAPI · SQLModel · HTMX · Jinja2</div>
           </td>
-          <td>
+          <td class="text-xs hidden md:table-cell">
             <div class="opacity-70">{{ app_version }}</div>
           </td>
-          <td>
-            <span class="badge badge-ghost">{{ env_name }}</span>
+          <td class="text-xs hidden md:table-cell">
+            <span class="badge badge-ghost badge-xs">{{ env_name }}</span>
           </td>
-          <td>
+          <td class="text-xs">
             <ul class="space-y-1">
               <li><a class="link" href="https://github.com/Michael-mm409/University-Marks-Manager/issues/new" target="_blank" rel="noopener">Report a bug</a></li>
-              <li><a class="link" href="https://github.com/Michael-mm409/University-Marks-Manager/issues" target="_blank" rel="noopener">Issue tracker</a></li>
-              <li><a class="link" href="https://github.com/Michael-mm409/University-Marks-Manager/blob/main/docs/usage.md" target="_blank" rel="noopener">User guide</a></li>
-              <li><a class="link" href="https://github.com/Michael-mm409/University-Marks-Manager/blob/main/docs/troubleshooting.md" target="_blank" rel="noopener">Troubleshooting</a></li>
+              <li class="hidden sm:list-item"><a class="link" href="https://github.com/Michael-mm409/University-Marks-Manager/issues" target="_blank" rel="noopener">Issue tracker</a></li>
+              <li class="hidden sm:list-item"><a class="link" href="https://github.com/Michael-mm409/University-Marks-Manager/blob/main/docs/usage.md" target="_blank" rel="noopener">User guide</a></li>
+              <li class="hidden md:list-item"><a class="link" href="https://github.com/Michael-mm409/University-Marks-Manager/blob/main/docs/troubleshooting.md" target="_blank" rel="noopener">Troubleshooting</a></li>
               <li><a class="link" href="https://github.com/Michael-mm409/University-Marks-Manager" target="_blank" rel="noopener">GitHub Repo</a></li>
             </ul>
           </td>
-          <td>
+          <td class="text-xs hidden sm:table-cell">
             <ul class="space-y-1">
               <li><a class="link" href="https://github.com/Michael-mm409/University-Marks-Manager/blob/main/LICENSE" target="_blank" rel="noopener">License</a></li>
               <li><button class="link" type="button" id="show-shortcuts">Keyboard shortcuts</button></li>

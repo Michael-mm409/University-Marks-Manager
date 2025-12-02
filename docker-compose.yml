@@ -25,6 +25,9 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}
       - ENABLE_DEBUG_ROUTES=${ENABLE_DEBUG_ROUTES}
       - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
+      - APP_VERSION=${APP_VERSION}
+      - ENV=${ENV}
+      - API_VERSION=${API_VERSION}
       # Ensure file change detection works reliably on bind mounts (Docker Desktop / Windows)
       - WATCHFILES_FORCE_POLLING=true
     volumes:
