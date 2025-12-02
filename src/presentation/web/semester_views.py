@@ -245,11 +245,19 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
 
         # Always calculate exam_weight for summary
         total_mark = sub.total_mark if sub.total_mark not in (None, 0) else None
-        exam_weight = exam.exam_weight if exam else None
+        
+        # Check if we have an assignment-based exam (is_exam=True)
+        if exam_assignment:
+            # Use the assignment-based exam data
+            exam_weight = float(exam_assignment.mark_weight) if exam_assignment.mark_weight not in (None, "") else None
+            exam_mark = float(exam_assignment.weighted_mark) if exam_assignment.weighted_mark not in (None, "") else None
+        else:
+            # Fall back to Examination table
+            exam_weight = exam.exam_weight if exam else None
+            exam_mark = exam.exam_mark if exam else None
+        
         final_exam_mark_weight = exam_weight
         effective_scoring_exam_weight = exam_weight * scaling if exam_weight is not None else None
-        # Use the exam_mark from the Examination table (database)
-        exam_mark = exam.exam_mark if exam else None
         is_exam_required = False
         # Debug logging for exam_weight
         logger.info(f"[DEBUG] Subject: {sub.subject_code} | Exam Weight: {exam_weight} | Exam Mark: {exam_mark} | Assessment Weight: {assess_weight_sum} | Assessment Mark: {assess_weighted_total}")

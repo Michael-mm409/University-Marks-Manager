@@ -1,52 +1,72 @@
 <section id="semesters-section" class="max-w-4xl mx-auto px-2"{% if oob %} hx-swap-oob="true"{% endif %}>
   <div class="flex flex-col items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
     <div class="flex items-center gap-2 sm:gap-4 md:gap-6 text-center">
-      <h2 class="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold heading-right">{{ 'Semester' if (semesters|length) == 1 else 'Semesters' }}</h2>
-      <span class="badge badge-info badge-xs sm:badge-sm heading-badge">{{ semesters|length }}</span>
+      <h2 class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold heading-right">{{ 'Semester' if (semesters|length) == 1 else 'Semesters' }}</h2>
+      <span class="badge badge-info badge-sm sm:badge-md md:badge-lg heading-badge">{{ semesters|length }}</span>
     </div>
     {% if course_filter %}
-    <div class="text-[10px] sm:text-xs opacity-70 text-center">
+    <div class="text-xs sm:text-sm md:text-base opacity-70 text-center">
       Filtering by course: <span class="font-semibold">{{ course_filter.name }}</span>
       {% if course_filter.code %}<span class="ml-1">({{ course_filter.code }})</span>{% endif %}
     </div>
     {% endif %}
     
     {% if wam is not none or gpa is not none %}
-    <div class="w-full sm:max-w-lg md:max-w-xl lg:max-w-2xl mx-auto mt-3 sm:mt-4 md:mt-6 grade-stats px-1 sm:px-2 md:px-3">
-      <div role="tablist" class="tabs tabs-lifted tabs-xs sm:tabs-sm md:tabs-md">
-        <input type="radio" name="grade_tabs" role="tab" class="tab text-[10px] sm:text-xs md:text-sm px-1.5 sm:px-2 md:px-3" aria-label="WAM" checked />
-        <div role="tabpanel" class="tab-content bg-base-100 border-base-300 rounded-box p-1.5 sm:p-2 md:p-3 lg:p-4 relative">
-          <a href="/settings" class="btn btn-xs btn-circle btn-ghost absolute top-1 right-1 opacity-50 hover:opacity-100 text-xs sm:text-sm" title="Configure Grade Scales" style="text-decoration:none;">
+    <div class="w-full sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-4xl mx-auto mt-3 sm:mt-4 md:mt-6 grade-stats px-1 sm:px-2 md:px-3">
+      <div role="tablist" class="tabs tabs-lifted tabs-sm sm:tabs-md md:tabs-lg">
+        <input type="radio" name="grade_tabs" role="tab" class="tab text-xs sm:text-sm md:text-base lg:text-lg px-2 sm:px-3 md:px-4 lg:px-6" aria-label="WAM" checked />
+        <div role="tabpanel" class="tab-content bg-base-100 border-base-300 rounded-box p-2 sm:p-3 md:p-5 lg:p-6 relative">
+          <a href="/settings" class="btn btn-xs sm:btn-sm btn-circle btn-ghost absolute top-1 right-1 sm:top-2 sm:right-2 opacity-50 hover:opacity-100 text-sm sm:text-base" title="Configure Grade Scales" style="text-decoration:none;">
             ⚙️
           </a>
-          <div class="flex flex-wrap justify-center items-center gap-1.5 sm:gap-2 md:gap-3">
-            <div class="flex flex-col items-center py-1 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-3">
-              <div class="text-[8px] sm:text-[10px] md:text-xs uppercase opacity-60 font-bold">WAM</div>
-              <div class="text-primary text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold">{{ wam if wam is not none else '-' }}</div>
-            </div>
-            {% if grade_counts %}
-              {% for grade, count in grade_counts.items() %}
-                {% if count > 0 %}
-                <div class="flex flex-col items-center py-1 sm:py-2 md:py-3 px-1 sm:px-1.5 md:px-2">
-                  <div class="text-[8px] sm:text-[10px] md:text-xs font-bold opacity-60">{{ grade }}</div>
-                  <div class="text-sm sm:text-base md:text-lg lg:text-xl font-semibold">{{ count }}</div>
-                </div>
-                {% endif %}
-              {% endfor %}
-            {% endif %}
+          <div class="overflow-x-auto">
+            <table class="table table-sm sm:table-md md:table-lg w-full">
+              <thead>
+                <tr>
+                  <th class="text-center text-xs sm:text-sm md:text-base lg:text-lg uppercase opacity-60 font-bold">WAM</th>
+                  {% if grade_counts %}
+                    {% for grade, count in grade_counts.items() %}
+                      {% if count > 0 %}
+                        <th class="text-center text-xs sm:text-sm md:text-base font-bold opacity-60">{{ grade }}</th>
+                      {% endif %}
+                    {% endfor %}
+                  {% endif %}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-center text-primary text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold">{{ wam if wam is not none else '-' }}</td>
+                  {% if grade_counts %}
+                    {% for grade, count in grade_counts.items() %}
+                      {% if count > 0 %}
+                        <td class="text-center text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-semibold">{{ count }}</td>
+                      {% endif %}
+                    {% endfor %}
+                  {% endif %}
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <input type="radio" name="grade_tabs" role="tab" class="tab text-[10px] sm:text-xs md:text-sm px-1.5 sm:px-2 md:px-3" aria-label="GPA" />
-        <div role="tabpanel" class="tab-content bg-base-100 border-base-300 rounded-box p-1.5 sm:p-2 md:p-3 lg:p-4 relative">
-          <a href="/settings" class="btn btn-xs btn-circle btn-ghost absolute top-1 right-1 opacity-50 hover:opacity-100 text-xs sm:text-sm" title="Configure Grade Scales" style="text-decoration:none;">
+        <input type="radio" name="grade_tabs" role="tab" class="tab text-xs sm:text-sm md:text-base lg:text-lg px-2 sm:px-3 md:px-4 lg:px-6" aria-label="GPA" />
+        <div role="tabpanel" class="tab-content bg-base-100 border-base-300 rounded-box p-2 sm:p-3 md:p-5 lg:p-6 relative">
+          <a href="/settings" class="btn btn-xs sm:btn-sm btn-circle btn-ghost absolute top-1 right-1 sm:top-2 sm:right-2 opacity-50 hover:opacity-100 text-sm sm:text-base" title="Configure Grade Scales" style="text-decoration:none;">
             ⚙️
           </a>
-           <div class="flex justify-center">
-            <div class="flex flex-col items-center py-2 sm:py-3 md:py-4 px-3 sm:px-4">
-              <div class="text-[8px] sm:text-[10px] md:text-xs uppercase opacity-60 font-bold">GPA</div>
-              <div class="text-secondary text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold">{{ gpa if gpa is not none else '-' }}</div>
-            </div>
+          <div class="overflow-x-auto">
+            <table class="table table-sm sm:table-md md:table-lg w-full">
+              <thead>
+                <tr>
+                  <th class="text-center text-xs sm:text-sm md:text-base lg:text-lg uppercase opacity-60 font-bold">GPA</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-center text-secondary text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold">{{ gpa if gpa is not none else '-' }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -56,8 +76,8 @@
     <!-- Year Filter -->
     <form method="get" action="/" class="flex flex-col sm:flex-row items-stretch sm:items-end gap-2 sm:gap-3 justify-center px-2 max-w-xs sm:max-w-none mx-auto">
       <label class="form-control w-full sm:w-44">
-        <span class="label-text text-xs">Filter Year</span>
-        <select name="year" class="select select-bordered select-sm" onchange="this.form.submit()">
+        <span class="label-text text-sm sm:text-base">Filter Year</span>
+        <select name="year" class="select select-bordered select-sm sm:select-md" onchange="this.form.submit()">
           <option value="" {% if not selected_year %}selected{% endif %}>All</option>
           {% for y in years %}
             <option value="{{y}}" {% if selected_year == y %}selected{% endif %}>{{y}}</option>
@@ -65,7 +85,7 @@
         </select>
       </label>
       {% if selected_year is not none %}
-        <a href="/all" class="btn btn-sm btn-ghost w-full sm:w-auto" title="Clear year filter">Reset</a>
+        <a href="/all" class="btn btn-sm sm:btn-md btn-ghost w-full sm:w-auto" title="Clear year filter">Reset</a>
       {% endif %}
     </form>
   </div>
