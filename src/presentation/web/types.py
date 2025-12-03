@@ -59,6 +59,7 @@ class SemesterContext(TypedDict):
     year: str
     subjects: Sequence[Subject]
     subject_summaries: List[SemesterSummary]
+    missing_exam_subjects: List[str]
 
 
 class SubjectContext(TypedDict):
