@@ -194,6 +194,7 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
         .order_by(subjects_table.c.subject_code.asc())
     ).all() if sem_id else []
     summaries: List[SemesterSummary] = []
+    missing_exam_subjects: List[str] = []
     import logging
     logger = logging.getLogger("uvicorn.error")
     for sub in display_subjects:
@@ -255,6 +256,10 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
             # Fall back to Examination table
             exam_weight = exam.exam_weight if exam else None
             exam_mark = exam.exam_mark if exam else None
+
+        # Track subjects missing both Examination and assignment-based exam
+        if exam is None and exam_assignment is None:
+            missing_exam_subjects.append(sub.subject_code)
         
         final_exam_mark_weight = exam_weight
         effective_scoring_exam_weight = exam_weight * scaling if exam_weight is not None else None
@@ -286,6 +291,7 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
         "year": year,
         "subjects": display_subjects,
         "subject_summaries": summaries,
+        "missing_exam_subjects": missing_exam_subjects,
     }
 
 

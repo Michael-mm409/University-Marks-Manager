@@ -7,7 +7,14 @@
     <a href="/year/{{year}}" class="btn btn-xs btn-outline">Back</a>
     <a href="/" class="btn btn-xs btn-secondary">Return to Home</a>
   </div>
-  
+  {% if missing_exam_subjects and missing_exam_subjects|length > 0 %}
+  <div role="alert" class="alert alert-warning shadow-sm mt-2 w-full max-w-2xl">
+    <span>
+      The following subjects have no exam recorded (neither an Examination nor an assignment marked as exam):
+      <span class="font-semibold">{{ missing_exam_subjects | join(', ') }}</span>
+    </span>
+  </div>
+  {% endif %}
 </div>
 <div class="p-4 md:p-5 rounded-xl bg-base-100 shadow card-glow mb-6">
   <div class="flex justify-center mb-3">
