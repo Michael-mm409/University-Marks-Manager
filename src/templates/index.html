@@ -1,5 +1,8 @@
 {% extends 'base.html' %}
-{% block title %}Home — {{ selected_year or 'All years' }}{% endblock %}
+{% block title %}{{ request.session.get('current_course_code') or request.session.get('current_course_name') or 'Home' }} | University Marks Manager{% endblock %}
+{% set breadcrumbs = [
+  {'label': selected_year or 'All Years', 'url': None}
+] %}
 {% block content %}
 <div class="flex flex-col gap-8">
   <!-- No Courses Warning -->

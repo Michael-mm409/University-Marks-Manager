@@ -1,4 +1,9 @@
 {% extends 'base.html' %}
+{% block title %}{{year}} - {{semester}} | University Marks Manager{% endblock %}
+{% set breadcrumbs = [
+  {'label': year, 'url': '/year/' ~ year},
+  {'label': semester, 'url': None}
+] %}
 {% block content %}
 <div class="flex flex-col items-center text-center gap-3 md:gap-4 mb-8">
   <h2 class="semester-title">{{semester}} <span class="semester-year">({{year}})</span></h2>

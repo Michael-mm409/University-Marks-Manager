@@ -46,7 +46,7 @@ services:
 
   db:
     container_name: marks-manager-db
-    image: postgres:16.1-alpine
+    image: postgres:16
     restart: unless-stopped
     volumes:
       - postgres_data_nas:/var/lib/postgresql/data/

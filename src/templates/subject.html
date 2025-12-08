@@ -1,4 +1,10 @@
 {% extends 'base.html' %}
+{% block title %}{{semester}} - {{subject.subject_code}} | University Marks Manager{% endblock %}
+{% set breadcrumbs = [
+  {'label': year, 'url': '/year/' ~ year},
+  {'label': semester, 'url': '/year/' ~ year ~ '/semester/' ~ semester},
+  {'label': subject.subject_code, 'url': None}
+] %}
 {% block content %}
 <style>
   /* Small helper to show a tidy chevron for collapsibles */
