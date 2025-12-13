@@ -8,11 +8,7 @@ class SubjectCreate(SQLModel, table=False):
     subject_code: str
     subject_name: str
     semester_id: int  # FK to Semester(id)
-    sync_subject: bool = False
     total_mark: Optional[float] = None
-    # Legacy fields (optional) for backward compatibility during transition
-    semester_name: Optional[str] = None
-    year: Optional[int] = None
 
 
 class SubjectRead(SQLModel):
@@ -20,7 +16,7 @@ class SubjectRead(SQLModel):
     subject_code: str
     subject_name: str
     semester_id: int
-    sync_subject: bool
+    # sync_subject removed
     total_mark: Optional[float] = None
     # pydantic v2: enable attribute population from ORM objects
     model_config = {"from_attributes": True}  # type: ignore[assignment]
@@ -33,10 +29,7 @@ class AssignmentCreate(SQLModel, table=False):
     unweighted_mark: Optional[float] = None
     mark_weight: Optional[float] = None
     grade_type: str = "numeric"
-    # Legacy optional fields for compatibility
-    subject_code: Optional[str] = None
-    semester_name: Optional[str] = None
-    year: Optional[int] = None
+    # denormalized fields removed
 
 
 class AssignmentRead(SQLModel):
@@ -55,10 +48,7 @@ class ExaminationCreate(SQLModel, table=False):
     subject_id: int  # FK to Subject(id)
     exam_mark: Optional[float] = None
     exam_weight: Optional[float] = None
-    # Legacy optional fields for compatibility
-    subject_code: Optional[str] = None
-    semester_name: Optional[str] = None
-    year: Optional[int] = None
+    # denormalized fields removed
 
 
 class ExaminationRead(SQLModel):

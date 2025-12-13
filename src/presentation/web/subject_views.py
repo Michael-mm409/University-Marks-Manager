@@ -18,20 +18,16 @@ def create_subject(
     subject_code: str = Form(...),
     subject_name: str = Form(...),
     credit_points: int = Form(6),
-    sync_subject: Optional[str] = Form(None),
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
     """
     Create a new subject in the semester if it does not already exist.
-    
     Args:
         semester (str): Semester name.
         year (str): Semester year.
         subject_code (str): Subject code.
         subject_name (str): Subject name.
-        sync_subject (Optional[str]): Sync subject identifier.
         session (Session): Database session dependency.
-        
     Returns:
         RedirectResponse: Redirect to semester detail page.
     """
@@ -43,11 +39,11 @@ def create_subject(
         )
     ).first()
     semester_id = getattr(sem, "id", None)
-    
+
     if semester_id is None:
         # Semester not found, redirect with error
         return RedirectResponse(f"/year/{year}/semester/{semester}?error=Semester+not+found", status_code=303)
-    
+
     exists = session.exec(
         select(Subject).where(
             Subject.semester_id == semester_id,
@@ -58,11 +54,9 @@ def create_subject(
         session.add(
             Subject(
                 semester_id=semester_id,
-                semester_year=int(year),
                 subject_code=subject_code,
                 subject_name=subject_name,
                 credit_points=credit_points,
-                sync_subject=bool(sync_subject),
             )
         )
         session.commit()
@@ -329,7 +323,7 @@ def update_subject(
     subject_code: str = Form(...),
     subject_name: str = Form(...),
     credit_points: int = Form(6),
-    sync_subject: Optional[str] = Form(None),
+    # sync_subject removed
     return_to: Optional[str] = Form(None),
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
@@ -346,8 +340,7 @@ def update_subject(
         subject.subject_code = subject_code
         subject.subject_name = subject_name
         subject.credit_points = credit_points
-        # Update sync flag (checkbox posts when checked; absent means False)
-        subject.sync_subject = bool(sync_subject)
+        # sync_subject removed
         session.add(subject)
         session.commit()
         session.refresh(subject)

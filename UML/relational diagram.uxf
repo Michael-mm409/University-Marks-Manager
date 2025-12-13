@@ -87,7 +87,7 @@ bg=#e6f3ff
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>1304</x>
+      <x>1312</x>
       <y>600</y>
       <w>272</w>
       <h>112</h>
@@ -99,7 +99,7 @@ subject_id: int FK Ref Subject(id) NOT NULL    CK1
 ps_exam: bool[false]
 ps_factor: float[40.0]
 
-UNIQUE(subject_id
+UNIQUE(subject_id)
 ON DELETE CASCADE via subject_id
 bg=#e6f3ff</panel_attributes>
     <additional_attributes/>
@@ -122,13 +122,13 @@ m2=0..1</panel_attributes>
     <coordinates>
       <x>1232</x>
       <y>656</y>
-      <w>88</w>
+      <w>96</w>
       <h>32</h>
     </coordinates>
     <panel_attributes>lt=-
 m1=1
 m2=0..1</panel_attributes>
-    <additional_attributes>10.0;10.0;90.0;10.0</additional_attributes>
+    <additional_attributes>10.0;10.0;100.0;10.0</additional_attributes>
   </element>
   <element>
     <id>UMLClass</id>

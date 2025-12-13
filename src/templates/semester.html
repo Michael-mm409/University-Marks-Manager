@@ -36,10 +36,7 @@
       <input name="subject_name" class="input input-bordered input-sm w-full" placeholder="Intro to ..." required />
     </label>
     <button class="btn btn-sm btn-primary md:col-span-1 md:justify-self-end" type="submit">Add</button>
-    <div class="md:col-span-1 md:justify-self-start flex items-center gap-2">
-      <label for="sync_subject" class="label-text text-xs">Sync</label>
-      <input id="sync_subject" type="checkbox" name="sync_subject" class="checkbox checkbox-sm" value="1" title="Enable subject sync (advanced)" />
-    </div>
+    <!-- Sync subject field removed -->
   </form>
 </div>
 
@@ -70,11 +67,11 @@
     </thead>
     <tbody>
       {% for row in subject_summaries %}
-      <tr class="hover:bg-base-200/50 border-b border-base-300/50 {% if row.sync_subject %} bg-blue-900/10 border-l-4 border-blue-500{% endif %}">
+      <tr class="hover:bg-base-200/50 border-b border-base-300/50">
         <td class="p-4 font-mono">
           {{row.code}}
           {% if row.sync_subject %}
-            <span class="badge badge-info badge-xs ml-1 align-middle">Sync</span>
+            <span class="badge badge-info ml-1" title="Synchronized subject">Sync</span>
           {% endif %}
         </td>
         <td class="p-4 text-right">{{ '%.2f' % row.assessment_mark if row.assessment_mark is not none else '-' }}</td>
@@ -91,31 +88,20 @@
         <td class="p-4 text-right">{% if row.final_exam_mark_weight is not none %}{{ '%.0f' % row.final_exam_mark_weight }}%{% else %}-{% endif %}</td>
         <td class="p-4 text-right font-bold">{{ '%.0f' % row.total_mark if row.total_mark is not none else '-' }}</td>
         <td class="p-4 text-right">
-          {% if row.sync_subject and row.semester_name != semester %}
-            <form method="post" action="/subjects/{{year}}/{{row.code}}/open" class="inline-block m-0 p-0">
-              <input type="hidden" name="semester" value="{{row.semester_name}}" />
-              <input type="hidden" name="return_to" value="{{semester}}-{{year}}" />
-              <button class="btn btn-xs btn-outline" type="submit">Open</button>
-            </form>
-          {% else %}
-            <form method="post" action="/subjects/{{year}}/{{row.code}}/open" class="inline-block m-0 p-0">
-              <input type="hidden" name="semester" value="{{semester}}" />
-              <button class="btn btn-xs btn-outline" type="submit">Open</button>
-            </form>
-          {% endif %}
+          <form method="post" action="/subjects/{{year}}/{{row.code}}/open" class="inline-block m-0 p-0">
+            <input type="hidden" name="semester" value="{{semester}}" />
+            <button class="btn btn-xs btn-outline" type="submit">Open</button>
+          </form>
           <button class="btn btn-xs ml-1" type="button" onclick="this.closest('tr').nextElementSibling.classList.toggle('hidden')">Manage</button>
         </td>
       </tr>
       <tr id="manage-{{ row.code }}-{{ loop.index }}" class="hidden">
         <td colspan="7" class="p-4 bg-base-100/60">
           <div class="flex flex-wrap gap-2 items-end w-full">
-            <form method="post" action="/semester/{{ row.semester_name }}/subject/{{ row.code }}/update" class="flex flex-wrap gap-2 items-end flex-1">
+            <form method="post" action="/semester/{{ semester }}/subject/{{ row.code }}/update" class="flex flex-wrap gap-2 items-end flex-1">
               <input type="hidden" name="year" value="{{year}}" />
               <input type="hidden" name="return_to" value="{{semester}}-{{year}}" />
-              <label class="label cursor-pointer flex gap-2 items-center w-28">
-                <span class="label-text text-xs">Sync</span>
-                <input type="checkbox" name="sync_subject" class="checkbox checkbox-xs" value="1" {% if row.sync_subject %}checked{% endif %} />
-              </label>
+              <!-- Sync subject field removed -->
               <label class="form-control w-28 shrink-0">
                 <span class="label-text text-xs">Code</span>
                 <input name="subject_code" value="{{ row.code }}" class="input input-bordered input-xs" required />

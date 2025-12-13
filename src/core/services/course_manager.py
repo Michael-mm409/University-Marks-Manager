@@ -229,4 +229,11 @@ class CourseManager:
         Returns:
             A list of Subject objects for the specified year.
         """
-        return list(self.session.exec(select(Subject).where(Subject.semester_year == int(year))).all())
+        # Now filter by Semester.year via join
+        return list(
+            self.session.exec(
+                select(Subject)
+                .join(Semester)
+                .where(Semester.year == int(year))
+            ).all()
+        )

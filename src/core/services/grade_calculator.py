@@ -23,15 +23,18 @@ class GradeCalculator:
 
     def _get_grade_scales(self, course_id: int | None = None) -> list[GradeScale]:
         """Get grade scales for the course, seeding defaults if empty."""
-        scale_name = "Standard"
+        scale_id = None
         if course_id:
             course = self.session.get(Course, course_id)
             if course and course.grading_scale:
-                scale_name = course.grading_scale
+                scale_id = course.grading_scale
 
-        scales = self.session.exec(select(GradeScale).where(GradeScale.scale_name == scale_name)).all()
-        
-        if not scales and scale_name == "Standard":
+        if scale_id:
+            scales = self.session.exec(select(GradeScale).where(GradeScale.id == scale_id)).all()
+        else:
+            scales = self.session.exec(select(GradeScale).where(GradeScale.scale_name == "Standard")).all()
+
+        if not scales:
             # Seed defaults for Standard scale if missing
             defaults = [
                 GradeScale(scale_name="Standard", grade="HD", label="High Distinction", min_mark=85.0, gpa_point=4.0),

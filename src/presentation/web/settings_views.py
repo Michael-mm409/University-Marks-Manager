@@ -1,7 +1,8 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlmodel import Session, select, delete, desc
+from sqlmodel import Session, col, select, delete, desc
+from sqlalchemy import or_, and_  # Import in_ for correct usage
 
 from src.presentation.api.deps import get_session
 from src.infrastructure.db.models import GradeScale, Course
@@ -28,20 +29,16 @@ def settings_page(request: Request, session: Session = Depends(get_session)):
                 # Heal session
                 sess["current_course_id"] = active_course_id
     
-    current_scale_name = "Standard"
+    current_scale_id = None
     course = None
-    
     if active_course_id:
         try:
-            # Ensure it's an int
             cid = int(str(active_course_id))
             course = session.get(Course, cid)
             if course:
-                # If course found, use its scale
                 if course.grading_scale:
-                    current_scale_name = course.grading_scale
+                    current_scale_id = course.grading_scale
             else:
-                # ID in session but not in DB? Clear it to avoid confusion
                 sess.pop("current_course_id", None)
         except (ValueError, TypeError):
             pass
@@ -53,21 +50,38 @@ def settings_page(request: Request, session: Session = Depends(get_session)):
     
     # Fetch all available scale names
     all_scale_names = session.exec(select(GradeScale.scale_name).distinct()).all()
-    # Fetch WAM and GPA bands for the current scale name
-    from sqlalchemy import or_, and_
+    
+    current_scale_id = None
+    course = None
+    if active_course_id:
+        try:
+            cid = int(str(active_course_id))
+            course = session.get(Course, cid)
+            if course and course.grading_scale:
+                current_scale_id = course.grading_scale
+        except (ValueError, TypeError):
+            pass
+    # Get the scale_name for the current grading_scale id
+    current_scale_name = None
+    if current_scale_id:
+        scale_obj = session.get(GradeScale, current_scale_id)
+        if scale_obj:
+            current_scale_name = scale_obj.scale_name
+    if not current_scale_name:
+        current_scale_name = "Standard"
     wam_bands = session.exec(
         select(GradeScale)
         .where(
-            (GradeScale.scale_name == current_scale_name) &
-                (GradeScale.band_type.in_(["wam", "both"]))
+            (col(GradeScale.scale_name) == current_scale_name) &
+            (col(GradeScale.band_type).in_(["wam", "both"]))
         )
         .order_by(desc(GradeScale.min_mark))
     ).all()
     gpa_bands = session.exec(
         select(GradeScale)
         .where(
-            (GradeScale.scale_name == current_scale_name) &
-                (GradeScale.band_type.in_(["gpa", "both"]))
+            (col(GradeScale.scale_name) == current_scale_name) &
+            (col(GradeScale.band_type).in_(["gpa", "both"]))
         )
         .order_by(desc(GradeScale.min_mark))
     ).all()
@@ -94,10 +108,14 @@ def update_course_scale(
             cid = int(str(active_course_id))
             course = session.get(Course, cid)
             if course:
-                course.grading_scale = scale_name
-                session.add(course)
-                session.commit()
-                sess["flash_message"] = f"Grading scale for '{course.name}' updated to '{scale_name}'."
+                # Find the GradeScale by scale_name, then set grading_scale to its id
+                scale = session.exec(select(GradeScale).where(GradeScale.scale_name == scale_name)).first()
+                if scale:
+                    # Ensure grading_scale is assigned the correct type (int)
+                    course.grading_scale = str(scale.id)  # If Course.grading_scale is an int FK
+                    session.add(course)
+                    session.commit()
+                    sess["flash_message"] = f"Grading scale for '{course.name}' updated to '{scale_name}'."
         except Exception:
             pass
     return RedirectResponse(url="/settings", status_code=303)

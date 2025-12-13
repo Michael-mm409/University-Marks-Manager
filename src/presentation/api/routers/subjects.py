@@ -82,17 +82,11 @@ def create_subject(data: SubjectCreate, session: Session = Depends(get_session))
     if exists:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="subject already exists for semester")
 
-    # Ensure semester_year is always an int (fallback to semester.year if not provided)
-    semester_year = getattr(data, 'semester_year', None)
-    if semester_year is None and sem:
-        semester_year = sem.year
-    if semester_year is None:
-        raise HTTPException(status_code=400, detail="semester_year is required")
+    # semester_year is now always derived from Semester.year, not stored in Subject
     sub = Subject(
         subject_code=data.subject_code,
         subject_name=data.subject_name,
         semester_id=data.semester_id,
-        semester_year=int(semester_year),
         sync_subject=data.sync_subject,
         total_mark=data.total_mark,
     )

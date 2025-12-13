@@ -178,30 +178,41 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
     sem = session.exec(select(Semester).where(Semester.name == semester, Semester.year == int(year))).first()
     sem_id = getattr(sem, "id", None)
     subjects_table = cast(Table, getattr(Subject, "__table__"))
-    # Get synced subjects: same year but different semester
-    all_sems_for_year = session.exec(select(Semester).where(Semester.year == int(year))).all()
-    other_sem_ids = [s.id for s in all_sems_for_year if s.id != sem_id]
-    # Fetch all subjects (main + synced) in a single SQL query with ORDER BY
-    from sqlalchemy import or_, false
-    display_subjects = session.exec(
+    # Only fetch subjects for the current semester
+    current_subjects = session.exec(
         select(Subject)
-        .where(
-            or_(
-                Subject.semester_id == sem_id,
-                (
-                    (col(Subject.semester_id).in_(other_sem_ids)) &
-                    (Subject.sync_subject == True) &
-                    (Subject.semester_year == int(year))
-                ) if other_sem_ids else false()
-            )
-        )
+        .where(Subject.semester_id == sem_id)
         .order_by(subjects_table.c.subject_code.asc())
     ).all() if sem_id else []
+
+    # Fetch all sync_subject subjects from other semesters in the same year
+    other_semesters = session.exec(
+        select(Semester.id)
+        .where(Semester.year == int(year), Semester.id != sem_id)
+    ).all() if sem_id else []
+    other_semester_ids = session.exec(
+        select(Semester.id)
+        .where(Semester.year == int(year), Semester.id != sem_id)
+    )
+    sync_subjects = []
+    if other_semester_ids:
+        sync_subjects = session.exec(
+            select(Subject)
+            .where(col(Subject.semester_id).in_(other_semester_ids), Subject.sync_subject == True)
+            .order_by(subjects_table.c.subject_code.asc())
+        ).all()
+    
+    # Combine, avoiding duplicates by subject_code
+    display_subjects = {subj.subject_code: subj for subj in current_subjects}
+    for subj in sync_subjects:
+        if subj.subject_code not in display_subjects:
+            display_subjects[subj.subject_code] = subj
+    current_subjects = list(display_subjects.values())
     summaries: List[SemesterSummary] = []
     missing_exam_subjects: List[str] = []
     import logging
     logger = logging.getLogger("uvicorn.error")
-    for sub in display_subjects:
+    for sub in current_subjects:
         sid = getattr(sub, "id", None)
         assignments = session.exec(
             select(Assignment).where(
@@ -286,14 +297,14 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
                 "ps_exam": ps_exam,
                 "ps_factor": ps_factor,
                 "total_mark": total_mark,
-                "sync_subject": sub.sync_subject,
                 "is_exam_required": is_exam_required,
+                "sync_subject": getattr(sub, "sync_subject", False),
             }
         )
     return {
         "semester": semester,
         "year": year,
-        "subjects": display_subjects,
+        "subjects": current_subjects,
         "subject_summaries": summaries,
         "missing_exam_subjects": missing_exam_subjects,
     }
@@ -418,7 +429,6 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
                 "ps_exam": ps_exam,
                 "ps_factor": ps_factor,
                 "total_mark": total_mark,
-                "sync_subject": sub.sync_subject,
                 "is_exam_required": is_exam_required,
             })
     ctx = {"semesters": semesters, "selected_year": y_int, "years": years, "course_filter": course_filter, "subject_summaries": summaries}

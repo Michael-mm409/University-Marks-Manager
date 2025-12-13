@@ -48,7 +48,7 @@ class Subject(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     subject_code: str = Field(index=True)
     semester_id: int = Field(foreign_key="semesters.id", index=True)
-    semester_year: int = Field(foreign_key="semesters.year", index=True)
+    # semester_year removed; use Semester.year via relationship
     subject_name: str
     total_mark: Optional[float] = 0.0
     credit_points: int = Field(default=6)
