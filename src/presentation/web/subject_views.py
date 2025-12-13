@@ -3,6 +3,7 @@ from fastapi.responses import RedirectResponse
 from sqlmodel import Session, select
 from typing import Optional, cast
 from sqlalchemy import Table
+from sqlalchemy.sql import expression
 from fastapi import Request
 from src.presentation.api.deps import get_session
 from src.infrastructure.db.models import Subject, Assignment, Examination, ExamSettings, GradeType, Semester
@@ -57,6 +58,7 @@ def create_subject(
         session.add(
             Subject(
                 semester_id=semester_id,
+                semester_year=int(year),
                 subject_code=subject_code,
                 subject_name=subject_name,
                 credit_points=credit_points,
@@ -81,12 +83,10 @@ def build_subject_context(
 ) -> Optional[SubjectContext]:
     """Build the SubjectContext for rendering the subject detail page."""
     subject = session.exec(
-        select(Subject)
-        .join(Semester)
-        .where(
+        select(Subject).join(Semester, expression.true() & (Subject.semester_id == Semester.id)).where(
             Semester.name == semester,
             Semester.year == int(year),
-            Subject.subject_code == code,
+            Subject.subject_code == code
         )
     ).first()
     if not subject:
@@ -335,12 +335,10 @@ def update_subject(
 ) -> RedirectResponse:
     """Update subject details."""
     subject = session.exec(
-        select(Subject)
-        .join(Semester)
-        .where(
+        select(Subject).join(Semester,  expression.true() & (Subject.semester_id == Semester.id)).where(
             Semester.name == semester,
             Semester.year == int(year),
-            Subject.subject_code == code,
+            Subject.subject_code == code
         )
     ).first()
     
@@ -380,12 +378,10 @@ def delete_subject(
 ) -> RedirectResponse:
     """Delete a subject and all its related data."""
     subject = session.exec(
-        select(Subject)
-        .join(Semester)
-        .where(
+        select(Subject).join(Semester, expression.true() & (Subject.semester_id == Semester.id)).where(
             Semester.name == semester,
             Semester.year == int(year),
-            Subject.subject_code == code,
+            Subject.subject_code == code
         )
     ).first()
     if subject:

@@ -39,7 +39,7 @@ class SemesterManager:
         stmt = (
             select(Semester)
             .where(Semester.course_id == course_id)
-            .order_by(desc(Semester.year), Semester.name)
+              .order_by(desc(Semester.year), Semester.name)
         )
         return list(self.session.exec(stmt).all())
 
@@ -50,7 +50,7 @@ class SemesterManager:
             select(Semester.year)
             .where(Semester.course_id == course_id)
             .distinct()
-            .order_by(semesters_table.c.year.asc())
+              .order_by(semesters_table.c.semester_year.asc())
         )
         years = [row for row in self.session.exec(stmt).all()]
         return [int(y) for y in years]

@@ -219,3 +219,14 @@ class CourseManager:
         self.session.delete(course)
         self.session.commit()
         return True
+
+    def get_subjects_by_year(self, year: int) -> list[Subject]:
+        """Retrieve all subjects for a given year.
+
+        Args:
+            year: The year for which to retrieve subjects.
+
+        Returns:
+            A list of Subject objects for the specified year.
+        """
+        return list(self.session.exec(select(Subject).where(Subject.semester_year == int(year))).all())

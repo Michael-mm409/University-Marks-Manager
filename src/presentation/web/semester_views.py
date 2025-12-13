@@ -136,7 +136,7 @@ def delete_semester(
         session.delete(obj)
     for obj in subs:
         session.delete(obj)
-    sem = session.exec(select(Semester).where(Semester.name == semester, Semester.year == year)).first()
+    sem = session.exec(select(Semester).where(Semester.name == semester, Semester.year == int(year))).first()
     if sem:
         session.delete(sem)
     session.commit()
@@ -160,7 +160,7 @@ def update_semester(
 
     Redirects back to Home with ?year=<year> so the filtered view remains active.
     """
-    sem = session.exec(select(Semester).where(Semester.name == semester, Semester.year == year)).first()
+    sem = session.exec(select(Semester).where(Semester.name == semester, Semester.year == int(year))).first()
     if sem:
         sem.name = new_name
         session.commit()
@@ -188,7 +188,11 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
         .where(
             or_(
                 Subject.semester_id == sem_id,
-                ((col(Subject.semester_id).in_(other_sem_ids)) & (Subject.sync_subject == True)) if other_sem_ids else false()
+                (
+                    (col(Subject.semester_id).in_(other_sem_ids)) &
+                    (Subject.sync_subject == True) &
+                    (Subject.semester_year == int(year))
+                ) if other_sem_ids else false()
             )
         )
         .order_by(subjects_table.c.subject_code.asc())

@@ -5,10 +5,13 @@ from typing import List, Optional, Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlmodel import Session, select
+    # No need for and_ import unless using multiple join conditions
 
 from src.infrastructure.db.models import Subject, Semester
 from src.presentation.api.schemas import SubjectCreate, SubjectRead
 from src.presentation.api.deps import get_session
+
+from sqlalchemy.sql import expression
 
 router = APIRouter()
 
@@ -37,8 +40,8 @@ def list_subjects(
     if semester_id is not None:
         stmt = stmt.where(Subject.semester_id == semester_id)
     elif semester_name or year:
-        # Legacy filters via JOIN on Semester
-        stmt = stmt.join(Semester)
+        # Join on semester_id to Semester.id, then filter by Semester.name/year
+        stmt = stmt.join(Semester, expression.true() & (Subject.semester_id == Semester.id))
         if semester_name:
             stmt = stmt.where(Semester.name == semester_name)
         if year:
@@ -79,10 +82,17 @@ def create_subject(data: SubjectCreate, session: Session = Depends(get_session))
     if exists:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="subject already exists for semester")
 
+    # Ensure semester_year is always an int (fallback to semester.year if not provided)
+    semester_year = getattr(data, 'semester_year', None)
+    if semester_year is None and sem:
+        semester_year = sem.year
+    if semester_year is None:
+        raise HTTPException(status_code=400, detail="semester_year is required")
     sub = Subject(
         subject_code=data.subject_code,
         subject_name=data.subject_name,
         semester_id=data.semester_id,
+        semester_year=int(semester_year),
         sync_subject=data.sync_subject,
         total_mark=data.total_mark,
     )
