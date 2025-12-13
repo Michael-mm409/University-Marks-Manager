@@ -87,7 +87,7 @@ def create_subject(data: SubjectCreate, session: Session = Depends(get_session))
         subject_code=data.subject_code,
         subject_name=data.subject_name,
         semester_id=data.semester_id,
-        sync_subject=data.sync_subject,
+        sync_subject=getattr(data, 'sync_subject', False),
         total_mark=data.total_mark,
     )
     session.add(sub)

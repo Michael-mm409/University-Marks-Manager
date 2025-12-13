@@ -8,6 +8,7 @@ class SubjectCreate(SQLModel, table=False):
     subject_code: str
     subject_name: str
     semester_id: int  # FK to Semester(id)
+    sync_subject: bool = False
     total_mark: Optional[float] = None
 
 
