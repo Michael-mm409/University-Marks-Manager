@@ -23,8 +23,8 @@
 </head>
 <body class="min-h-screen bg-base-200">
   <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 btn btn-xs">Skip to content</a>
-  <div class="w-full sm:max-w-7xl mx-auto px-2 sm:px-3 md:px-4 py-2 sm:py-4 md:py-6">
-    <header class="mb-2 sm:mb-4 md:mb-6 flex flex-col items-center gap-1 sm:gap-2 md:gap-3 text-center">
+  <div class="w-full sm:max-w-7xl mx-auto px-1 sm:px-2 md:px-3 py-1 sm:py-2 md:py-3">
+    <header class="mb-1 sm:mb-2 md:mb-3 flex flex-col items-center gap-0.5 sm:gap-1 md:gap-1.5 text-center">
       <div>
         <h1 class="site-title text-base leading-none sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black tracking-tighter drop-shadow">University Marks Manager</h1>
               <!-- <p class="text-base md:text-lg opacity-80">FastAPI · SQLModel · HTMX · Jinja2</p> -->
@@ -71,7 +71,7 @@
       </div>
     </div>
     {% include 'partials/breadcrumbs.html' %}
-    <main id="main" class="space-y-6">
+    <main id="main" class="space-y-3">
       {% block content %}{% endblock %}
     </main>
     {% block footer %}

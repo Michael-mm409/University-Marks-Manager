@@ -60,7 +60,7 @@
         <th class="text-right p-4">Assessment Mark</th>
         <th class="text-right p-4">Assessment Weight</th>
         <th class="text-right p-4">Exam Contribution</th>
-        <th class="text-right p-4">Final Exam Weight</th>
+         {% if row.has_exam %}<th class="text-right p-4">Final Exam Weight</th>{% endif %}
         <th class="text-right p-4 font-bold">Total Mark</th>
         <th class="text-right p-4"></th>
       </tr>
@@ -77,15 +77,19 @@
         <td class="p-4 text-right">{{ '%.2f' % row.assessment_mark if row.assessment_mark is not none else '-' }}</td>
         <td class="p-4 text-right">{{ '%.0f' % row.assessment_weight if row.assessment_weight is not none else '-' }}%</td>
         <td class="p-4 text-right">
-          {% if row.is_exam_required %}
-            <span class="text-info font-bold" title="Required (Weighted)">{{ '%.2f' % row.exam_mark }}</span>
-          {% elif row.exam_mark is not none %}
-            {{ '%.2f' % row.exam_mark }}
+          {% if row.has_exam %}
+            {% if row.is_exam_required %}
+              <span class="text-info font-bold" title="Required (Weighted)">{{ '%.2f' % row.exam_mark }}</span>
+            {% elif row.exam_mark is not none %}
+              {{ '%.2f' % row.exam_mark }}
+            {% else %}
+              -
+            {% endif %}
           {% else %}
             -
           {% endif %}
         </td>
-        <td class="p-4 text-right">{% if row.final_exam_mark_weight is not none %}{{ '%.0f' % row.final_exam_mark_weight }}%{% else %}-{% endif %}</td>
+        {% if row.has_exam %}<td class="p-4 text-right">{% if row.final_exam_mark_weight is not none %}{{ '%.0f' % row.final_exam_mark_weight }}%{% else %}-{% endif %}</td>{% endif %}
         <td class="p-4 text-right font-bold">{{ '%.0f' % row.total_mark if row.total_mark is not none else '-' }}</td>
         <td class="p-4 text-right">
           <form method="post" action="/subjects/{{year}}/{{row.code}}/open" class="inline-block m-0 p-0">

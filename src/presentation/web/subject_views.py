@@ -18,6 +18,7 @@ def create_subject(
     subject_code: str = Form(...),
     subject_name: str = Form(...),
     credit_points: int = Form(6),
+    has_exam: Optional[bool] = Form(False),
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
     """
@@ -57,6 +58,7 @@ def create_subject(
                 subject_code=subject_code,
                 subject_name=subject_name,
                 credit_points=credit_points,
+                has_exam=bool(has_exam),
             )
         )
         session.commit()

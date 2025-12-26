@@ -27,7 +27,7 @@ services:
       - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
       - APP_VERSION=${APP_VERSION}
       - ENV=${ENV}
-      - API_VERSION=${API_VERSION}
+      - API_VERION=${API_VERSION}
       # Ensure file change detection works reliably on bind mounts (Docker Desktop / Windows)
       - WATCHFILES_FORCE_POLLING=true
     volumes:
@@ -35,7 +35,7 @@ services:
       - ./:/app
     # Mark the web app healthy only when /healthz responds OK; helps avoid transient 502s on restart
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz').getcode()==200 else 1)\""]
+      test: [ "CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz').getcode()==200 else 1)\"" ]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -45,11 +45,13 @@ services:
         condition: service_healthy
 
   db:
+    platform: linux/arm64
     container_name: marks-manager-db
     image: postgres:16
     restart: unless-stopped
     volumes:
-      - postgres_data_nas:/var/lib/postgresql/data/
+      - /volume1/docker/Marks-Manager/db/data:/var/lib/postgresql/data/
+      # - E:/NAS/Marks-Manager/db/data:/var/lib/postgresql/data/
     env_file:
       - .env
     environment:
@@ -57,11 +59,10 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -h 127.0.0.1"]
+      test: [ "CMD-SHELL", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -h 127.0.0.1" ]
       interval: 5s
       timeout: 3s
       retries: 20
       start_period: 10s
 
-volumes:
-  postgres_data_nas:
+

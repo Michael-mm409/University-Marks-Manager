@@ -1,25 +1,32 @@
-<div class="p-4 rounded-lg bg-base-100 border border-base-300 hover:border-primary/70 hover:shadow-md transition card-glow flex flex-col gap-3 group animate-fade-in">
-  <!-- Header row with title and action button -->
+<div class="manage-panel hidden absolute inset-0 bg-white z-40">
+  <div class="relative p-4 rounded-lg bg-base-100 border border-base-300 hover:border-primary/70 hover:shadow-md transition card-glow flex flex-col gap-3 group animate-fade-in overflow-hidden">
+  
   <div class="flex items-start justify-between gap-3">
     <a href="/courses/{{ course.code if course.code is defined and course.code|trim != '' else course.id }}" class="flex-grow">
       <h3 class="text-lg font-semibold link link-hover text-primary">{{ course.name }}</h3>
       {% if course.code %}
         <p class="text-sm opacity-70 font-mono">{{ course.code }}</p>
       {% endif %}
+      {% if course.university %}
+        <p class="text-sm opacity-70 mt-1">{{ course.university.name }}</p>
+      {% endif %}
     </a>
-    <details class="dropdown dropdown-end">
-      <summary class="btn btn-ghost btn-sm" title="More options">⋮</summary>
-      <div class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-56">
-        <a href="/courses/{{ course.code if course.code is defined and course.code|trim != '' else course.id }}" class="btn btn-sm btn-ghost">Open Course</a>
-        <button class="btn btn-sm btn-ghost" onclick="this.closest('.dropdown').querySelector('form').style.display = this.closest('.dropdown').querySelector('form').style.display === 'none' ? 'block' : 'none'">Edit Details</button>
-        <form method="post" action="/courses/{{ course.code if course.code is defined and course.code|trim != '' else course.id }}/delete" onsubmit="return confirm('Delete this course? Semesters will be unassigned.');" style="display: none;">
-          <button class="btn btn-sm btn-error btn-outline w-full">Delete Course</button>
-        </form>
-      </div>
+
+    <details class="dropdown dropdown-bottom dropdown-end">
+      <summary class="btn btn-ghost btn-sm">⋮</summary>
+      <ul class="dropdown-content z-[60] menu p-2 shadow-xl bg-base-100 rounded-box w-52 border border-base-300">
+        <li><a href="/courses/{{ course.code if course.code is defined and course.code|trim != '' else course.id }}">Open Course</a></li>
+        <li><button type="button" onclick="const panel = this.closest('.card-glow').querySelector('.manage-panel'); panel.classList.remove('hidden'); panel.classList.add('flex');">Edit Details</button></li>
+        <div class="divider my-0"></div>
+        <li>
+          <form method="post" action="/courses/{{ course.code if course.code is defined and course.code|trim != '' else course.id }}/delete" onsubmit="return confirm('Delete this course?');">
+            <button class="text-error">Delete Course</button>
+          </form>
+        </li>
+      </ul>
     </details>
   </div>
 
-  <!-- Semesters display -->
   <div class="text-sm">
     {% if course.semesters and course.semesters|length > 0 %}
       <div class="flex flex-wrap gap-2 items-center">
@@ -33,21 +40,25 @@
     {% endif %}
   </div>
 
-  <!-- Inline edit panel (initially hidden) -->
-  <form method="post" action="/courses/{{ course.code if course.code is defined and course.code|trim != '' else course.id }}/update" class="manage-panel hidden border-t border-base-300 pt-3 mt-2 flex flex-col gap-3">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+ <form method="post" 
+        action="/courses/{{ course.code if course.code is defined and course.code|trim != '' else course.id }}/update" 
+        class="manage-panel hidden absolute inset-0 w-full h-full flex flex-col justify-center items-start gap-3 bg-white !bg-opacity-100 border border-base-300 shadow-xl z-[70] p-4 rounded-lg">
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
       <label class="form-control w-full">
-        <span class="label-text text-xs font-medium">Course Name</span>
-        <input name="name" class="input input-bordered input-sm" value="{{ course.name }}" required />
+        <span class="label-text text-xs font-bold text-gray-600">Course Name</span>
+        <input name="name" class="input input-bordered input-sm bg-white text-black" value="{{ course.name }}" required />
       </label>
       <label class="form-control w-full">
-        <span class="label-text text-xs font-medium">Course Code</span>
-        <input name="code" class="input input-bordered input-sm" value="{{ course.code }}" required />
+        <span class="label-text text-xs font-bold text-gray-600">Course Code</span>
+        <input name="code" class="input input-bordered input-sm bg-white text-black" value="{{ course.code }}" required />
       </label>
-    </div>
-    <div class="flex gap-2">
+      </div>
+
+    <div class="flex gap-2 w-full mt-2">
       <button class="btn btn-sm btn-primary flex-1" type="submit">Save Changes</button>
-      <button class="btn btn-sm btn-ghost flex-1" type="button" onclick="this.closest('.manage-panel').classList.add('hidden')">Cancel</button>
+      <button class="btn btn-sm btn-ghost flex-1 text-gray-500" type="button" onclick="this.closest('.manage-panel').classList.add('hidden')">Cancel</button>
     </div>
   </form>
+</div>
 </div>

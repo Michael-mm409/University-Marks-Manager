@@ -17,6 +17,8 @@ class CourseCreate(BaseModel):
     """Request model for creating a course."""
     name: str
     code: str | None = None
+    university_id: int | None = None
+    new_university_name: str | None = None
 
 
 class CourseRead(BaseModel):
@@ -24,6 +26,7 @@ class CourseRead(BaseModel):
     id: int
     name: str
     code: str | None
+    university_id: int | None = None
 
 
 # API Router
@@ -33,14 +36,33 @@ courses_router = APIRouter(prefix="/courses", tags=["Courses"])
 @courses_router.post("/", response_model=CourseRead, status_code=status.HTTP_201_CREATED)
 def create_course(
     course_data: CourseCreate,
-    session: Session = Depends(get_session),  # noqa: B008 - FastAPI dependency injection is intended here
+    session: Session = Depends(get_session),
 ) -> Course:
-    """Create a new course."""
+    """Create a new course, creating a university if needed."""
     normalized_code = (course_data.code or "").strip()
     if not normalized_code:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="course code is required")
+
+    university_id = course_data.university_id
+    if course_data.university_id == None and course_data.new_university_name:
+        # Try to find or create the university
+        from src.infrastructure.db.models import University
+        from sqlmodel import select
+        uni_name = course_data.new_university_name.strip()
+        if not uni_name:
+            raise HTTPException(status_code=422, detail="University name required")
+        existing = session.exec(select(University).where(University.name == uni_name)).first()
+        if existing:
+            university_id = existing.id
+        else:
+            new_uni = University(name=uni_name)
+            session.add(new_uni)
+            session.commit()
+            session.refresh(new_uni)
+            university_id = new_uni.id
+
     course_manager = CourseManager(session)
-    course = course_manager.create_course(name=course_data.name, code=normalized_code)
+    course = course_manager.create_course(name=course_data.name, code=normalized_code, university_id=university_id)
     return course
 
 

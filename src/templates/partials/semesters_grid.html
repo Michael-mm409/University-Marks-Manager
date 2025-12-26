@@ -12,23 +12,8 @@
       <span class="badge badge-outline badge-sm sm:badge-md md:badge-lg heading-badge">{{semester.year}}</span>
       <button class="btn btn-ghost btn-xs sm:btn-sm ml-2 sm:ml-3 shrink-0" onclick="this.closest('.sem-card').querySelector('.manage-panel').classList.toggle('hidden');" title="Manage">⚙️</button>
     </div>
-    <p class="text-sm sm:text-base opacity-70">View subjects & assignments</p>signments</p>
-    <div class="manage-panel hidden mt-1 animate-fade-in text-sm space-y-2 w-full">
-      <form method="post" action="/semester/{{semester.name}}/update" hx-post="/semester/{{semester.name}}/update" hx-target="#semesters-section" hx-swap="outerHTML" class="flex flex-col sm:flex-row gap-2 sm:gap-1 items-stretch sm:items-end flex-wrap">
-        <input type="hidden" name="year" value="{{semester.year}}" />
-        <input type="hidden" name="return_year" value="{{selected_year}}" />
-        <label class="form-control w-full sm:w-28">
-          <span class="label-text text-xs sm:text-sm">Rename</span>
-          <input name="new_name" placeholder="New name" class="input input-bordered input-xs sm:input-sm" required />
-        </label>
-        <button class="btn btn-xs sm:btn-sm btn-primary w-full sm:w-auto sm:mt-4" type="submit">Save</button>
-      </form>
-      <form method="post" action="/semester/{{semester.name}}/delete" hx-post="/semester/{{semester.name}}/delete" hx-target="#semesters-section" hx-swap="outerHTML" onsubmit="return confirm('Delete semester {{semester.name}} {{semester.year}} and ALL its data?');">
-        <input type="hidden" name="year" value="{{semester.year}}" />
-        <input type="hidden" name="return_year" value="{{selected_year}}" />
-        <button class="btn btn-xs sm:btn-sm btn-error btn-outline w-full">Delete</button>
-      </form>
-    </div>
+    <p class="text-sm sm:text-base opacity-70">View subjects & assignments</p>
+    <!-- Removed manage-panel for a cleaner card, as requested -->
 
     {# Add subject summary table for this semester #}
     {% if subject_summaries %}

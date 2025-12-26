@@ -12,6 +12,7 @@
     {% endif %}
     
     {% if wam is not none or gpa is not none %}
+    <!-- ...existing code... -->
     <div class="w-full sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-4xl mx-auto mt-3 sm:mt-4 md:mt-6 grade-stats px-1 sm:px-2 md:px-3">
       <div role="tablist" class="tabs tabs-lifted tabs-sm sm:tabs-md md:tabs-lg">
         <input type="radio" name="grade_tabs" role="tab" class="tab text-xs sm:text-sm md:text-base lg:text-lg px-2 sm:px-3 md:px-4 lg:px-6" aria-label="WAM" checked />
@@ -24,25 +25,18 @@
               <thead>
                 <tr>
                   <th class="text-center text-xs sm:text-sm md:text-base lg:text-lg uppercase opacity-60 font-bold">WAM</th>
-                  {% if grade_counts %}
-                    {% for grade, count in grade_counts.items() %}
-                      {% if count > 0 %}
-                        <th class="text-center text-xs sm:text-sm md:text-base font-bold opacity-60">{{ grade }}</th>
-                      {% endif %}
-                    {% endfor %}
-                  {% endif %}
+                  {% set all_grades = ['HD', 'D', 'C', 'P', 'PS', 'F'] %}
+                  {% for grade in all_grades %}
+                      <th class="text-center text-xs sm:text-sm md:text-base font-bold opacity-60">{{ grade }}</th>
+                  {% endfor %}
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td class="text-center text-primary text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold">{{ wam if wam is not none else '-' }}</td>
-                  {% if grade_counts %}
-                    {% for grade, count in grade_counts.items() %}
-                      {% if count > 0 %}
-                        <td class="text-center text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-semibold">{{ count }}</td>
-                      {% endif %}
-                    {% endfor %}
-                  {% endif %}
+                  {% for grade in all_grades %}
+                      <td class="text-center text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-semibold">{{ grade_counts[grade] if grade_counts and grade in grade_counts else 0 }}</td>
+                  {% endfor %}
                 </tr>
               </tbody>
             </table>

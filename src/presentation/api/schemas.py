@@ -10,6 +10,7 @@ class SubjectCreate(SQLModel, table=False):
     semester_id: int  # FK to Semester(id)
     sync_subject: bool = False
     total_mark: Optional[float] = None
+    has_exam: bool = True
 
 
 class SubjectRead(SQLModel):
@@ -19,6 +20,7 @@ class SubjectRead(SQLModel):
     semester_id: int
     # sync_subject removed
     total_mark: Optional[float] = None
+    has_exam: bool = True
     # pydantic v2: enable attribute population from ORM objects
     model_config = {"from_attributes": True}  # type: ignore[assignment]
 
@@ -49,6 +51,9 @@ class ExaminationCreate(SQLModel, table=False):
     subject_id: int  # FK to Subject(id)
     exam_mark: Optional[float] = None
     exam_weight: Optional[float] = None
+    subject_code: Optional[str] = None
+    semester_name: Optional[str] = None
+    year: Optional[int] = None
     # denormalized fields removed
 
 

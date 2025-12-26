@@ -117,6 +117,7 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
     wam = gc.calculate_wam(cid)
     gpa = gc.calculate_gpa(cid)
     grade_counts = gc.calculate_grade_counts(cid)
+    # ...existing code...
 
     ctx: IndexContext = {
         "semesters": display_semesters,
@@ -298,7 +299,6 @@ def subject_detail_pretty(
                 return HTMLResponse("Subject not found", status_code=404)
         return _render(request, "subject.html", ctx)
 
-
 @views.get("/subjects/{year}/{code}", response_class=HTMLResponse)
 def subject_detail_short(
     request: Request,
@@ -307,31 +307,17 @@ def subject_detail_short(
     semester: Optional[str] = None,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
-    """Shorter subject URL.
-
-    Behaviour:
-    - If `semester` query param provided: render same as the pretty URL.
-    - If not provided: attempt to resolve subjects matching year+code. If exactly one
-      match is found, render that subject. If multiple matches are found, present a
-      small choice page linking to the canonical semester-specific pages.
-    """
-    # If semester provided, delegate to the same build path used by the pretty view
-    # Also support `offering` query parameter commonly used in external links
+    """Shorter subject URL. Standard joins used to satisfy Pylance and prevent Cartesian products."""
     qp = request.query_params
     offering = qp.get("offering")
-    # Prefer explicit query param, else consume a one-time return_to stored in session by a preceding POST
     return_to = qp.get("return_to") or request.session.pop("return_to", None)
 
-    # If client supplied a concrete semester param, prefer it
     if semester:
         ctx = build_subject_context(
             session,
             semester=semester,
             year=year,
             code=code,
-            exam_weight=None,
-            final_total=None,
-            total_mark=None,
             return_to=return_to,
             error_message=qp.get("error"),
         )
@@ -339,16 +325,12 @@ def subject_detail_short(
             return HTMLResponse("Subject not found", status_code=404)
         return _render(request, "subject.html", ctx)
 
-    # If offering is provided, attempt to resolve a semester from it.
-    # Typical offering values look like: 'Wollongong-Autumn-On-Campus'. We'll try:
-    # 1) exact match against semester_name
-    # 2) token match (split on '-') against semester_name
-    # If a semester is resolved we'll render that subject directly.
     if offering:
-        # Try exact match first
+        # Join using the Relationship attribute 'Subject.semester'
+        # This is the cleanest way to avoid the "bool" type error
         candidate = session.exec(
             select(Subject)
-            .join(Semester)
+            .join(Semester) 
             .where(
                 Semester.year == year,
                 Subject.subject_code == code,
@@ -363,7 +345,6 @@ def subject_detail_short(
                 if ctx:
                     return _render(request, "subject.html", ctx)
 
-        # Token match: split offering and look for any token equal to semester name
         parts = [p for p in offering.split("-") if p]
         if parts:
             for token in parts:
@@ -384,7 +365,7 @@ def subject_detail_short(
                         if ctx:
                             return _render(request, "subject.html", ctx)
 
-    # No semester provided: find matching subjects for this year+code
+    # Final query also updated to use standard join
     rows = session.exec(
         select(Subject)
         .join(Semester)
@@ -393,14 +374,16 @@ def subject_detail_short(
             Subject.subject_code == code
         )
     ).all()
+
     if not rows:
         return HTMLResponse("Subject not found", status_code=404)
+    
     if len(rows) == 1:
         subj = rows[0]
         sem_obj = session.get(Semester, subj.semester_id)
         if not sem_obj:
             return HTMLResponse("Subject not found", status_code=404)
-        # Build context and render
+        
         ctx = build_subject_context(
             session,
             semester=sem_obj.name,
@@ -412,14 +395,15 @@ def subject_detail_short(
             return HTMLResponse("Subject not found", status_code=404)
         return _render(request, "subject.html", ctx)
 
-    # Multiple semesters found: show choices
     links = []
     for s in rows:
-        sem = getattr(s, "semester_name", "")
-        links.append(f"<li><a href='/subjects/{year}/{code}?semester={sem}'>Semester {sem}</a></li>")
+        # Resolve semester name from related object since it's safer
+        sem_obj = session.get(Semester, s.semester_id)
+        sem_name = sem_obj.name if sem_obj else "Unknown"
+        links.append(f"<li><a href='/subjects/{year}/{code}?semester={sem_name}'>Semester {sem_name}</a></li>")
+    
     body = f"<h1>Multiple semesters</h1><p>Choose semester for {code} {year}:</p><ul>{''.join(links)}</ul>"
     return HTMLResponse(body)
-
 
 @views.post("/subjects/{year}/{code}/open")
 def subject_open(

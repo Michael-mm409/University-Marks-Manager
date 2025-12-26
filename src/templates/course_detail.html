@@ -11,6 +11,9 @@
       {% if course.code %}
         <p class="text-sm opacity-70 font-mono mt-1">{{ course.code }}</p>
       {% endif %}
+      {% if course.university %}
+        <p class="text-sm opacity-70 mt-1">{{ course.university.name }}</p>
+      {% endif %}
     </div>
     <a href="/courses" class="btn btn-sm md:btn-md btn-outline">← Back to Courses</a>
   </div>
@@ -34,21 +37,39 @@
         <form method="post" action="/courses/{{ course.code or course.id }}/select" hx-post="/courses/{{ course.code or course.id }}/select" hx-target="#course-select-alert" hx-swap="innerHTML">
           <button type="submit" class="btn btn-sm btn-primary">Use this Course</button>
         </form>
-        <details class="dropdown dropdown-end">
+        <details class="dropdown dropdown-bottom relative">
           <summary class="btn btn-sm btn-ghost">⋮</summary>
-          <div class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-56">
-            <form method="post" action="/courses/{{ course.code or course.id }}/update" class="flex flex-col gap-2">
+          <div class="dropdown-content z-[100] menu p-6 shadow-2xl bg-white !bg-opacity-100 border border-base-300 rounded-box w-[28rem] max-w-[95vw] absolute left-0 mt-2"></div>
+            <form method="post" action="/courses/{{ course.code or course.id }}/update" class="flex flex-col gap-4">
+              <h3 class="font-bold text-lg border-b pb-2 mb-2">Edit Course Details</h3>
+              
               <label class="form-control">
-                <span class="label-text text-xs font-medium">Course Name</span>
-                <input name="name" class="input input-bordered input-sm" value="{{ course.name }}" required />
+                <span class="label-text text-xs font-semibold uppercase opacity-60">Course Name</span>
+                <input name="name" class="input input-bordered input-sm mt-1" value="{{ course.name }}" required />
               </label>
+
               <label class="form-control">
-                <span class="label-text text-xs font-medium">Course Code</span>
-                <input name="code" class="input input-bordered input-sm" value="{{ course.code }}" required />
+                <span class="label-text text-xs font-semibold uppercase opacity-60">Course Code</span>
+                <input name="code" class="input input-bordered input-sm mt-1" value="{{ course.code }}" required />
               </label>
-              <button class="btn btn-sm btn-secondary" type="submit">Save Changes</button>
+
+              <label class="form-control">
+                <span class="label-text text-xs font-semibold uppercase opacity-60">University</span>
+                <select name="university_id" class="select select-bordered select-sm mt-1" required onchange="this.nextElementSibling.style.display = this.value === 'add_new' ? 'block' : 'none'">
+                  <option value="" disabled {% if not course.university_id %}selected{% endif %}>Select university</option>
+                  {% for uni in universities %}
+                    <option value="{{ uni.id }}" {% if course.university_id == uni.id %}selected{% endif %}>{{ uni.name }}</option>
+                  {% endfor %}
+                  <option value="add_new">Add new university...</option>
+                </select>
+                <input name="new_university_name" class="input input-bordered input-sm mt-2" placeholder="Enter new university name" style="display:none;" />
+              </label>
+
+              <button class="btn btn-sm btn-secondary w-full mt-2" type="submit">Save Changes</button>
             </form>
-            <hr class="my-2" />
+            
+            <div class="divider my-1"></div>
+
             <form method="post" action="/courses/{{ course.code or course.id }}/delete" onsubmit="return confirm('Delete this course? Semesters will be unassigned.');">
               <button class="btn btn-sm btn-error btn-outline w-full" type="submit">Delete Course</button>
             </form>

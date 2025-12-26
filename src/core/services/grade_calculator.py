@@ -26,8 +26,8 @@ class GradeCalculator:
         scale_id = None
         if course_id:
             course = self.session.get(Course, course_id)
-            if course and course.grading_scale:
-                scale_id = course.grading_scale
+            if course and getattr(course, "grading_scale_id", None):
+                scale_id = course.grading_scale_id
 
         if scale_id:
             scales = self.session.exec(select(GradeScale).where(GradeScale.id == scale_id)).all()
@@ -48,7 +48,7 @@ class GradeCalculator:
                 self.session.add(d)
             self.session.commit()
             scales = defaults
-            
+
         # Sort by min_mark descending for evaluation logic
         return sorted(scales, key=lambda x: x.min_mark, reverse=True)
 
@@ -60,13 +60,15 @@ class GradeCalculator:
         """
         base_query = self._build_base_query(course_id)
         
+        # Define the subquery variable so it can be referenced
+        sub = base_query.subquery()
+
         # Use SQL aggregation for efficiency
         result = self.session.exec(
             select(
-                func.sum(col(Subject.total_mark) * col(Subject.credit_points)).label("weighted_sum"),
-                func.sum(col(Subject.credit_points)).label("credit_sum")
+                func.sum(sub.c.total_mark * sub.c.credit_points).label("weighted_sum"),
+                func.sum(sub.c.credit_points).label("credit_sum")
             )
-            .select_from(base_query.subquery())
         ).first()
         
         if result is None or result[1] is None or result[1] == 0:
@@ -81,11 +83,17 @@ class GradeCalculator:
         Uses GradeScale from DB. Each subject is counted in the HIGHEST grade it qualifies for.
         """
         scales = self._get_grade_scales(course_id)
-        counts = {s.grade: 0 for s in scales}
+        # Always include all standard grades in the output, even if not present in DB
+        all_grades = ['HD', 'D', 'C', 'P', 'PS', 'F']
+        counts = {g: 0 for g in all_grades}
+        for s in scales:
+            if s.grade not in counts:
+                counts[s.grade] = 0
         
         # Fetch all valid subjects (already filtered by total_mark > 0)
         base_query = self._build_base_query(course_id)
         subjects = self.session.exec(base_query).all()
+        # ...existing code...
         
         # For each subject, find the highest grade it qualifies for
         # Scales are already sorted descending by min_mark
@@ -94,6 +102,7 @@ class GradeCalculator:
             if mark is not None:
                 for scale in scales:
                     if mark >= scale.min_mark:
+                        # ...existing code...
                         counts[scale.grade] += 1
                         break  # Count in highest matching grade only
         
@@ -108,18 +117,19 @@ class GradeCalculator:
         scales = self._get_grade_scales(course_id)
         base_query = self._build_base_query(course_id)
         
+        # Define the subquery variable so it can be referenced
+        grade_subquery = base_query.subquery()
         # Build CASE expression for GPA points based on grade scales
         # Use SQLAlchemy's case() for proper typing
-        whens = [(col(Subject.total_mark) >= scale.min_mark, scale.gpa_point) for scale in scales]
+        whens = [(grade_subquery.c.total_mark >= scale.min_mark, scale.gpa_point) for scale in scales]
         gpa_point_expr = case(*whens, else_=0.0)
         
         # Calculate weighted GPA
         result = self.session.exec(
             select(
-                func.sum(gpa_point_expr * col(Subject.credit_points)).label("gpa_weighted_sum"),
-                func.sum(col(Subject.credit_points)).label("credit_sum")
+                func.sum(gpa_point_expr * grade_subquery.c.credit_points).label("gpa_weighted_sum"),
+                func.sum(grade_subquery.c.credit_points).label("credit_sum")
             )
-            .select_from(base_query.subquery())
         ).first()
         
         if result is None or result[1] is None or result[1] == 0:

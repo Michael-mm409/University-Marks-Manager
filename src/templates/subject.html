@@ -44,6 +44,10 @@
     <input name="subject_code" class="input input-xs w-24 shrink-0" value="{{subject.subject_code}}" placeholder="Code" required />
     <input name="subject_name" class="input input-xs flex-1 min-w-0" value="{{subject.subject_name}}" placeholder="Subject name" required />
     <input name="credit_points" type="number" class="input input-xs w-20 shrink-0 text-right" value="{{subject.credit_points}}" placeholder="CP" required />
+      <label class="flex items-center gap-1">
+        <span class="text-xs">Has Exam?</span>
+        <input type="checkbox" name="has_exam" value="true" {% if subject.has_exam %}checked{% endif %} class="checkbox checkbox-xs" />
+      </label>
     <button type="submit" class="btn btn-xs btn-primary shrink-0">Save</button>
     <button type="button" class="btn btn-xs shrink-0" onclick="hideSubjectEditForm()">Cancel</button>
   </form>

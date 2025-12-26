@@ -16,20 +16,24 @@ class CourseManager:
         """Initialize the CourseManager with a database session."""
         self.session = session
 
-    def create_course(self, name: str, code: str) -> Course:
-        """Create a new course.
-
-        Args:
-            name: The name of the course.
-            code: The optional course code.
-
-        Returns:
-            The newly created Course object.
-        """
-        # Normalize inputs: trim whitespace; keep code case as-is but trimmed
+    def create_course(self, name: str, code: str, grading_scale_id: int, university_id: int | None = None, new_university_name: str | None = None) -> Course:
+        """Create a new course, creating a university if needed."""
         name = name.strip()
         code = code.strip()
-        course = Course(name=name, code=code)
+        if university_id is None and new_university_name:
+            from src.infrastructure.db.models import University
+            from sqlmodel import select
+            uni_name = new_university_name.strip()
+            existing = self.session.exec(select(University).where(University.name == uni_name)).first()
+            if existing:
+                university_id = existing.id
+            else:
+                new_uni = University(name=uni_name)
+                self.session.add(new_uni)
+                self.session.commit()
+                self.session.refresh(new_uni)
+                university_id = new_uni.id
+        course = Course(name=name, code=code, grading_scale_id=grading_scale_id, university_id=university_id)
         self.session.add(course)
         self.session.commit()
         self.session.refresh(course)
@@ -194,13 +198,29 @@ class CourseManager:
         return sorted([int(y) for y in years], reverse=True)
 
     # New: update and delete
-    def update_course(self, course_id: int, name: str, code: str) -> Optional[Course]:
-        """Update an existing course's name and code (trimmed)."""
+    def update_course(self, course_id: int, name: str, code: str, university_id: int | None = None, new_university_name: str | None = None) -> Optional[Course]:
+        """Update an existing course's name, code, and university. Create university if needed."""
         course = self.get_course_by_id(course_id)
         if not course:
             return None
         course.name = name.strip()
         course.code = code.strip()
+        # University logic
+        if new_university_name and (university_id is None or university_id == "add_new"):
+            from src.infrastructure.db.models import University
+            from sqlmodel import select
+            uni_name = new_university_name.strip()
+            existing = self.session.exec(select(University).where(University.name == uni_name)).first()
+            if existing:
+                course.university_id = existing.id
+            else:
+                new_uni = University(name=uni_name)
+                self.session.add(new_uni)
+                self.session.commit()
+                self.session.refresh(new_uni)
+                course.university_id = new_uni.id
+        elif university_id:
+            course.university_id = university_id
         self.session.add(course)
         self.session.commit()
         self.session.refresh(course)

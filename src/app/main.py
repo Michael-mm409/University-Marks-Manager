@@ -11,7 +11,7 @@ import os
 from contextlib import asynccontextmanager
 
 # Third-party imports
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -38,6 +38,10 @@ except Exception:
     # Proceed without .env if loading fails
     pass
 
+app_name = os.getenv("APP_NAME", "Marks Manager")
+app_version = os.getenv("APP_VERSION", "dev")
+api_version = os.getenv("API_VERSION", "v1").strip().strip("/")
+
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
     """Application lifespan context.
@@ -61,29 +65,20 @@ async def lifespan(fastapi_app: FastAPI):
     # Provide global template variables
     fastapi_app.state.jinja_env.globals.update(
         current_year=str(datetime.now().year),
-        app_version=os.getenv("APP_VERSION", "dev"),
+        app_version=app_version,
         env_name=os.getenv("ENV", "dev"),
+        api_version=api_version,
+        app_name=app_name
     )
-    # Debug routes gating (off by default). Enable by setting ENABLE_DEBUG_ROUTES to a truthy value.
-    fastapi_app.state.enable_debug_routes = str(os.getenv("ENABLE_DEBUG_ROUTES", "")).lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-    # Optional shared secret for debug endpoints: require token query param if set
-    fastapi_app.state.debug_token = os.getenv("DEBUG_TOKEN")
+    # ...existing code...
     yield
     # Shutdown (no-op)
 
 
 APPLICATION = FastAPI(title="University Marks Manager API", lifespan=lifespan)
 
-
-# Configure API version prefix from environment (default: v1)
-API_VERSION = os.getenv("API_VERSION", "v1").strip().lstrip("/") or "v1"
-API_PREFIX = f"/api/{API_VERSION}"
-
+# Use API_VERSION for API prefix
+API_PREFIX = f"/api/{api_version}" if api_version else "/api"
 APPLICATION.include_router(api, prefix=API_PREFIX)
 APPLICATION.include_router(views)
 
@@ -125,6 +120,15 @@ if static_favicon.exists() or assets_favicon.exists():
 app = APPLICATION  # backwards compatible name for uvicorn target
 
 __all__ = ["app", "APPLICATION"]
+
+# --- No-Cache Middleware ---
+@APPLICATION.middleware("http")
+async def no_cache_middleware(request: Request, call_next):
+    response: Response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 # Root-level health endpoint (does not depend on API router mounting)
 @APPLICATION.get("/healthz")

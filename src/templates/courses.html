@@ -42,6 +42,32 @@
         />
       </div>
 
+      <div class="form-control w-full">
+        <label class="label">
+          <span class="label-text font-medium">Grading Scale</span>
+        </label>
+        <select name="grading_scale_id" class="select select-bordered select-sm md:select-md w-full bg-white" required>
+          <option value="" disabled selected>Select grading scale</option>
+          {% for scale in grading_scales %}
+            <option value="{{ scale.id }}">{{ scale.scale_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-control w-full">
+        <label class="label">
+          <span class="label-text font-medium">University</span>
+        </label>
+        <select name="university_id" class="select select-bordered select-sm md:select-md w-full" required onchange="this.nextElementSibling.style.display = this.value === 'add_new' ? 'block' : 'none'">
+          <option value="" disabled selected>Select university</option>
+          {% for uni in universities %}
+            <option value="{{ uni.id }}">{{ uni.name }}</option>
+          {% endfor %}
+          <option value="add_new">Add new university...</option>
+        </select>
+        <input name="new_university_name" class="input input-bordered input-sm md:input-md mt-2" placeholder="Enter new university name" style="display:none;" />
+      </div>
+
       <div class="flex gap-2">
         <button type="submit" class="btn btn-primary btn-sm md:btn-md">
           Create Course

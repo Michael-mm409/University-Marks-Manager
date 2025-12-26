@@ -36,8 +36,8 @@ def settings_page(request: Request, session: Session = Depends(get_session)):
             cid = int(str(active_course_id))
             course = session.get(Course, cid)
             if course:
-                if course.grading_scale:
-                    current_scale_id = course.grading_scale
+                if getattr(course, "grading_scale_id", None):
+                    current_scale_id = course.grading_scale_id
             else:
                 sess.pop("current_course_id", None)
         except (ValueError, TypeError):
@@ -51,16 +51,7 @@ def settings_page(request: Request, session: Session = Depends(get_session)):
     # Fetch all available scale names
     all_scale_names = session.exec(select(GradeScale.scale_name).distinct()).all()
     
-    current_scale_id = None
-    course = None
-    if active_course_id:
-        try:
-            cid = int(str(active_course_id))
-            course = session.get(Course, cid)
-            if course and course.grading_scale:
-                current_scale_id = course.grading_scale
-        except (ValueError, TypeError):
-            pass
+    # (Already handled above, remove duplicate block)
     # Get the scale_name for the current grading_scale id
     current_scale_name = None
     if current_scale_id:
@@ -108,11 +99,10 @@ def update_course_scale(
             cid = int(str(active_course_id))
             course = session.get(Course, cid)
             if course:
-                # Find the GradeScale by scale_name, then set grading_scale to its id
+                # Find the GradeScale by scale_name, then set grading_scale_id to its id
                 scale = session.exec(select(GradeScale).where(GradeScale.scale_name == scale_name)).first()
                 if scale:
-                    # Ensure grading_scale is assigned the correct type (int)
-                    course.grading_scale = str(scale.id)  # If Course.grading_scale is an int FK
+                    course.grading_scale_id = scale.id
                     session.add(course)
                     session.commit()
                     sess["flash_message"] = f"Grading scale for '{course.name}' updated to '{scale_name}'."

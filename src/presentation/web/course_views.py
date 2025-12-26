@@ -1,7 +1,7 @@
 """Web views for managing courses."""
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 from src.core.services.course_manager import CourseManager
 from src.core.services.semester_manager import SemesterManager
 from src.infrastructure.db.engine import get_session
-from src.infrastructure.db.models import Subject, Course, Semester
+from src.infrastructure.db.models import Subject, Course, Semester, University
 
 router = APIRouter()
 
@@ -40,8 +40,13 @@ def get_courses_page(
     jinja_env = request.app.state.jinja_env
     course_manager = CourseManager(session)
     courses = course_manager.get_all_courses()
+    # Get all universities for the dropdown
+    universities = session.exec(select(University)).all()
+    # Get all grading scales for the dropdown
+    from src.infrastructure.db.models import GradeScale
+    grading_scales = session.exec(select(GradeScale)).all()
     template = jinja_env.get_template("courses.html")
-    return template.render(request=request, courses=courses)
+    return template.render(request=request, courses=courses, universities=universities, grading_scales=grading_scales)
 
 
 @router.head("/courses")
@@ -253,25 +258,27 @@ def create_course_view(
     request: Request,
     name: str = Form(...),
     code: str = Form(...),
+    grading_scale_id: int = Form(...),
+    university_id: int = Form(None),
+    new_university_name: str = Form(None),
     session: Session = Depends(get_session),
 ):
     """Handle the form submission to create a new course and return the HTML fragment."""
     jinja_env = request.app.state.jinja_env
     course_manager = CourseManager(session)
-    course = course_manager.create_course(name=name, code=code)
+    course = course_manager.create_course(
+        name=name,
+        code=code,
+        grading_scale_id=grading_scale_id,
+        university_id=university_id,
+        new_university_name=new_university_name,
+    )
     template = jinja_env.get_template("partials/course_item.html")
-    # If this request was issued by HTMX, return the new course fragment
-    # and trigger a client-side event so the header/selector can be refreshed
-    # via a separate HTMX GET (keeps behavior fast and avoids full reload).
     content = template.render(request=request, course=course)
     if request.headers.get("HX-Request"):
         resp = HTMLResponse(content)
-        # Trigger a client-side event 'courseListChanged' so page JS can
-        # request an updated selector/header fragment and swap it in.
         resp.headers["HX-Trigger"] = "courseListChanged"
         return resp
-
-    # Non-HTMX: return the fragment (legacy behavior)
     return content
 
 
@@ -308,6 +315,9 @@ def get_course_detail_page(
         ).all()
         subjects_by_semester[getattr(sem, "id")] = list(candidates)
 
+    # Get all universities for the dropdown
+    from src.infrastructure.db.models import University
+    universities = session.exec(select(University)).all()
     template = jinja_env.get_template("course_detail.html")
     return template.render(
         request=request,
@@ -316,6 +326,7 @@ def get_course_detail_page(
         unassigned_semesters=unassigned_semesters,
         unassigned_years=unassigned_years,
         subjects_by_semester=subjects_by_semester,
+        universities=universities,
     )
 
 
@@ -543,19 +554,36 @@ def update_course_view(
     course_code: str,
     name: str = Form(...),
     code: str = Form(...),
+    university_id: str = Form(None),
+    new_university_name: str = Form(None),
     session: Session = Depends(get_session),
 ):
-    """Update course name and code and redirect to the (possibly new) code path."""
+    """Update course name, code, and university. Create university if needed."""
     cm = CourseManager(session)
     course = _resolve_course(cm, course_code)
     if not course:
         return HTMLResponse("Course not found", status_code=404)
     try:
-        updated = cm.update_course(course.id, name=name, code=code)  # type: ignore[arg-type]
+        # Handle university_id: if 'add_new', use new_university_name
+        uni_id = None
+        if university_id and university_id != "add_new":
+            try:
+                uni_id = int(university_id)
+            except Exception:
+                uni_id = None
+        elif university_id == "add_new" and new_university_name:
+            uni_id = None  # Will be handled in update_course
+        if course.id is None:
+            return HTMLResponse("Course ID is missing.", status_code=400)
+        updated = cm.update_course(
+            course.id,
+            name=name,
+            code=code,
+            university_id=uni_id,
+            new_university_name=new_university_name if university_id == "add_new" else None,
+        )
     except Exception as ex:
-        # Likely a uniqueness violation; show simple message
         return HTMLResponse(f"Update failed: {ex}", status_code=400)
-    # Update session banner if this course is active
     sess = request.session
     if updated and sess.get("current_course_id") == getattr(updated, "id", None):
         sess["current_course_name"] = getattr(updated, "name", None)
