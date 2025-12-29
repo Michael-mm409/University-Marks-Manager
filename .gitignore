@@ -21,3 +21,4 @@ __pycache__/
 # Scripts
 db/data/
 db/build/
+assets/@eaDir/
