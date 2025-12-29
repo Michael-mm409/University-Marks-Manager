@@ -85,6 +85,15 @@ def settings_page(request: Request, session: Session = Depends(get_session)):
     })
 
 
+@router.get("/courses", response_class=HTMLResponse)
+def courses_page(request: Request, session: Session = Depends(get_session)):
+    """Render the manage courses page, including a list of all existing courses."""
+    # Fetch all courses
+    courses = session.exec(select(Course)).all()
+    return _render(request, "courses.html", {
+        "courses": courses
+    })
+
 # Endpoint to update the grading scale for the active course
 @router.post("/settings/scale/update")
 def update_course_scale(

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import cast
 from sqlalchemy import Table
-from sqlmodel import Session, select, desc
+from sqlmodel import Session, select, asc
 
 from src.infrastructure.db.models import Semester
 
@@ -16,12 +16,8 @@ class SemesterManager:
         self.session = session
 
     def get_all_semesters(self) -> list[Semester]:
-        """Retrieve all semesters from the database.
-
-        Returns:
-            A list of all Semester objects.
-        """
-        statement = select(Semester).order_by(desc(Semester.year), Semester.name)
+        """Retrieve all semesters from the database, sorted by year (asc), then name (asc)."""
+        statement = select(Semester).order_by(asc(Semester.year), asc(Semester.name))
         results = self.session.exec(statement).all()
         return list(results)
 
@@ -35,11 +31,11 @@ class SemesterManager:
         return [int(y) for y in years]
 
     def get_semesters_for_course(self, course_id: int) -> list[Semester]:
-        """Retrieve semesters assigned to a specific course, newest first."""
+        """Retrieve semesters assigned to a specific course, sorted by year (asc), then name (asc)."""
         stmt = (
             select(Semester)
             .where(Semester.course_id == course_id)
-              .order_by(desc(Semester.year), Semester.name)
+            .order_by(asc(Semester.year), asc(Semester.name))
         )
         return list(self.session.exec(stmt).all())
 
@@ -50,7 +46,7 @@ class SemesterManager:
             select(Semester.year)
             .where(Semester.course_id == course_id)
             .distinct()
-            .order_by(semesters_table.c.year.asc())
+            .order_by(asc(semesters_table.c.year))
         )
         years = [row for row in self.session.exec(stmt).all()]
         return [int(y) for y in years]

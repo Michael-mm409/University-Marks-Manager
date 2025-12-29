@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Optional, List, cast
 from datetime import datetime
+from urllib import request
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -91,6 +92,10 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
         all_semesters = sm.get_all_semesters()
         years = sm.get_distinct_years()
 
+    # If the selected year is not in the available years for this course, fallback to All
+    if parsed_year is not None and parsed_year not in years:
+        parsed_year = None
+
     display_semesters = [s for s in all_semesters if (parsed_year is None or int(s.year) == int(parsed_year))]
     # Pop any one-time flash message (set after selecting a course)
     flash_message = request.session.pop("flash_message", None)
@@ -156,10 +161,28 @@ def home(request: Request, year: Optional[str] = None, session: Session = Depend
 
     # No year provided: prefer current year if any data exists, else All
     sm = SemesterManager(session)
-    years = sm.get_distinct_years()
+    # Determine if a course is selected
+    sess = request.session
+    active_course_id = sess.get("current_course_id")
+    cid = None
+    if active_course_id is not None:
+        try:
+            cid = int(str(active_course_id).strip())
+        except Exception:
+            cid = None
+    if cid is not None:
+        years = sm.get_distinct_years_for_course(cid)
+        semesters = sm.get_semesters_for_course(cid)
+    else:
+        years = sm.get_distinct_years()
+        semesters = sm.get_all_semesters()
     now_year = int(datetime.now().year)
-    if now_year in years:
+    # Only redirect to current year if there are semesters for that year
+    if now_year in years and any(int(s.year) == now_year for s in semesters):
         return cast(HTMLResponse, RedirectResponse(url=f"/year/{now_year}{selected_suffix}", status_code=303))
+    elif years:
+        first_year = min(years)
+        return cast(HTMLResponse, RedirectResponse(url=f"/year/{first_year}{selected_suffix}", status_code=303))
     return _render_home_body(request, session, None)
 
 
@@ -197,17 +220,30 @@ def home_year_head(request: Request, year: int, session: Session = Depends(get_s
 def home_all(request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
     """Render the All years page, or redirect to current/first year if appropriate."""
     sm = SemesterManager(session)
-    years = sm.get_distinct_years()
+    sess = request.session
+    active_course_id = sess.get("current_course_id")
+    cid = None
+    if active_course_id is not None:
+        try:
+            cid = int(str(active_course_id).strip())
+        except Exception:
+            cid = None
+    if cid is not None:
+        years = sm.get_distinct_years_for_course(cid)
+        semesters = sm.get_semesters_for_course(cid)
+    else:
+        years = sm.get_distinct_years()
+        semesters = sm.get_all_semesters()
     now_year = int(datetime.now().year)
     selected_suffix = "?selected=1" if request.query_params.get("selected") == "1" else ""
-    if now_year in years:
-        # If current year has semesters, redirect to it
-        return cast(HTMLResponse, RedirectResponse(url=f"/year/{now_year}{selected_suffix}", status_code=303))
-    elif years:
-        # If any year exists, redirect to the first (earliest) year
-        first_year = min(years)
-        return cast(HTMLResponse, RedirectResponse(url=f"/year/{first_year}{selected_suffix}", status_code=303))
-    # No semesters at all, render the all years page (empty)
+    # Only redirect if this is a legacy redirect (e.g., has ?redirect=1)
+    if request.query_params.get("redirect") == "1":
+        if now_year in years and any(int(s.year) == now_year for s in semesters):
+            return cast(HTMLResponse, RedirectResponse(url=f"/year/{now_year}{selected_suffix}", status_code=303))
+        elif years:
+            first_year = min(years)
+            return cast(HTMLResponse, RedirectResponse(url=f"/year/{first_year}{selected_suffix}", status_code=303))
+    # Otherwise, render all years view (even if empty)
     return _render_home_body(request, session, None)
 
 

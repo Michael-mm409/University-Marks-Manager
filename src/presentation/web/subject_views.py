@@ -5,11 +5,15 @@ from typing import Optional, cast
 from sqlalchemy import Table
 from sqlalchemy.sql import expression
 from fastapi import Request
+from fastapi.templating import Jinja2Templates
+
 from src.presentation.api.deps import get_session
 from src.infrastructure.db.models import Subject, Assignment, Examination, ExamSettings, GradeType, Semester
 from .types import SubjectContext
 
 subject_router = APIRouter()
+
+templates = Jinja2Templates(directory="src/templates")
 
 @subject_router.api_route("/subject/create", methods=["POST"])
 def create_subject(
@@ -162,7 +166,7 @@ def build_subject_context(
     # Determine active exam source
     if exam_assignment:
         # Use assignment based exam
-        # Assignment stores unweighted_mark as a ratio (e.g. 0.75 for 75%), so we multiply by 100 for percent logic
+        # Assignment stores unweighted_mark as a ratio (e.g. 0.75 for 75%), so we multiply to compute the raw percent
         if exam_assignment.unweighted_mark is not None:
              exam_raw_percent = float(exam_assignment.unweighted_mark) * 100.0
         
@@ -410,3 +414,16 @@ def delete_subject(
             return RedirectResponse(f"/year/{parts[1]}/semester/{parts[0]}", status_code=303)
     
     return RedirectResponse(f"/year/{year}/semester/{semester}", status_code=303)
+
+@subject_router.get("/subjects/{year}/{code}")
+def get_subject(
+    year: str,
+    code: str,
+    semester: str,
+    request: Request,
+    session: Session = Depends(get_session)
+):
+    ctx = build_subject_context(session, semester, year, code)
+    if ctx is None:
+        return RedirectResponse(f"/year/{year}/semester/{semester}?error=Subject+not+found", status_code=303)
+    return templates.TemplateResponse("subject.html", {"request": request, **ctx})

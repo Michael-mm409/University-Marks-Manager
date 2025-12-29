@@ -90,7 +90,9 @@ class GradeCalculator:
         """
         Calculate the count of subjects in each grade band.
         Uses GradeScale from DB. Each subject is counted in the HIGHEST grade it qualifies for.
+        Pass Supplementary (PS) is counted using the ps_exam flag from exam_settings, and must be counted before P.
         """
+        from src.infrastructure.db.models import ExamSettings
         scales = self._get_grade_scales(course_id)
         # Always include all standard grades in the output, even if not present in DB
         all_grades = ['HD', 'D', 'C', 'P', 'PS', 'F']
@@ -98,23 +100,35 @@ class GradeCalculator:
         for s in scales:
             if s.grade not in counts:
                 counts[s.grade] = 0
-        
+
         # Fetch all valid subjects (already filtered by total_mark > 0)
         base_query = self._build_base_query(course_id)
         subjects = self.session.exec(base_query).all()
-        # ...existing code...
-        
-        # For each subject, find the highest grade it qualifies for
-        # Scales are already sorted descending by min_mark
+
+        # Pre-fetch all exam_settings for efficiency
+        subject_ids = [subj.id for subj in subjects]
+        exam_settings_map = {}
+        if subject_ids:
+            exam_settings = self.session.exec(
+                select(ExamSettings).where(ExamSettings.subject_id.in_(subject_ids))
+            ).all()
+            exam_settings_map = {es.subject_id: es for es in exam_settings}
+
         for subject in subjects:
             mark = subject.total_mark
-            if mark is not None:
-                for scale in scales:
-                    if mark >= scale.min_mark:
-                        # ...existing code...
-                        counts[scale.grade] += 1
-                        break  # Count in highest matching grade only
-        
+            subj_exam = exam_settings_map.get(subject.id) if subject.id is not None else None
+            is_ps = subj_exam.ps_exam if subj_exam else False
+            if is_ps:
+                # Count as PS regardless of mark
+                counts['PS'] += 1
+                continue
+            # Otherwise, assign by mark, but skip PS band
+            for scale in scales:
+                if scale.grade == 'PS':
+                    continue  # skip PS for non-ps_exam subjects
+                if mark is not None and mark >= scale.min_mark:
+                    counts[scale.grade] += 1
+                    break
         return counts
 
     def calculate_gpa(self, course_id: int | None = None) -> float | None:

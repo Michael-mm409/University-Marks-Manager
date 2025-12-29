@@ -4,6 +4,7 @@
   {'label': year, 'url': '/year/' ~ year},
   {'label': semester, 'url': '/year/' ~ year ~ '/semester/' ~ semester},
 ] %}
+
 {% block content %}
 <div class="flex flex-col items-center text-center gap-3 md:gap-4 mb-8">
   <h2 class="subject-title flex items-center gap-3 justify-center">
@@ -11,23 +12,26 @@
     <span id="subject-name-display">{{subject.subject_name}}</span>
     <button id="edit-subject-btn" class="btn btn-xs btn-circle btn-ghost" type="button" onclick="showSubjectEditForm()" title="Edit subject">&#9881;</button>
   </h2>
+
   <form id="subject-edit-form" method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/update" class="flex items-center gap-2 mt-2 hidden w-full" onsubmit="return submitSubjectEditForm(event)">
     <input type="hidden" name="year" value="{{year}}" />
     <input name="subject_code" class="input input-xs w-24 shrink-0" value="{{subject.subject_code}}" placeholder="Code" required />
     <input name="subject_name" class="input input-xs flex-1 min-w-0" value="{{subject.subject_name}}" placeholder="Subject name" required />
     <input name="credit_points" type="number" class="input input-xs w-20 shrink-0 text-right" value="{{subject.credit_points}}" placeholder="CP" required />
-      <label class="flex items-center gap-1">
-        <span class="text-xs">Has Exam?</span>
-        <input type="checkbox" name="has_exam" value="true" {% if subject.has_exam %}checked{% endif %} class="checkbox checkbox-xs" />
-      </label>
-      <label class="flex items-center gap-1">
-        <span class="text-xs">Sync Subject?</span>
-        <input type="checkbox" name="sync_subject" value="true" {% if subject.sync_subject %}checked{% endif %} class="checkbox checkbox-xs" />
-      </label>
+    <label class="flex items-center gap-1">
+      <span class="text-xs">Has Exam?</span>
+      <input type="checkbox" name="has_exam" value="true" {% if subject.has_exam %}checked{% endif %} class="checkbox checkbox-xs" />
+    </label>
+    <label class="flex items-center gap-1">
+      <span class="text-xs">Sync Subject?</span>
+      <input type="checkbox" name="sync_subject" value="true" {% if subject.sync_subject %}checked{% endif %} class="checkbox checkbox-xs" />
+    </label>
     <button type="submit" class="btn btn-xs btn-primary shrink-0">Save</button>
     <button type="button" class="btn btn-xs shrink-0" onclick="hideSubjectEditForm()">Cancel</button>
   </form>
+
   <p class="semester-title mt-1"><span>{{semester}}</span> <span class="semester-year">{{year}}</span></p>
+
   <div class="flex gap-2 justify-center">
     {% if return_to %}
       {% set ret = return_to.split('-') %}
@@ -45,182 +49,331 @@
 </div>
 
 <div class="mt-8">
-  <div class="tabs tabs-boxed w-full mb-4">
-    <a class="tab tab-sm tab-active" id="tab-assignments" onclick="showTab('assignments')">Assignments</a>
-    <a class="tab tab-sm" id="tab-summary" onclick="showTab('summary')">Summary</a>
-  </div>
-  <div id="panel-assignments">
-    <div class="overflow-x-auto mb-6">
-      <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
-        <thead>
-          <tr>
-            <th>Assessment</th>
-            <th>Weighted</th>
-            <th>Unweighted</th>
-            <th>Weight</th>
-            <th>Type</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-  {% for assignment in assignments %}
-  <tr data-assessment="{{ assignment.assessment }}" data-code="{{ subject.subject_code }}" data-semester="{{ semester }}" data-year="{{ year }}" class="assignment-row">
-    <td class="assignment-assessment">
-      {{assignment.assessment}}
-      {% if assignment.is_exam %}
-      <span class="badge badge-xs badge-info ml-1">Exam</span>
-      {% endif %}
-    </td>
-    <td class="assignment-weighted">
-      {% if assignment.is_exam and (assignment.weighted_mark is none or assignment.weighted_mark == 0) and required_exam_mark is not none %}
-        <span class="text-info font-bold" title="Target to reach goal">{{ '%.2f' % ((required_exam_mark / 100) * assignment.mark_weight) }}</span>
-      {% else %}
-        {% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.weighted_mark|float) if assignment.weighted_mark is not none else '0.00' }}{% endif %}
-      {% endif %}
-    </td>
-    <td class="assignment-unweighted">
-      {% if assignment.is_exam and (assignment.unweighted_mark is none or assignment.unweighted_mark == 0) and required_exam_mark is not none %}
-        <span class="text-info font-bold" title="Target to reach goal">{{ '%.2f' % (required_exam_mark / 100) }}</span>
-      {% else %}
-        {% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}{% endif %}
-      {% endif %}
-    </td>
-    <td class="assignment-mark-weight">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.mark_weight|float) if assignment.mark_weight is not none else '0.00' }}{% endif %}%</td>
-    <td class="assignment-grade-type">{{assignment.grade_type}}</td>
-    <td class="flex gap-1">
-      <form method="post" action="/semester/{{ semester }}/subject/{{ subject.subject_code }}/assignment/{{ assignment.assessment }}/{{ year }}/delete" onsubmit="return confirm('Delete assignment?');">
-        <input type="hidden" name="year" value="{{ year }}" />
-        {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}" />{% endif %}
-        <button class="btn btn-xs btn-error" type="submit">✕</button>
-      </form>
-      <button class="btn btn-xs btn-outline" type="button" onclick="startInlineEditAssignment('{{ assignment.assessment }}','{{ subject.subject_code }}','{{ semester }}','{{ year }}')">Edit</button>
-    </td>
-  </tr>
-  {% endfor %}
-
-  <!-- end assignment loop -->
-  {% if assignments|length == 0 %}
-  <tr><td colspan="6" class="opacity-70">No assignments.</td></tr>
-  {% endif %}
-        </tbody>
-      </table>
+  <div class="mb-4 flex flex-row items-center gap-2">
+    <div class="flex-1">
+      <button class="btn btn-sm btn-primary" id="show-add-assignment-form" type="button" onclick="toggleSection('add-assignment-form', false)">Add Assignment</button>
+    </div>
+    <div class="flex-1 flex justify-end">
+      <button class="btn btn-sm btn-accent ml-auto" id="show-total-mark-form" type="button" onclick="toggleSection('add-total-mark-form')">Add Total Mark</button>
     </div>
   </div>
-  <div id="panel-summary" class="hidden">
-    <div class="overflow-x-auto p-2">
-      <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
-        <thead>
-          <tr>
-            <th>Subject Title</th>
-            <th>Assignment Mark</th>
-            <th>Unweighted Mark</th>
-            <th>Assessment Weight</th>
-            {% if subject.has_exam %}
-              <th>Exam Contribution</th>
-              <th>Final Exam Mark Weight{% if ps_exam %} (PS Factor Applied){% endif %}</th>
-            {% else %}
-              <th hidden>Exam Contribution</th>
-              <th hidden>Final Exam Mark Weight</th>
-            {% endif %}
-            <th>Total Mark</th>
-            {% if count_s %}<th>S Grades</th>{% endif %}
-            {% if count_u %}<th>U Grades</th>{% endif %}
+
+  <div class="flex flex-row gap-2 mb-6">
+    <div id="add-assignment-form-section" class="flex-1 hidden">
+      <form id="add-assignment-form" class="p-3 border border-gray-300 rounded-xl bg-base-200 space-y-2" method="post" action="/semester/{{ semester }}/subject/{{ subject.subject_code }}/assignment/create">
+        <input type="hidden" name="year" value="{{ year }}" />
+        <div>
+          <label class="block text-left text-xs font-semibold mb-1" for="assignment-title">Title</label>
+          <input id="assignment-title" name="assessment" class="input input-xs w-full" placeholder="Assignment title" required />
+        </div>
+        <div>
+          <label class="block text-left text-xs font-semibold mb-1" for="assignment-mark">Mark</label>
+          <input id="assignment-mark" name="weighted_mark" type="number" step="0.01" class="input input-xs w-full text-right" placeholder="Mark" required />
+        </div>
+        <div>
+          <label class="block text-left text-xs font-semibold mb-1" for="assignment-weight">Weight (%)</label>
+          <input id="assignment-weight" name="mark_weight" type="number" step="0.01" min="0" max="100" class="input input-xs w-full text-right" placeholder="Weight (e.g. 20)" required />
+        </div>
+        <div class="flex gap-2 mt-2">
+          <button type="submit" class="btn btn-xs btn-success">Save</button>
+          <button type="button" class="btn btn-xs" onclick="toggleSection('add-assignment-form', true)">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="add-total-mark-form-section" class="flex-1 hidden">
+      {% if subject.has_exam %}
+        <div class="mb-2 p-2 rounded bg-base-100 border border-info text-xs text-left">
+          <div><strong>Current Exam Weight:</strong> {{ '%.2f' % final_exam_mark_weight if final_exam_mark_weight is defined else '-' }}%</div>
+          <div><strong>PS Exam:</strong> {{ 'Yes' if ps_exam else 'No' }}</div>
+          <div><strong>PS Factor:</strong> {{ ps_factor if ps_factor is defined else '40' }}</div>
+        </div>
+      {% endif %}
+      <form id="add-total-mark-form" class="p-3 border border-gray-300 rounded-xl bg-base-200 space-y-2" method="post" action="/semester/{{ semester }}/subject/{{ subject.subject_code }}/totalMark/save">
+        <input type="hidden" name="year" value="{{ year }}" />
+        <div>
+          <label class="block text-left text-xs font-semibold mb-1" for="total-mark">Total Mark (0-100)</label>
+          <input id="total-mark" name="total_mark" type="number" step="0.01" min="0" max="100" class="input input-xs w-full text-right" placeholder="Total Mark (0-100)" required />
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-xs font-semibold" for="ps-exam-toggle">PS Exam?</label>
+          <input type="checkbox" name="ps_exam" id="ps-exam-toggle" value="true" class="checkbox checkbox-xs" />
+        </div>
+        <div>
+          <label class="block text-left text-xs font-semibold mb-1" for="ps-factor-input">PS Factor (default 40)</label>
+          <input name="ps_factor" id="ps-factor-input" type="number" step="0.01" min="0" max="100" class="input input-xs w-full text-right" placeholder="PS Factor (default 40)" disabled />
+        </div>
+        <div class="flex gap-2 mt-2">
+          <button type="submit" class="btn btn-xs btn-success">Save</button>
+          <button type="button" class="btn btn-xs" onclick="toggleSection('add-total-mark-form', true)">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="mt-8">
+    <div class="tabs tabs-boxed w-full mb-4" style="position:sticky;top:0;z-index:10;background:inherit;">
+      <a class="tab tab-sm tab-active" id="tab-assignments" onclick="showTab('assignments')">Assignments</a>
+      <a class="tab tab-sm" id="tab-summary" onclick="showTab('summary')">Summary</a>
+    </div>
+
+    <div id="panel-assignments">
+      <div class="overflow-x-auto mb-6">
+        <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Mark</th>
+              <th>Raw</th>
+              <th>Weight</th>
+              <th>Type</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+         <tbody>
+          {% for assignment in assignments %}
+          <tr id="assignment-row-{{ loop.index }}" class="assignment-row">
+            <td class="assignment-title">{{ assignment.assessment }}</td>
+            <td class="assignment-mark">
+              {% if assignment.grade_type in ['S','U'] %}
+                {{ assignment.grade_type }}
+              {% else %}
+                {{ '%.2f' % (assignment.weighted_mark|float) if assignment.weighted_mark is not none else '0.00' }}
+              {% endif %}
+            </td>
+            <td class="assignment-raw">
+              {% if assignment.grade_type in ['S','U'] %}
+                -
+              {% else %}
+                {{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}
+              {% endif %}
+            </td>
+            <td class="assignment-weight">
+              {% if assignment.grade_type in ['S','U'] %}
+                -
+              {% else %}
+                {{ '%.2f' % (assignment.mark_weight|float) if assignment.mark_weight is not none else '0.00' }}
+              {% endif %}%
+            </td>
+            <td class="assignment-type">{{ assignment.grade_type }}</td> <!-- Add this line -->
+            <td class="flex gap-1">
+              <form method="post" action="/semester/{{ semester }}/subject/{{ subject.subject_code }}/assignment/{{ assignment.assessment }}/{{ year }}/delete" style="display:inline;" onsubmit="return confirm('Delete this assignment?');">
+                <input type="hidden" name="year" value="{{ year }}" />
+                <button class="btn btn-xs btn-error" type="submit">✕</button>
+              </form>
+              <button
+                type="button"
+                class="btn btn-xs btn-outline edit-assignment-btn"
+                data-index="{{ loop.index }}"
+                data-assessment="{{ assignment.assessment }}"
+                data-mark="{{ assignment.weighted_mark }}"
+                data-weight="{{ assignment.mark_weight }}"
+              >Edit</button>
+           </td>
           </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>{{ subject.subject_name }}</td>
-            <td>{{ '%.2f' % assignment_weighted_sum }}</td>
-            <td>{% if assignment_unweighted_sum is defined %}{{ '%.2f' % assignment_unweighted_sum }}{%else %}0{% endif %}</td>
-            <td>{{ '%.0f' % assignment_weight_percent }}%</td>
-            {% if subject.has_exam %}
-              <td>
-                {{ '%.2f' % exam_weighted_sum if exam_weighted_sum is not none else '-' }}
-              </td>
-              <td>{{ '%.0f' % final_exam_mark_weight }}%</td>
-            {% endif %}
-            <td>{{ '%.0f' % subject.total_mark if subject.total_mark is not none else '-' }}</td>
-            {% if count_s %}<td>{{ count_s }}</td>{% endif %}
-            {% if count_u %}<td>{{ count_u }}</td>{% endif %}
-          </tr>
+          {% endfor %}
+          {% if assignments|length == 0 %}
+          <tr><td colspan="6" class="opacity-70 text-center">No assignments.</td></tr>
+          {% endif %}
         </tbody>
-      </table>
+     </table>
+    </div>
+  </div>
+
+    <div id="panel-summary" class="hidden">
+      <div class="overflow-x-auto p-2">
+        <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
+          <thead>
+            <tr>
+              <th>Subject Title</th>
+              <th>Assignment Mark</th>
+              <th>Unweighted Mark</th>
+              <th>Assessment Weight</th>
+              {% if subject.has_exam %}
+                <th>Exam Contribution</th>
+                <th>Final Exam Mark Weight{% if ps_exam %} (PS Factor Applied){% endif %}</th>
+              {% endif %}
+              <th>Total Mark</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{{ subject.subject_name }}</td>
+              <td>{{ '%.2f' % assignment_weighted_sum }}</td>
+              <td>{{ '%.2f' % assignment_unweighted_sum if assignment_unweighted_sum is defined else '0.00' }}</td>
+              <td>{{ '%.0f' % assignment_weight_percent }}%</td>
+              {% if subject.has_exam %}
+                <td>{{ '%.2f' % exam_weighted_sum if exam_weighted_sum is not none else '-' }}</td>
+                <td>{{ '%.0f' % final_exam_mark_weight }}%</td>
+              {% endif %}
+              <td>{{ '%.0f' % subject.total_mark if subject.total_mark is not none else '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
+
 <script>
-  window.subjectBasePath = '/semester/{{semester}}/subject/{{subject.subject_code}}';
-  window.subjectYear = '{{year}}';
-  console.log('subject.total_mark:', "{{ subject.total_mark }}");
-  // Tab switching logic for Assignments/Summary
-  function showTab(tab) {
-    const assignmentsPanel = document.getElementById('panel-assignments');
-    const summaryPanel = document.getElementById('panel-summary');
-    const tabAssignments = document.getElementById('tab-assignments');
-    const tabSummary = document.getElementById('tab-summary');
-    if (tab === 'assignments') {
-      assignmentsPanel.classList.remove('hidden');
-      summaryPanel.classList.add('hidden');
-      tabAssignments.classList.add('tab-active');
-      tabSummary.classList.remove('tab-active');
-    } else {
-      assignmentsPanel.classList.add('hidden');
-      summaryPanel.classList.remove('hidden');
-      tabAssignments.classList.remove('tab-active');
-      tabSummary.classList.add('tab-active');
+// Shared global variables for JS logic
+window.subjectYear = "{{ year }}";
+window.subjectSemester = "{{ semester }}";
+window.subjectCode = "{{ subject.subject_code }}";
+
+function toggleSection(formId, hideOnly) {
+  const section = document.getElementById(formId + '-section');
+  if (section) {
+    if (hideOnly) { section.classList.add('hidden'); }
+    else {
+      section.classList.toggle('hidden');
+      if (formId === 'add-total-mark-form' && !section.classList.contains('hidden')) {
+        updatePsFactorState();
+      }
     }
   }
-</script>
-{% endblock %}
-<script src="/static/js/subject_page.js"></script>
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    var saveForm = document.querySelector('form[action*="totalMark/save"]');
-    var psExamToggle = document.getElementById('ps-exam-toggle');
-    var psFactorInput = saveForm ? saveForm.querySelector('input[name="ps_factor"]') : null;
-    if (psExamToggle && psFactorInput) {
-      function updatePsFactorState() {
-        psFactorInput.disabled = !psExamToggle.checked;
+}
+
+function updatePsFactorState() {
+  var psExamToggle = document.getElementById('ps-exam-toggle');
+  var psFactorInput = document.getElementById('ps-factor-input');
+  if (psExamToggle && psFactorInput) {
+    psFactorInput.disabled = !psExamToggle.checked;
+  }
+}
+
+function showTab(tab) {
+  const assignmentsPanel = document.getElementById('panel-assignments');
+  const summaryPanel = document.getElementById('panel-summary');
+  const tabAssignments = document.getElementById('tab-assignments');
+  const tabSummary = document.getElementById('tab-summary');
+  if (tab === 'assignments') {
+    assignmentsPanel.classList.remove('hidden');
+    summaryPanel.classList.add('hidden');
+    tabAssignments.classList.add('tab-active');
+    tabSummary.classList.remove('tab-active');
+  } else {
+    assignmentsPanel.classList.add('hidden');
+    summaryPanel.classList.remove('hidden');
+    tabAssignments.classList.remove('tab-active');
+    tabSummary.classList.add('tab-active');
+  }
+}
+
+// --- Inline edit for assignments ---
+
+let currentEditRow = null;
+
+// Escape HTML special characters for safety
+function escapeHtml(str) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/`/g, '&#96;')
+            .replace(/\\/g, '\\\\');
+}
+
+function startInlineEditAssignment(index, assessment, mark, weight) {
+  if (currentEditRow !== null) cancelInlineEditAssignment();
+
+  const rowId = 'assignment-row-' + index;
+  const row = document.getElementById(rowId);
+  if (!row) return;
+
+  currentEditRow = rowId;
+  row.dataset.originalHtml = row.innerHTML;
+  row.classList.add('editing-row');
+
+  // Use escapeHtml for all values
+  const safeAssessment = escapeHtml(assessment);
+  const safeMark = escapeHtml(mark);
+  const safeWeight = escapeHtml(weight);
+
+  // Use the correct backend URL!
+  row.innerHTML = `
+    <div>
+      <label class="block text-left text-xs font-semibold mb-1" for="assignment-title">Title</label>
+      <input id="assignment-title" name="assessment" class="input input-xs w-full" placeholder="Assignment title" required />
+    </div>
+    <td>
+      <input name="weighted_mark" type="number" step="0.01" class="input input-xs w-full text-right" value="${safeMark}" required />
+    </td>
+    <td></td>
+    <td>
+      <input name="mark_weight" type="number" step="0.01" min="0" max="100" class="input input-xs w-full text-right" value="${safeWeight}" required />
+    </td>
+    <td class="flex gap-1">
+      <button type="button" class="btn btn-xs btn-success" onclick="submitInlineEditAssignmentRow('${assessment}', '${window.subjectCode}', '${window.subjectSemester}', '${window.subjectYear}')">Save</button>
+      <button type="button" class="btn btn-xs" onclick="cancelInlineEditAssignment()">Cancel</button>
+    </td>
+  `;
+}
+
+function cancelInlineEditAssignment() {
+  if (currentEditRow === null) return;
+  const row = document.getElementById(currentEditRow);
+  if (row && row.dataset.originalHtml) {
+    row.innerHTML = row.dataset.originalHtml;
+    delete row.dataset.originalHtml;
+    row.classList.remove('editing-row');
+  }
+  currentEditRow = null;
+}
+
+window.submitInlineEditAssignmentRow = function(assessment, code, semester, year) {
+  const row = document.querySelector('.editing-row');
+  if (!row) return;
+  const formData = new FormData();
+
+  formData.append('new_assessment', row.querySelector('[name="new_assessment"]').value);
+  formData.append('weighted_mark', row.querySelector('[name="weighted_mark"]').value);
+  formData.append('mark_weight', row.querySelector('[name="mark_weight"]').value);
+
+  // Use the correct backend URL!
+  const updateUrl = `/semester/${encodeURIComponent(semester)}/subject/${encodeURIComponent(code)}/assignment/${encodeURIComponent(assessment)}/${encodeURIComponent(year)}/update`;
+
+  fetch(updateUrl, {
+    method: 'POST',
+    body: formData
+  })
+  .then(r => r.json())
+  .then(result => {
+    if (result.success) {
+      if (result.reload_url) {
+        window.location.href = result.reload_url;
+      } else if (result.row_html) {
+        row.innerHTML = result.row_html;
+        row.classList.remove('editing-row');
+        currentEditRow = null;
       }
-      psExamToggle.addEventListener('change', updatePsFactorState);
-      updatePsFactorState();
-    }
-    if (saveForm) {
-      saveForm.addEventListener('submit', function(event) {
-        event.preventDefault();
-        var formData = new FormData(saveForm);
-        fetch(saveForm.action, {
-          method: 'POST',
-          body: formData,
-          headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        })
-        .then(r => r.json())
-        .then(data => {
-          if (data.success) {
-            window.location.reload(); // Automatically refresh page
-          }
-        });
-      });
-      var resetBtn = document.getElementById('reset-total-btn');
-        var confirmResetBtn = document.getElementById('confirm-reset-btn');
-        if (confirmResetBtn) {
-          confirmResetBtn.addEventListener('click', function() {
-            if (!confirm('Are you sure you want to reset the saved total mark for this subject? This will clear the stored total.')) return;
-            // POST to dedicated reset endpoint
-            var formData = new FormData();
-            formData.append('year', window.subjectYear);
-            fetch(window.subjectBasePath + '/totalMark/reset', {
-              method: 'POST',
-              body: formData,
-              headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(r => r.json())
-            .then(data => {
-              if (data.success) window.location.reload();
-            });
-          });
-        }
+    } else {
+      alert(result.error || "Failed to update assignment.");
     }
   });
-// Functions are now defined in subject_page.js - no need to override them here
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Delegate click event for edit buttons
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.edit-assignment-btn');
+    if (btn) {
+      startInlineEditAssignment(
+        btn.dataset.index,
+        btn.dataset.assessment,
+        btn.dataset.mark,
+        btn.dataset.weight
+      );
+    }
+  });
+
+  var psExamToggle = document.getElementById('ps-exam-toggle');
+  if (psExamToggle) {
+    psExamToggle.addEventListener('change', updatePsFactorState);
+  }
+  updatePsFactorState();
+});
 </script>
+{% endblock %}

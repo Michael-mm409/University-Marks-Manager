@@ -90,40 +90,23 @@
   <table class="table w-full">
     <thead class="text-sm opacity-70">
       <tr class="border-b border-base-300">
-        <th class="text-left p-4">Subject Title</th>
-        <th class="text-right p-4">Assessment Mark</th>
-        <th class="text-right p-4">Unweighted Mark</th>
-        <th class="text-right p-4">Assessment Weight</th>
-        {% set show_exam = subject_summaries|selectattr('has_exam')|list|length > 0 %}
-        {% if show_exam %}
-          <th class="text-right p-4">Exam Contribution</th>
-          <th class="text-right p-4">Final Exam Weight</th>
-        {% endif %}
-        <th class="text-right p-4 font-bold">Total Mark</th>
-        <th class="text-right p-4" hidden></th>
+        <th class="text-left p-4">Code</th>
+        <th class="text-left p-4" style="white-space:normal;word-break:break-word;">Name</th>
+        <th class="text-right p-4">Mark</th>
+        <th class="text-right p-4">Raw</th>
+        <th class="text-right p-4">Weight</th>
+        <th class="text-right p-4 font-bold">Total</th>
+        <th class="text-right p-4"></th>
       </tr>
     </thead>
     <tbody>
       {% for row in subject_summaries %}
       <tr class="hover:bg-base-200/50 border-b border-base-300/50">
-        <td class="p-4 font-mono">
-          {{row.code}}
-          {% if row.sync_subject %}
-            <span class="badge badge-info ml-1" title="Synchronized subject">Sync</span>
-          {% endif %}
-        </td>
+        <td class="p-4 font-mono">{{ row.code }}</td>
+        <td class="p-4" style="white-space:normal;word-break:break-word;">{{ row.name }}</td>
         <td class="p-4 text-right">{{ '%.2f' % row.assessment_mark if row.assessment_mark is not none else '-' }}</td>
         <td class="p-4 text-right">{% if row.assessment_unweighted is defined and row.assessment_unweighted is not none %}{{ '%.2f' % row.assessment_unweighted }}{% else %}-{% endif %}</td>
         <td class="p-4 text-right">{{ '%.0f' % row.assessment_weight if row.assessment_weight is not none else '-' }}%</td>
-        {% if show_exam %}
-          {% if row.has_exam %}
-            <td class="p-4 text-right">{{ '%.2f' % row.exam_mark if row.exam_mark is not none else '0' }}</td>
-            <td class="p-4 text-right">{{ '%.0f' % row.final_exam_mark_weight if row.final_exam_mark_weight is not none else '0' }}%</td>
-          {% else %}
-            <td class="p-4 text-right" hidden>0</td>
-            <td class="p-4 text-right" hidden>0%</td>
-          {% endif %}
-        {% endif %}
         <td class="p-4 text-right font-bold">{{ '%.0f' % row.total_mark if row.total_mark is not none else '-' }}</td>
         <td class="p-4 text-right">
           <form method="post" action="/subjects/{{year}}/{{row.code}}/open" class="inline-block m-0 p-0">
