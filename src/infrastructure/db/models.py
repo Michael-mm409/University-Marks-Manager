@@ -110,6 +110,7 @@ class Examination(SQLModel, table=True):
     subject_id: int = Field(foreign_key="subjects.id", index=True, unique=True)
     exam_mark: float = 0
     exam_weight: float = 100
+    exam_type: str = Field(default="main", max_length=32, description="Type of exam, e.g., 'assignment', 'main', etc.")
 
 class ExamSettings(SQLModel, table=True):
     __tablename__: ClassVar[str] = "exam_settings"

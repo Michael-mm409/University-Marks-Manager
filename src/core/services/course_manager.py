@@ -40,12 +40,12 @@ class CourseManager:
         return course
 
     def get_all_courses(self) -> list[Course]:
-        """Retrieve all courses from the database.
-
-        Returns:
-            A list of all Course objects.
-        """
-        statement = select(Course)
+        """Retrieve all courses from the database, with related university and grading_scale."""
+        from sqlalchemy.orm import selectinload
+        statement = select(Course).options(
+            selectinload(Course.university),
+            selectinload(Course.grading_scale)
+        )
         results = self.session.exec(statement).all()
         return list(results)
 

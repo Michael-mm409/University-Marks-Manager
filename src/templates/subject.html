@@ -3,36 +3,8 @@
 {% set breadcrumbs = [
   {'label': year, 'url': '/year/' ~ year},
   {'label': semester, 'url': '/year/' ~ year ~ '/semester/' ~ semester},
-  {'label': subject.subject_code, 'url': None}
 ] %}
 {% block content %}
-<style>
-  /* Small helper to show a tidy chevron for collapsibles */
-  .chev { width: 16px; height: 16px; opacity: 0.7; transition: transform 0.2s ease; }
-  .collapse > input[type="checkbox"]:checked + .collapse-title .chev { transform: rotate(180deg); }
-
-  /* Desktop layout */
-  .form-panels { display: grid; gap: 1.5rem; }
-  @media (min-width: 768px) {
-    .form-panels { grid-template-columns: 1fr 1fr; }
-  }
-
-  /* Center title and position chevron */
-  .collapse-title {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* Remove font and spacing overrides so .add-subject-title and others work */
-  }
-  .custom-chevron {
-    position: absolute;
-    right: 1rem; /* Position chevron to the right */
-  }
-
-  /* Hide the checkbox toggle visually but keep it functional */
-  .collapse > input[type="checkbox"].sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-</style>
 <div class="flex flex-col items-center text-center gap-3 md:gap-4 mb-8">
   <h2 class="subject-title flex items-center gap-3 justify-center">
     <span id="subject-code-display">{{subject.subject_code}}</span>
@@ -47,6 +19,10 @@
       <label class="flex items-center gap-1">
         <span class="text-xs">Has Exam?</span>
         <input type="checkbox" name="has_exam" value="true" {% if subject.has_exam %}checked{% endif %} class="checkbox checkbox-xs" />
+      </label>
+      <label class="flex items-center gap-1">
+        <span class="text-xs">Sync Subject?</span>
+        <input type="checkbox" name="sync_subject" value="true" {% if subject.sync_subject %}checked{% endif %} class="checkbox checkbox-xs" />
       </label>
     <button type="submit" class="btn btn-xs btn-primary shrink-0">Save</button>
     <button type="button" class="btn btn-xs shrink-0" onclick="hideSubjectEditForm()">Cancel</button>
@@ -65,120 +41,6 @@
       {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}" />{% endif %}
       <button class="btn btn-xs btn-error" type="submit">Delete Subject</button>
     </form>
-  </div>
-</div>
-
-<div class="form-panels mb-8">
-  <!-- Add Assignment (collapsible) -->
-  <div class="collapse bg-base-100 rounded-xl shadow card-glow">
-    <input id="toggle-add" type="checkbox" class="sr-only" />
-    <label for="toggle-add" class="collapse-title cursor-pointer border-b border-base-300 pb-2">
-      <span class="flex items-center gap-2">
-        <span class="section-card-title">Add Assignment</span> <span class="badge badge-outline badge-sm">{{ assignments|length }} existing</span>
-      </span>
-      <svg class="custom-chevron chev" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.5a1 1 0 0 1-.71-.29l-7-7a1 1 0 1 1 1.42-1.42L12 13.09l6.29-6.3a1 1 0 1 1 1.42 1.42l-7 7a1 1 0 0 1-.71.29z"/></svg>
-    </label>
-    <div class="collapse-content">
-      {% if error_messages and error_messages|length %}
-        <div class="alert alert-error mb-4 text-sm relative" id="error-alert">
-          <button type="button" class="btn btn-xs btn-circle absolute right-2 top-2" onclick="document.getElementById('error-alert').style.display='none'">✕</button>
-          <ul class="list-disc ml-4">
-            {% for err in error_messages %}<li>{{ err }}</li>{% endfor %}
-          </ul>
-        </div>
-      {% endif %}
-      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/create" class="grid grid-cols-1 md:grid-cols-12 gap-3 text-sm">
-        <input type="hidden" name="year" value="{{year}}" />
-        {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}" />{% endif %}
-        {% if final_total is not none %}<input type="hidden" name="total_mark" value="{{ final_total }}" />{% endif %}
-        {% if effective_exam_weight %}<input type="hidden" name="exam_weight" value="{{ effective_exam_weight }}" />{% endif %}
-        {% if ps_exam %}<input type="hidden" name="ps_exam" value="true" />{% endif %}
-        {% if ps_exam and ps_factor %}<input type="hidden" name="ps_factor" value="{{ ps_factor }}" />{% endif %}
-        <input name="assessment" placeholder="Assignment" class="input input-bordered input-xs col-span-1 md:col-span-4" required />
-        <input id="weighted_mark_input" name="weighted_mark" type="number" step="any" min="0" placeholder="Weighted mark" class="input input-bordered input-xs col-span-1 md:col-span-2" />
-        <input id="mark_weight_input" name="mark_weight" type="number" step="any" min="0" placeholder="Mark weight" class="input input-bordered input-xs col-span-1 md:col-span-2" />
-        <select id="grade_type_select" name="grade_type" class="select select-bordered select-xs col-span-1 md:col-span-2">
-          <option value="numeric">Numeric</option>
-          <option value="S">S</option>
-          <option value="U">U</option>
-        </select>
-        <div class="col-span-1 md:col-span-2 flex items-center">
-            <label class="cursor-pointer label p-0">
-                <span class="label-text text-xs mr-2">Is Exam?</span>
-                <input type="checkbox" name="is_exam" value="true" class="checkbox checkbox-xs" />
-            </label>
-        </div>
-        <button class="btn btn-xs btn-primary col-span-1 md:col-span-2" type="submit">Add</button>
-      </form>
-      {% if error_messages and error_messages|length %}
-      <script>
-        // Auto-open the Add Assignment panel when there are errors
-        (function(){
-          const cb = document.getElementById('toggle-add');
-          if (cb) cb.checked = true;
-        })();
-      </script>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- Total Mark (collapsible) -->
-  <div class="collapse bg-base-100 rounded-xl shadow card-glow">
-    <input id="toggle-total" type="checkbox" class="sr-only" />
-    <label for="toggle-total" class="collapse-title cursor-pointer border-b border-base-300 pb-2">
-      <span class="flex items-center gap-2">
-        <span class="section-card-title">Total Mark</span>
-        {% if subject.total_mark is not none and subject.total_mark != 0 %}
-          <span class="badge badge-outline badge-sm">Saved</span>
-        {% else %}
-          <span class="badge badge-outline badge-sm">Not Saved Yet</span>
-        {% endif %}
-      </span>
-      <svg class="custom-chevron chev" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.5a1 1 0 0 1-.71-.29l-7-7a1 1 0 1 1 1.42-1.42L12 13.09l6.29-6.3a1 1 0 1 1 1.42 1.42l-7 7a1 1 0 0 1-.71.29z"/></svg>
-    </label>
-    <div class="collapse-content">
-      {% if show_total_mark_saved and subject.total_mark is not none and subject.total_mark != 0 %}
-        <div class="alert alert-success mb-2 relative" id="success-alert">
-          <button type="button" class="btn btn-xs btn-circle absolute right-2 top-2" onclick="document.getElementById('success-alert').style.display='none'">✕</button>
-          Total mark saved successfully.
-        </div>
-      {% endif %}
-      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/totalMark/save" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-4 text-sm">
-        <input type="hidden" name="year" value="{{year}}" />
-        {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}" />{% endif %}
-        <div class="col-span-1 sm:col-span-2 md:col-span-4">
-          <label class="form-control">
-            <span class="label-text text-xs">Desired Final Total Mark</span>
-            <input name="total_mark" value="{{ final_total if final_total is not none else '' }}" placeholder="e.g. 75" class="input input-bordered input-xs" />
-          </label>
-        </div>
-        <div class="col-span-1 sm:col-span-2 md:col-span-4">
-          <label class="form-control">
-            <span class="label-text text-xs">Exam Weight (%)</span>
-            <input disabled value="{{ effective_exam_weight if effective_exam_weight else 0 }}" class="input input-bordered input-xs" />
-          </label>
-        </div>
-        <div class="col-span-1 sm:col-span-1 md:col-span-2 flex items-end">
-          <label class="form-control w-full">
-            <span class="label-text text-xs">PS Factor %</span>
-            <input name="ps_factor" value="{{ ps_factor if ps_factor is not none else '40' }}" class="input input-bordered input-xs" {% if not ps_exam %}disabled{% endif %} />
-          </label>
-        </div>
-        <div class="col-span-1 sm:col-span-1 md:col-span-2 flex items-end">
-          <label class="label cursor-pointer flex gap-2 items-center text-xs">
-            <span>PS Exam?</span>
-            <input type="checkbox" name="ps_exam" value="true" class="toggle toggle-xs" {% if ps_exam %}checked{% endif %} id="ps-exam-toggle" />
-          </label>
-        </div>
-        <div class="col-span-1 sm:col-span-2 md:col-span-4 flex items-end">
-          <div class="flex gap-2 w-full">
-            <button class="btn btn-xs btn-secondary w-full" type="submit">Save Total Mark</button>
-            <button id="confirm-reset-btn" class="btn btn-xs btn-ghost" type="button">Confirm Reset</button>
-          </div>
-        </div>
-      </form>
-      <p class="mt-2 text-xs opacity-70">Provide a desired overall final %; the system derives and stores the weighted exam contribution based on the required raw exam %. Exam weight is automatically set to the remaining percentage after assignments (or retained if already created).{% if ps_exam %} PS mode: you must score at least {{ ps_factor if ps_factor is not none else 40 }}% raw on the exam to pass (the exam weight is unchanged).{% endif %}</p>
-    </div>
   </div>
 </div>
 
@@ -251,9 +113,15 @@
           <tr>
             <th>Subject Title</th>
             <th>Assignment Mark</th>
+            <th>Unweighted Mark</th>
             <th>Assessment Weight</th>
-            <th>Exam Contribution</th>
-            <th>Final Exam Mark Weight{% if ps_exam %} (PS Factor Applied){% endif %}</th>
+            {% if subject.has_exam %}
+              <th>Exam Contribution</th>
+              <th>Final Exam Mark Weight{% if ps_exam %} (PS Factor Applied){% endif %}</th>
+            {% else %}
+              <th hidden>Exam Contribution</th>
+              <th hidden>Final Exam Mark Weight</th>
+            {% endif %}
             <th>Total Mark</th>
             {% if count_s %}<th>S Grades</th>{% endif %}
             {% if count_u %}<th>U Grades</th>{% endif %}
@@ -263,11 +131,14 @@
           <tr>
             <td>{{ subject.subject_name }}</td>
             <td>{{ '%.2f' % assignment_weighted_sum }}</td>
+            <td>{% if assignment_unweighted_sum is defined %}{{ '%.2f' % assignment_unweighted_sum }}{%else %}0{% endif %}</td>
             <td>{{ '%.0f' % assignment_weight_percent }}%</td>
-            <td>
-              {{ '%.2f' % exam_weighted_sum if exam_weighted_sum is not none else '-' }}
-            </td>
-            <td>{{ '%.0f' % final_exam_mark_weight }}%</td>
+            {% if subject.has_exam %}
+              <td>
+                {{ '%.2f' % exam_weighted_sum if exam_weighted_sum is not none else '-' }}
+              </td>
+              <td>{{ '%.0f' % final_exam_mark_weight }}%</td>
+            {% endif %}
             <td>{{ '%.0f' % subject.total_mark if subject.total_mark is not none else '-' }}</td>
             {% if count_s %}<td>{{ count_s }}</td>{% endif %}
             {% if count_u %}<td>{{ count_u }}</td>{% endif %}
@@ -281,7 +152,26 @@
   window.subjectBasePath = '/semester/{{semester}}/subject/{{subject.subject_code}}';
   window.subjectYear = '{{year}}';
   console.log('subject.total_mark:', "{{ subject.total_mark }}");
+  // Tab switching logic for Assignments/Summary
+  function showTab(tab) {
+    const assignmentsPanel = document.getElementById('panel-assignments');
+    const summaryPanel = document.getElementById('panel-summary');
+    const tabAssignments = document.getElementById('tab-assignments');
+    const tabSummary = document.getElementById('tab-summary');
+    if (tab === 'assignments') {
+      assignmentsPanel.classList.remove('hidden');
+      summaryPanel.classList.add('hidden');
+      tabAssignments.classList.add('tab-active');
+      tabSummary.classList.remove('tab-active');
+    } else {
+      assignmentsPanel.classList.add('hidden');
+      summaryPanel.classList.remove('hidden');
+      tabAssignments.classList.remove('tab-active');
+      tabSummary.classList.add('tab-active');
+    }
+  }
 </script>
+{% endblock %}
 <script src="/static/js/subject_page.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
@@ -334,4 +224,3 @@
   });
 // Functions are now defined in subject_page.js - no need to override them here
 </script>
-{% endblock %}

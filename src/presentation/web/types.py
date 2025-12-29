@@ -45,6 +45,7 @@ class SemesterSummary(TypedDict):
     ps_factor: Optional[float]
     total_mark: Optional[float]
     is_exam_required: bool
+    has_exam: bool
     sync_subject: bool
 
 

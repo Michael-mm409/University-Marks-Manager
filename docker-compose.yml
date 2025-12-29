@@ -45,7 +45,6 @@ services:
         condition: service_healthy
 
   db:
-    platform: linux/arm64
     container_name: marks-manager-db
     image: postgres:16
     restart: unless-stopped

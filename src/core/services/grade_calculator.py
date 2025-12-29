@@ -22,7 +22,7 @@ class GradeCalculator:
         return query
 
     def _get_grade_scales(self, course_id: int | None = None) -> list[GradeScale]:
-        """Get grade scales for the course, seeding defaults if empty."""
+        """Get grade scales for the course, seeding defaults if empty. Only use band_type='both'."""
         scale_id = None
         if course_id:
             course = self.session.get(Course, course_id)
@@ -30,19 +30,23 @@ class GradeCalculator:
                 scale_id = course.grading_scale_id
 
         if scale_id:
-            scales = self.session.exec(select(GradeScale).where(GradeScale.id == scale_id)).all()
+            scales = self.session.exec(
+                select(GradeScale).where(GradeScale.id == scale_id, GradeScale.band_type == "both")
+            ).all()
         else:
-            scales = self.session.exec(select(GradeScale).where(GradeScale.scale_name == "Standard")).all()
+            scales = self.session.exec(
+                select(GradeScale).where(GradeScale.scale_name == "Standard", GradeScale.band_type == "both")
+            ).all()
 
         if not scales:
             # Seed defaults for Standard scale if missing
             defaults = [
-                GradeScale(scale_name="Standard", grade="HD", label="High Distinction", min_mark=85.0, gpa_point=4.0),
-                GradeScale(scale_name="Standard", grade="D", label="Distinction", min_mark=75.0, gpa_point=3.7),
-                GradeScale(scale_name="Standard", grade="C", label="Credit", min_mark=65.0, gpa_point=3.3),
-                GradeScale(scale_name="Standard", grade="P", label="Pass", min_mark=50.01, gpa_point=2.0),
-                GradeScale(scale_name="Standard", grade="PS", label="Pass Supplementary", min_mark=50.0, gpa_point=2.0),
-                GradeScale(scale_name="Standard", grade="F", label="Fail", min_mark=0.0, gpa_point=0.0),
+                GradeScale(scale_name="Standard", grade="HD", label="High Distinction", min_mark=85.0, gpa_point=4.0, band_type="both"),
+                GradeScale(scale_name="Standard", grade="D", label="Distinction", min_mark=75.0, gpa_point=3.7, band_type="both"),
+                GradeScale(scale_name="Standard", grade="C", label="Credit", min_mark=65.0, gpa_point=3.3, band_type="both"),
+                GradeScale(scale_name="Standard", grade="P", label="Pass", min_mark=50.01, gpa_point=2.0, band_type="both"),
+                GradeScale(scale_name="Standard", grade="PS", label="Pass Supplementary", min_mark=50.0, gpa_point=2.0, band_type="both"),
+                GradeScale(scale_name="Standard", grade="F", label="Fail", min_mark=0.0, gpa_point=0.0, band_type="both"),
             ]
             for d in defaults:
                 self.session.add(d)
@@ -50,7 +54,12 @@ class GradeCalculator:
             scales = defaults
 
         # Sort by min_mark descending for evaluation logic
-        return sorted(scales, key=lambda x: x.min_mark, reverse=True)
+        sorted_scales = sorted(scales, key=lambda x: x.min_mark, reverse=True)
+        # Debug output
+        print("[GRADE_CALCULATOR] Using grade scales for GPA:")
+        for s in sorted_scales:
+            print(f"  Grade: {s.grade}, min_mark: {s.min_mark}, gpa_point: {s.gpa_point}, band_type: {s.band_type}")
+        return sorted_scales
 
     def calculate_wam(self, course_id: int | None = None) -> float | None:
         """
@@ -114,6 +123,7 @@ class GradeCalculator:
         GPA = Sum(GradePoints * CreditPoints) / Sum(CreditPoints)
         Uses GradeScale from DB.
         """
+        print(f"[GRADE_CALCULATOR] Calculating GPA for course_id={course_id}")
         scales = self._get_grade_scales(course_id)
         base_query = self._build_base_query(course_id)
         
@@ -132,6 +142,20 @@ class GradeCalculator:
             )
         ).first()
         
+        # Debug: Print each subject's mark, credit points, and assigned GPA point
+        print("[GRADE_CALCULATOR] GPA subject breakdown (course_id={}):".format(course_id))
+        subjects = self.session.exec(base_query).all()
+        for subj in subjects:
+            mark = subj.total_mark
+            cp = subj.credit_points
+            course = getattr(subj, 'semester', None)
+            course_id_dbg = getattr(course, 'course_id', None) if course else None
+            assigned_gpa = 0.0
+            for scale in scales:
+                if mark is not None and mark >= scale.min_mark:
+                    assigned_gpa = scale.gpa_point
+                    break
+            print(f"  Subject: {subj.subject_code}, Mark: {mark}, Credit Points: {cp}, GPA Point: {assigned_gpa}, Subject Course ID: {course_id_dbg}")
         if result is None or result[1] is None or result[1] == 0:
             return None
         

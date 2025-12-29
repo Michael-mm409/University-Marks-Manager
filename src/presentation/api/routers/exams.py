@@ -32,6 +32,7 @@ def list_exams(
     """
     # Prefer normalized filtering when subject_id provided
     if subject_id is not None:
+        # Optionally filter by exam_type if provided in query params (future extension)
         return session.exec(select(Examination).where(Examination.subject_id == subject_id)).all()
     # Legacy: composite provided
     if subject_code and semester_name and year:
@@ -87,9 +88,15 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
         sid = getattr(subj, "id", None)
         if sid is None:
             raise HTTPException(status_code=404, detail="subject not found")
-    existing = session.exec(select(Examination).where(Examination.subject_id == sid)).first()
-    if existing:
-        raise HTTPException(status_code=409, detail="Exam already exists for subject")
+    # Allow multiple exams per subject, but only one per type (optional: enforce uniqueness per (subject_id, exam_type))
+    if data.exam_type:
+        existing = session.exec(select(Examination).where(
+            (Examination.subject_id == sid) & (Examination.exam_type == data.exam_type)
+        )).first()
+        if existing:
+            raise HTTPException(status_code=409, detail=f"Exam of type '{data.exam_type}' already exists for subject")
+    else:
+        existing = None
 
     # infer exam_weight if needed from remaining weight after assignments
     if not data.exam_weight:
@@ -110,6 +117,9 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
     # Exclude None values so SQLModel will use the model defaults for non-optional fields
     payload = data.model_dump(exclude_none=True, exclude={"id"})
     payload["subject_id"] = sid
+    # Ensure exam_type is set
+    if "exam_type" not in payload or not payload["exam_type"]:
+        payload["exam_type"] = "main"
     exam = Examination(**payload)
     session.add(exam)
     session.commit()

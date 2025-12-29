@@ -53,13 +53,14 @@ def save_total_mark(
             url += f"&return_to={return_to}"
         return RedirectResponse(url, status_code=303)
     
-    # Fetch existing exam (single allowed)
+    # Fetch existing exam of type 'main' (default)
+    exam_type = "main"  # Could be extended to support other types from form
     existing = session.exec(
         select(Examination).where(
-            Examination.subject_id == sid
+            (Examination.subject_id == sid) & (Examination.exam_type == exam_type)
         )
     ).first()
-    logger.info(f"[DEBUG] Existing exam row: {existing}")
+    logger.info(f"[DEBUG] Existing exam row (type={exam_type}): {existing}")
 
     # Aggregate assignment weighted marks and weight percent
     assignments = session.exec(
@@ -160,6 +161,7 @@ def save_total_mark(
             subject_id=sid,
             exam_mark=mark_to_save,
             exam_weight=current_exam_weight,
+            exam_type=exam_type,
         )
         session.add(new_exam)
 

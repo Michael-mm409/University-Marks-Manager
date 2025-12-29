@@ -4,16 +4,20 @@
 
 {% block content %}
 <div class="flex flex-col gap-8">
-  <!-- Page heading -->
   <div class="flex items-center justify-between gap-4">
     <h1 class="site-title">Manage Courses</h1>
     <a href="/all" class="btn btn-sm md:btn-md btn-outline">Back to Home</a>
   </div>
 
-  <!-- Create Course Form -->
   <section class="p-6 rounded-xl bg-base-100 shadow card-glow">
     <h2 class="section-card-title text-xl">Create New Course</h2>
-    <form hx-post="/courses/" hx-target="#course-list" hx-swap="beforeend" hx-on="htmx:afterRequest: this.reset()" class="flex flex-col gap-4">
+    <form 
+      hx-post="/courses/" 
+      hx-target="#course-list" 
+      hx-swap="outerHTML" 
+      hx-on="htmx:afterRequest: this.reset(); toggleCustomScale(document.getElementById('grading_scale_id'))" 
+      class="flex flex-col gap-4"
+    >
       <div class="form-control w-full">
         <label class="label">
           <span class="label-text font-medium">Course Name</span>
@@ -46,26 +50,84 @@
         <label class="label">
           <span class="label-text font-medium">Grading Scale</span>
         </label>
-        <select name="grading_scale_id" class="select select-bordered select-sm md:select-md w-full bg-white" required>
+        <select 
+          name="grading_scale_id" 
+          id="grading_scale_id" 
+          class="select select-bordered select-sm md:select-md w-full bg-white" 
+          required 
+          onchange="toggleCustomScale(this)"
+        >
           <option value="" disabled selected>Select grading scale</option>
           {% for scale in grading_scales %}
             <option value="{{ scale.id }}">{{ scale.scale_name }}</option>
           {% endfor %}
+          <option value="other">Other (Define Custom)</option>
         </select>
+
+        <div id="custom_scale_div" class="mt-4 p-4 border border-base-300 rounded-lg bg-base-200/50" style="display: none;">
+          <div class="form-control mb-4">
+            <label class="label"><span class="label-text font-bold">Custom Scale Name</span></label>
+            <input type="text" name="custom_grading_scale" class="input input-bordered input-sm w-full" placeholder="e.g. My University Scale">
+          </div>
+          
+          <label class="label"><span class="label-text font-bold">Grade Mappings</span></label>
+          <div class="overflow-x-auto">
+            <table id="grading-scale-table" class="table table-sm w-full bg-base-100">
+              <thead>
+                <tr>
+                  <th>Grade</th>
+                  <th>Label</th>
+                  <th>Min %</th>
+                  <th>GPA</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><input type="text" name="custom_grades[]" value="HD" class="input input-xs w-16" required></td>
+                  <td><input type="text" name="custom_labels[]" value="High Distinction" class="input input-xs w-full" required></td>
+                  <td><input type="number" name="custom_min_marks[]" value="85" step="any" class="input input-xs w-16" required></td>
+                  <td><input type="number" name="custom_gpa_points[]" value="4.0" step="any" class="input input-xs w-16" required></td>
+                  <td></td>
+                </tr>
+                <tr>
+                  <td><input type="text" name="custom_grades[]" value="D" class="input input-xs w-16" required></td>
+                  <td><input type="text" name="custom_labels[]" value="Distinction" class="input input-xs w-full" required></td>
+                  <td><input type="number" name="custom_min_marks[]" value="75" step="any" class="input input-xs w-16" required></td>
+                  <td><input type="number" name="custom_gpa_points[]" value="3.0" step="any" class="input input-xs w-16" required></td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+            <button type="button" class="btn btn-xs btn-outline mt-2" onclick="addGradingScaleRow()">+ Add Grade</button>
+          </div>
+        </div>
       </div>
 
       <div class="form-control w-full">
         <label class="label">
           <span class="label-text font-medium">University</span>
         </label>
-        <select name="university_id" class="select select-bordered select-sm md:select-md w-full" required onchange="this.nextElementSibling.style.display = this.value === 'add_new' ? 'block' : 'none'">
+        <select 
+          name="university_id" 
+          id="university_id" 
+          class="select select-bordered select-sm md:select-md w-full" 
+          required 
+          onchange="toggleNewUniversity(this)"
+        >
           <option value="" disabled selected>Select university</option>
           {% for uni in universities %}
             <option value="{{ uni.id }}">{{ uni.name }}</option>
           {% endfor %}
           <option value="add_new">Add new university...</option>
         </select>
-        <input name="new_university_name" class="input input-bordered input-sm md:input-md mt-2" placeholder="Enter new university name" style="display:none;" />
+        <input 
+          id="new_university_input" 
+          name="new_university_name" 
+          class="input input-bordered input-sm md:input-md mt-2" 
+          placeholder="Enter new university name" 
+          style="display:none;" 
+        />
       </div>
 
       <div class="flex gap-2">
@@ -76,20 +138,62 @@
     </form>
   </section>
 
-  <!-- List of Courses -->
   <section class="p-6 rounded-xl bg-base-100 shadow card-glow">
     <h2 class="section-card-title text-xl">Existing Courses</h2>
-    <div id="course-list" class="flex flex-col gap-3">
-      {% if courses %}
-        {% for course in courses %}
-          {% include 'partials/course_item.html' %}
-        {% endfor %}
-      {% else %}
-        <div class="p-8 rounded-xl border-dashed border-2 text-center opacity-70">
-          No courses yet. Create your first course above.
-        </div>
-      {% endif %}
-    </div>
+    {% include 'partials/course_list.html' %}
   </section>
 </div>
+
+<script>
+function toggleCustomScale(select) {
+  const customDiv = document.getElementById('custom_scale_div');
+  const isOther = select.value === 'other';
+  
+  customDiv.style.display = isOther ? 'block' : 'none';
+  
+  // Enable/Disable inputs so HTMX only picks them up if 'Other' is selected
+  const inputs = customDiv.querySelectorAll('input');
+  inputs.forEach(input => {
+    input.disabled = !isOther;
+    if (isOther) {
+      input.setAttribute('required', '');
+    } else {
+      input.removeAttribute('required');
+    }
+  });
+}
+
+function addGradingScaleRow() {
+  const tableBody = document.querySelector('#grading-scale-table tbody');
+  const row = document.createElement('tr');
+  row.innerHTML = `
+    <td><input type="text" name="custom_grades[]" class="input input-xs w-16" required></td>
+    <td><input type="text" name="custom_labels[]" class="input input-xs w-full" required></td>
+    <td><input type="number" name="custom_min_marks[]" step="any" class="input input-xs w-16" required></td>
+    <td><input type="number" name="custom_gpa_points[]" step="any" class="input input-xs w-16" required></td>
+    <td><button type="button" class="btn btn-xs btn-ghost text-error" onclick="this.closest('tr').remove()">✕</button></td>
+  `;
+  tableBody.appendChild(row);
+}
+
+function toggleNewUniversity(select) {
+  const input = document.getElementById('new_university_input');
+  if (select.value === 'add_new') {
+    input.style.display = 'block';
+    input.disabled = false;
+    input.setAttribute('required', '');
+    input.focus();
+  } else {
+    input.style.display = 'none';
+    input.disabled = true;
+    input.removeAttribute('required');
+  }
+}
+
+// Ensure correct state on page load
+document.addEventListener('DOMContentLoaded', () => {
+  toggleCustomScale(document.getElementById('grading_scale_id'));
+  toggleNewUniversity(document.getElementById('university_id'));
+});
+</script>
 {% endblock %}

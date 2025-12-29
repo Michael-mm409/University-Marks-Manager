@@ -117,6 +117,7 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
     wam = gc.calculate_wam(cid)
     gpa = gc.calculate_gpa(cid)
     grade_counts = gc.calculate_grade_counts(cid)
+    print(f"[debug] Passing to template: gpa={gpa}, wam={wam}, course_id={cid}")
     # ...existing code...
 
     ctx: IndexContext = {
@@ -194,7 +195,19 @@ def home_year_head(request: Request, year: int, session: Session = Depends(get_s
 
 @views.get("/all", response_class=HTMLResponse)
 def home_all(request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
-    """Render the All years page."""
+    """Render the All years page, or redirect to current/first year if appropriate."""
+    sm = SemesterManager(session)
+    years = sm.get_distinct_years()
+    now_year = int(datetime.now().year)
+    selected_suffix = "?selected=1" if request.query_params.get("selected") == "1" else ""
+    if now_year in years:
+        # If current year has semesters, redirect to it
+        return cast(HTMLResponse, RedirectResponse(url=f"/year/{now_year}{selected_suffix}", status_code=303))
+    elif years:
+        # If any year exists, redirect to the first (earliest) year
+        first_year = min(years)
+        return cast(HTMLResponse, RedirectResponse(url=f"/year/{first_year}{selected_suffix}", status_code=303))
+    # No semesters at all, render the all years page (empty)
     return _render_home_body(request, session, None)
 
 

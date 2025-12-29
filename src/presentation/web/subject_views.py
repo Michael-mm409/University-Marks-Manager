@@ -19,6 +19,7 @@ def create_subject(
     subject_name: str = Form(...),
     credit_points: int = Form(6),
     has_exam: Optional[bool] = Form(False),
+    sync_subject: Optional[bool] = Form(False),
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
     """
@@ -59,6 +60,7 @@ def create_subject(
                 subject_name=subject_name,
                 credit_points=credit_points,
                 has_exam=bool(has_exam),
+                sync_subject=bool(sync_subject),
             )
         )
         session.commit()
@@ -109,6 +111,9 @@ def build_subject_context(
         )
     ).all()
 
+    # Find the 'main' exam_type examination for summary
+    main_exam = next((e for e in examinations if getattr(e, "exam_type", None) == "main"), None)
+
     assignment_weighted_sum = 0.0
     assignment_weight_percent = 0.0
     
@@ -124,9 +129,7 @@ def build_subject_context(
         elif assignment_record.grade_type == GradeType.UNSATISFACTORY.value:
             count_u += 1
 
-        if getattr(assignment_record, "is_exam", False):
-            continue
-
+        # Include all assignments (including is_exam) in the weight sum
         if (
             assignment_record.grade_type == GradeType.NUMERIC.value
             and assignment_record.weighted_mark is not None
@@ -142,18 +145,17 @@ def build_subject_context(
     exam_contribution = 0.0
     existing_exam_weight = 0.0
     
-    # Legacy exam data
-    single_exam = examinations[0] if examinations else None
+    # Use only the 'main' exam for summary (if present)
     legacy_exam_mark: Optional[float] = None
     legacy_exam_weight: float = 0.0
-
-    if single_exam:
+    single_exam = main_exam
+    if main_exam:
         try:
-            legacy_exam_mark = float(single_exam.exam_mark)
+            legacy_exam_mark = float(main_exam.exam_mark)
         except (TypeError, ValueError):
             pass
         try:
-            legacy_exam_weight = float(single_exam.exam_weight)
+            legacy_exam_weight = float(main_exam.exam_weight)
         except (TypeError, ValueError):
             pass
 
@@ -190,17 +192,21 @@ def build_subject_context(
     scaling = 1.0
     effective_scoring_exam_weight = effective_exam_weight
 
-    # Interpret Examination.exam_mark as a WEIGHTED contribution (no inference)
-    if single_exam and not exam_assignment:
-        exam_contribution = float(legacy_exam_mark or 0.0)
-        if effective_scoring_exam_weight > 0:
-            exam_raw_percent = (exam_contribution / effective_scoring_exam_weight) * 100.0
-        else:
-            exam_raw_percent = 0.0
+    # For summary: Exam Contribution = total_mark - assignment_weighted_sum
+    # Use the desired goal (total_mark/final_total/subject.total_mark) as the total mark
+    summary_total_mark = None
+    if final_total not in (None, ""):
+        summary_total_mark = float(final_total)
+    elif total_mark not in (None, ""):
+        summary_total_mark = float(total_mark)
+    elif subject.total_mark not in (None, 0, 0.0):
+        summary_total_mark = float(subject.total_mark)
+    else:
+        summary_total_mark = 100.0
 
-    # If exam_raw_percent was already set (assignment-based), compute contribution normally
-    if exam_raw_percent is not None and exam_contribution == 0.0 and effective_scoring_exam_weight > 0:
-        exam_contribution = (exam_raw_percent / 100.0) * effective_scoring_exam_weight
+    exam_contribution = summary_total_mark - assignment_weighted_sum
+    if exam_contribution < 0:
+        exam_contribution = 0.0
 
     total_weighted = assignment_weighted_sum + exam_contribution
     total_scoring_weight_percent = assignment_weight_percent + (
@@ -325,7 +331,8 @@ def update_subject(
     subject_code: str = Form(...),
     subject_name: str = Form(...),
     credit_points: int = Form(6),
-    # sync_subject removed
+    has_exam: Optional[bool] = Form(None),
+    sync_subject: Optional[bool] = Form(False),
     return_to: Optional[str] = Form(None),
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
@@ -342,11 +349,12 @@ def update_subject(
         subject.subject_code = subject_code
         subject.subject_name = subject_name
         subject.credit_points = credit_points
-        # sync_subject removed
+        subject.sync_subject = bool(sync_subject)
+        # Handle has_exam checkbox: if not present, set to False
+        subject.has_exam = bool(has_exam)
         session.add(subject)
         session.commit()
         session.refresh(subject)
-        
         # If subject code changed, we need to redirect to the new code
         new_code = subject.subject_code
     else:

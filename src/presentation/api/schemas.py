@@ -54,6 +54,7 @@ class ExaminationCreate(SQLModel, table=False):
     subject_code: Optional[str] = None
     semester_name: Optional[str] = None
     year: Optional[int] = None
+    exam_type: Optional[str] = "main"  # e.g., 'assignment', 'main', etc.
     # denormalized fields removed
 
 
@@ -62,6 +63,7 @@ class ExaminationRead(SQLModel):
     subject_id: int
     exam_mark: float
     exam_weight: float
+    exam_type: str
     # pydantic v2: enable attribute population from ORM objects
     model_config = {"from_attributes": True}  # type: ignore[assignment]
 

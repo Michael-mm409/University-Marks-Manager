@@ -102,6 +102,24 @@ def create_semester(
         return Response(content=add_card_html + section_html, media_type="text/html")
     return RedirectResponse(f"/?year={target_year}", status_code=303)
 
+@semester_router.api_route("/{semester}/edit", methods=["POST"])
+def edit_semester(
+    request: Request,
+    semester: str,
+    old_year: str = Form(...),
+    new_name: str = Form(...),
+    new_year: str = Form(...),
+    session: Session = Depends(get_session),
+) -> Response:
+    """Edit semester name and year."""
+    sem = session.exec(select(Semester).where(Semester.name == semester, Semester.year == int(old_year))).first()
+    if sem:
+        sem.name = new_name
+        sem.year = int(new_year)
+        session.commit()
+    # Redirect to the updated semester page
+    return RedirectResponse(f"/year/{new_year}/semester/{new_name}", status_code=303)
+
 
 @semester_router.api_route("/{semester}/delete", methods=["POST"])
 def delete_semester(
@@ -221,7 +239,7 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
         ).all()
         exam = session.exec(
             select(Examination).where(
-                Examination.subject_id == sid
+                (Examination.subject_id == sid) & (Examination.exam_type == "main")
             )
         ).first()
         # Fetch PS Factor settings
@@ -240,10 +258,7 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
         assess_weighted_total = 0.0
         assignment_weights = []
         for a in assignments:
-            # Skip assignment-based exam in assessment totals
-            if getattr(a, "is_exam", False):
-                continue
-
+            # Include all assignments, including those marked as is_exam
             if a.grade_type == GradeType.NUMERIC.value:
                 if a.mark_weight not in (None, ""):
                     try:
@@ -272,8 +287,8 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
             exam_weight = exam.exam_weight if exam else None
             exam_mark = exam.exam_mark if exam else None
 
-        # Track subjects missing both Examination and assignment-based exam
-        if exam is None and exam_assignment is None:
+        # Track subjects missing both Examination and assignment-based exam, unless has_exam is True
+        if exam is None and exam_assignment is None and not getattr(sub, 'has_exam', False):
             missing_exam_subjects.append(sub.subject_code)
         
         final_exam_mark_weight = exam_weight
@@ -299,6 +314,7 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
                 "total_mark": total_mark,
                 "is_exam_required": is_exam_required,
                 "sync_subject": getattr(sub, "sync_subject", False),
+                "has_exam": getattr(sub, "has_exam", False),
             }
         )
     return {
@@ -383,7 +399,8 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
     for sub in all_subjects:
             sid = getattr(sub, "id", None)
             assignments = session.exec(select(Assignment).where(Assignment.subject_id == sid).order_by(Assignment.assessment)).all()
-            exam = session.exec(select(Examination).where(Examination.subject_id == sid)).first()
+            # Only use the 'main' exam_type row for summary
+            exam = session.exec(select(Examination).where((Examination.subject_id == sid) & (Examination.exam_type == "main"))).first()
             setting = session.exec(select(ExamSettings).where(ExamSettings.subject_id == sid)).first()
             ps_exam = bool(setting.ps_exam) if setting else False
             ps_factor = setting.ps_factor if setting else 40.0
@@ -393,8 +410,7 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
             assess_weighted_total = 0.0
             assignment_weights = []
             for a in assignments:
-                if getattr(a, "is_exam", False):
-                    continue
+                # Include all assignments, including those marked as is_exam
                 if a.grade_type == GradeType.NUMERIC.value:
                     if a.mark_weight not in (None, ""):
                         try:

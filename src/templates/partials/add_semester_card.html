@@ -17,6 +17,10 @@
       <span class="label-text text-sm sm:text-base">Year</span>
       <input name="year" type="number" class="input input-bordered input-sm sm:input-md" value="{{ form_year or (selected_year or current_year) }}" min="2000" max="2100" step="1" id="add-semester-year" />
     </label>
+    <label class="form-control w-full sm:w-32 flex flex-row gap-2 items-center mt-2">
+      <span class="label-text text-sm sm:text-base">Sync Subject?</span>
+      <input type="checkbox" name="sync_subject" value="true" class="checkbox checkbox-xs" />
+    </label>
     <input type="hidden" name="return_year" value="{{ selected_year or '' }}" />
     <button class="btn btn-sm sm:btn-md btn-primary w-full sm:w-auto mt-2 sm:mt-4" type="submit">Add</button>
   </form>

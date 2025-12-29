@@ -22,6 +22,7 @@ def create_assignment(
     mark_weight: Optional[str] = Form(None),
     grade_type: str = Form("numeric"),
     is_exam: bool = Form(False),
+    exam_type: str = Form("assignment"),
     total_mark: Optional[str] = Form(None),  # propagate desired final total to trigger recompute
     return_to: Optional[str] = Form(None),
     session: Session = Depends(get_session),  # noqa: B008 - FastAPI dependency injection is intended here
@@ -119,9 +120,10 @@ def create_assignment(
 
         # If this assignment is marked as the exam, sync the Examination table immediately
         if is_exam:
+            # Use provided exam_type (default to 'assignment', can be 'main')
             exam = session.exec(
                 select(Examination).where(
-                    Examination.subject_id == subject_id,
+                    (Examination.subject_id == subject_id) & (Examination.exam_type == exam_type)
                 )
             ).first()
             exam_mark = new_assignment.weighted_mark if new_assignment.weighted_mark is not None else 0.0
@@ -135,6 +137,7 @@ def create_assignment(
                         subject_id=subject_id,
                         exam_mark=exam_mark,
                         exam_weight=exam_weight,
+                        exam_type=exam_type,
                     )
                 )
             session.commit()
@@ -318,15 +321,21 @@ def edit_assignment_form(
         return HTMLResponse("Assignment not found", status_code=404)
     # Return only <td> cells for inline editing, with a form inside the last cell
     is_exam_checked = "checked" if getattr(assignment, "is_exam", False) else ""
+    # exam_type is not a field on Assignment; default to 'assignment' for UI
+    exam_type_val = "assignment"
     return HTMLResponse(f"""
     <td>
         <input name='assessment' class='input input-xs w-24' value='{assignment.assessment}' required />
-        <div class="flex items-center mt-1">
-            <label class="cursor-pointer label p-0"><span class="label-text text-[10px] mr-1">Exam?</span><input type="checkbox" name="is_exam" value="true" class="checkbox checkbox-xs" {is_exam_checked} /></label>
+        <div class='flex items-center mt-1 gap-2'>
+            <label class='cursor-pointer label p-0'><span class='label-text text-[10px] mr-1'>Exam?</span><input type='checkbox' name='is_exam' value='true' class='checkbox checkbox-xs' {is_exam_checked} onchange="document.getElementById('edit-exam-type-select').disabled = !this.checked;" /></label>
+            <select id='edit-exam-type-select' name='exam_type' class='select select-xs' {'disabled' if not getattr(assignment, 'is_exam', False) else ''}>
+                <option value='assignment' {'selected' if exam_type_val == 'assignment' else ''}>Assignment</option>
+                <option value='main' {'selected' if exam_type_val == 'main' else ''}>Main</option>
+            </select>
         </div>
     </td>
     <td><input name='weighted_mark' type='number' step='any' min='0' class='input input-xs w-16' value='{assignment.weighted_mark if assignment.weighted_mark is not None else ''}' placeholder='Weighted mark' /></td>
-    <td class='assignment-unweighted'><input name='unweighted_mark' type='text' class='input input-xs w-16' value="{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.unweighted_mark) if assignment.unweighted_mark is not None else '0.00')}" readonly /></td>
+    <td class='assignment-unweighted'><input name='unweighted_mark' type='text' class='input input-xs w-16 bg-gray-200 cursor-not-allowed' style='background-color:#e5e7eb;cursor:not-allowed;' value="{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.unweighted_mark) if assignment.unweighted_mark is not None else '0.00')}" readonly tabindex='-1' /></td>
     <td><input name='mark_weight' type='number' step='any' min='0' class='input input-xs w-16' value='{assignment.mark_weight if assignment.mark_weight is not None else ''}' placeholder='Mark weight' /></td>
     <td><select name='grade_type' class='select select-xs w-16'>
             <option value='numeric' {'selected' if assignment.grade_type == 'numeric' else ''}>Numeric</option>
@@ -351,6 +360,7 @@ def update_assignment_ajax(
     mark_weight: Optional[str] = Form(None),
     grade_type: str = Form("numeric"),
     is_exam: bool = Form(False),
+    exam_type: str = Form("assignment"),
     session: Session = Depends(get_session),
 ):
     """
@@ -434,7 +444,7 @@ def update_assignment_ajax(
         # Only one exam per subject is supported (by design)
         exam = session.exec(
             select(Examination).where(
-                Examination.subject_id == sid,
+                (Examination.subject_id == sid) & (Examination.exam_type == exam_type)
             )
         ).first()
         if is_exam:
@@ -450,6 +460,7 @@ def update_assignment_ajax(
                         subject_id=sid,
                         exam_mark=exam_mark,
                         exam_weight=exam_weight,
+                        exam_type=exam_type,
                     )
                 )
             session.commit()

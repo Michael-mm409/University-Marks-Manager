@@ -36,13 +36,10 @@ def get_courses_page(
     request: Request,
     session: Session = Depends(get_session),
 ):
-    """Render the main page for managing courses."""
     jinja_env = request.app.state.jinja_env
     course_manager = CourseManager(session)
     courses = course_manager.get_all_courses()
-    # Get all universities for the dropdown
     universities = session.exec(select(University)).all()
-    # Get all grading scales for the dropdown
     from src.infrastructure.db.models import GradeScale
     grading_scales = session.exec(select(GradeScale)).all()
     template = jinja_env.get_template("courses.html")
@@ -254,32 +251,113 @@ def debug_resolve_course(key: str, request: Request, session: Session = Depends(
 
 
 @router.post("/courses/", response_class=HTMLResponse)
-def create_course_view(
+async def create_course_view(
     request: Request,
     name: str = Form(...),
     code: str = Form(...),
-    grading_scale_id: int = Form(...),
-    university_id: int = Form(None),
+    grading_scale_id: str = Form(...),
+    university_id: str = Form(None),
     new_university_name: str = Form(None),
     session: Session = Depends(get_session),
 ):
     """Handle the form submission to create a new course and return the HTML fragment."""
     jinja_env = request.app.state.jinja_env
     course_manager = CourseManager(session)
-    course = course_manager.create_course(
-        name=name,
-        code=code,
-        grading_scale_id=grading_scale_id,
-        university_id=university_id,
-        new_university_name=new_university_name,
-    )
-    template = jinja_env.get_template("partials/course_item.html")
-    content = template.render(request=request, course=course)
+    # Handle grading_scale_id: if 'other', pass None or handle custom logic
+    gs_id = None
+    custom_scale_id = None
+    if grading_scale_id and grading_scale_id != "other":
+        try:
+            gs_id = int(grading_scale_id)
+        except Exception:
+            gs_id = None
+    elif grading_scale_id == "other":
+        # Handle custom grading scale creation (async)
+        form = await request.form()
+        custom_scale_name = str(form.get("custom_grading_scale")) if form.get("custom_grading_scale") is not None else None
+        custom_grades = [str(x) for x in form.getlist("custom_grades[]")]
+        custom_labels = [str(x) for x in form.getlist("custom_labels[]")]
+        custom_min_marks = [str(x) for x in form.getlist("custom_min_marks[]")]
+        custom_gpa_points = [str(x) for x in form.getlist("custom_gpa_points[]")]
+        custom_band_types = [str(x) for x in form.getlist("custom_band_types[]")]
+
+        # Validate required fields
+        if not custom_scale_name or not custom_grades or not custom_labels or not custom_min_marks or not custom_gpa_points:
+            return HTMLResponse("Missing custom grading scale data.", status_code=400)
+
+        # Create GradeScale entries for each row
+        from src.infrastructure.db.models import GradeScale
+        scale_ids = []
+        for i in range(len(custom_grades)):
+            grade = custom_grades[i]
+            label = custom_labels[i]
+            try:
+                min_mark = float(custom_min_marks[i])
+            except Exception:
+                min_mark = 0.0
+            try:
+                gpa_point = float(custom_gpa_points[i])
+            except Exception:
+                gpa_point = 0.0
+            band_type = custom_band_types[i] if custom_band_types and i < len(custom_band_types) else "both"
+            # Check if this GradeScale row already exists (avoid duplicates)
+            existing = session.exec(
+                select(GradeScale).where(
+                    GradeScale.scale_name == custom_scale_name,
+                    GradeScale.grade == grade,
+                    GradeScale.band_type == band_type
+                )
+            ).first()
+            if existing:
+                scale_ids.append(existing.id)
+            else:
+                gs = GradeScale(
+                    scale_name=custom_scale_name,
+                    grade=grade,
+                    label=label,
+                    min_mark=min_mark,
+                    gpa_point=gpa_point,
+                    band_type=band_type
+                )
+                session.add(gs)
+                session.commit()
+                session.refresh(gs)
+                scale_ids.append(gs.id)
+        # Use the first GradeScale row's id as the grading_scale_id for the course
+        if scale_ids:
+            gs_id = scale_ids[0]
+        else:
+            return HTMLResponse("Failed to create custom grading scale.", status_code=400)
+
+    # Handle university_id: if 'add_new', use new_university_name
+    uni_id = None
+    if university_id and university_id != "add_new":
+        try:
+            uni_id = int(university_id)
+        except Exception:
+            uni_id = None
+    elif university_id == "add_new" and new_university_name:
+        uni_id = None  # Will be handled in create_course
+    if gs_id is not None:
+        course = course_manager.create_course(
+            name=name,
+            code=code,
+            grading_scale_id=gs_id,
+            university_id=uni_id,
+            new_university_name=new_university_name if university_id == "add_new" else None,
+        )
+    else:
+        return HTMLResponse("Invalid grading scale selected.", status_code=400)
+    # After creating, render the full course list for HTMX swap
+    courses = course_manager.get_all_courses()
+    template = jinja_env.get_template("partials/course_list.html")
+    content = template.render(request=request, courses=courses)
     if request.headers.get("HX-Request"):
-        resp = HTMLResponse(content)
+        resp = HTMLResponse(content=content, status_code=200)
+        resp.headers["Content-Type"] = "text/html"
         resp.headers["HX-Trigger"] = "courseListChanged"
         return resp
-    return content
+    return HTMLResponse(content=content, status_code=200)
 
 
 @router.get("/courses/{course_code}", response_class=HTMLResponse)
