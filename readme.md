@@ -405,8 +405,8 @@ See `docs/configuration.md` for environment suggestions & feature flags.
 
 ## 📘 Additional Documentation
 
-| Doc                            | Purpose                                                    |
-| ------------------------------ | ---------------------------------------------------------- |
+| Doc                                                     | Purpose                           |
+| ------------------------------------------------------- | --------------------------------- |
 | [api-reference.md](docs/api-reference.md)               | Endpoints & form fields           |
 | [configuration.md](docs/configuration.md)               | Settings, calculations, structure |
 | [troubleshooting.md](docs/troubleshooting.md)           |Common issues & fixes              |
