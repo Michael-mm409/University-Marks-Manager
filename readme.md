@@ -432,11 +432,3 @@ MIT – see `LICENSE`.
 ## 📣 Support
 
 Open an issue with reproduction steps and environment details.
-
----
-
-Generated README reflects current FastAPI-based implementation (replacing legacy Streamlit description).
-
-```
-
-```
