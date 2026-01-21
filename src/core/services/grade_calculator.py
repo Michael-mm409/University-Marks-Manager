@@ -1,7 +1,8 @@
 from typing import Sequence, Any, cast
-from sqlmodel import Session, select, func, col
-from sqlalchemy import case
-from src.infrastructure.db.models import Subject, Semester, GradeScale, Course
+from sqlmodel import Session, select, func, col, SQLModel
+from sqlalchemy import case  # Removed in_ import
+## Use column.in_([...]) directly; no import needed for in_
+from src.infrastructure.db.models import Subject, Semester, GradeScale, Course, ExamSettings
 
 class GradeCalculator:
     def __init__(self, session: Session):
@@ -92,7 +93,6 @@ class GradeCalculator:
         Uses GradeScale from DB. Each subject is counted in the HIGHEST grade it qualifies for.
         Pass Supplementary (PS) is counted using the ps_exam flag from exam_settings, and must be counted before P.
         """
-        from src.infrastructure.db.models import ExamSettings
         scales = self._get_grade_scales(course_id)
         # Always include all standard grades in the output, even if not present in DB
         all_grades = ['HD', 'D', 'C', 'P', 'PS', 'F']
@@ -109,8 +109,9 @@ class GradeCalculator:
         subject_ids = [subj.id for subj in subjects]
         exam_settings_map = {}
         if subject_ids:
+            # Use the ExamSettings model class, not an instance
             exam_settings = self.session.exec(
-                select(ExamSettings).where(ExamSettings.subject_id.in_(subject_ids))
+                select(ExamSettings).where(SQLModel.metadata.tables["exam_settings"].c.subject_id.in_(subject_ids))
             ).all()
             exam_settings_map = {es.subject_id: es for es in exam_settings}
 

@@ -1,5 +1,83 @@
+<div class="mt-6 w-full max-w-xl mx-auto">
+    <h3 class="font-semibold mb-2">Prerequisite Graph</h3>
+    <div style="position: relative;">
+      <div id="prereq-graph" style="height: 320px; border: 1px solid #ccc; background: #fff; border-radius: 8px;"></div>
+      <div style="position: absolute; right: 8px; bottom: 8px; background: rgba(255,255,255,0.9); border: 1px solid #ddd; border-radius: 6px; padding: 6px 8px; font-size: 0.75rem; color: #333; box-shadow: 0 1px 2px rgba(0,0,0,0.08);">
+        <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+          <span style="display:inline-block; width:14px; height:14px; background:#1976d2; border-radius:3px;"></span>
+          <span>Main subject</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+          <span style="display:inline-block; width:14px; height:14px; background:#90caf9; border-radius:3px;"></span>
+          <span>Subject</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+          <span style="display:inline-block; width:16px; height:0; border-top:2px solid #1976d2;"></span>
+          <span>Prerequisite</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span style="display:inline-block; width:16px; height:0; border-top:2px dashed #ff9800;"></span>
+          <span>Corequisite</span>
+        </div>
+      </div>
+    </div>
+    <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      fetch(`/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite_graph/json?year={{year}}`)
+        .then(r => r.json())
+        .then(data => {
+          const container = document.getElementById('prereq-graph');
+          if (!container || !data.nodes) return;
+          
+          const nodes = new vis.DataSet(data.nodes.map(n => ({
+            id: n.id,
+            label: n.label,
+            color: n.main ? '#1976d2' : (n.corequisite ? '#ffeb3b' : '#90caf9'),
+            font: { color: n.main ? '#fff' : '#222', size: n.main ? 22 : 16, bold: n.main },
+            x: n.x,
+            y: n.y,
+            physics: n.physics || false,
+          })));
+          const edges = new vis.DataSet(data.edges.map(e => ({
+            from: e.from,
+            to: e.to,
+            arrows: 'to',
+            color: e.type === 'corequisite' ? { color: '#ff9800' } : { color: '#1976d2' },
+            dashes: e.type === 'corequisite',
+            // Use a tooltip instead of inline text to prevent overlapping
+            // labels when multiple edges run close together.
+            title: e.type.charAt(0).toUpperCase() + e.type.slice(1),
+          })));
+          const network = new vis.Network(container, { nodes, edges }, {
+            layout: {
+              randomSeed: 42,
+            },
+            nodes: { shape: 'box', borderWidth: 2 },
+            edges: {
+              smooth: {
+                enabled: true,
+                type: 'cubicBezier',
+                forceDirection: 'vertical',
+                roundness: 0.4,
+              }
+            },
+            physics: {
+              enabled: false,
+            },
+          });
+
+          // Let physics spread the nodes out, then freeze layout
+          network.once('stabilizationIterationsDone', function () {
+            network.setOptions({ physics: false });
+          });
+        });
+    });
+    </script>
+  </div>
+<!-- Prerequisite UI: Only custom (free text) entry is enabled -->
 {% extends 'base.html' %}
-{% block title %}{{semester}} - {{subject.subject_code}} | University Marks Manager{% endblock %}
+{% block title %}{{semester}} - {{subject.subject_code}}{% endblock %}
 {% set breadcrumbs = [
   {'label': year, 'url': '/year/' ~ year},
   {'label': semester, 'url': '/year/' ~ year ~ '/semester/' ~ semester},
@@ -13,11 +91,15 @@
     <button id="edit-subject-btn" class="btn btn-xs btn-circle btn-ghost" type="button" onclick="showSubjectEditForm()" title="Edit subject">&#9881;</button>
   </h2>
 
-  <form id="subject-edit-form" method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/update" class="flex items-center gap-2 mt-2 hidden w-full" onsubmit="return submitSubjectEditForm(event)">
-    <input type="hidden" name="year" value="{{year}}" />
+  <form id="subject-edit-form" method="post" class="flex flex-wrap items-center gap-2 mt-2 hidden w-full max-w-4xl mx-auto" onsubmit="return submitSubjectEditForm(event)">
+    <input type="hidden" name="old_semester" value="{{semester}}" />
+    <input type="hidden" name="old_year" value="{{year}}" />
+    <input type="hidden" name="old_subject_code" value="{{subject.subject_code}}" />
     <input name="subject_code" class="input input-xs w-24 shrink-0" value="{{subject.subject_code}}" placeholder="Code" required />
-    <input name="subject_name" class="input input-xs flex-1 min-w-0" value="{{subject.subject_name}}" placeholder="Subject name" required />
+    <input name="subject_name" class="input input-xs flex-1 min-w-[200px]" value="{{subject.subject_name}}" placeholder="Subject name" required />
     <input name="credit_points" type="number" class="input input-xs w-20 shrink-0 text-right" value="{{subject.credit_points}}" placeholder="CP" required />
+    <input name="semester" class="input input-xs w-32 shrink-0" value="{{semester}}" placeholder="Semester" required />
+    <input name="year" type="number" class="input input-xs w-24 shrink-0" value="{{year}}" placeholder="Year" min="2000" max="2100" required />
     <label class="flex items-center gap-1">
       <span class="text-xs">Has Exam?</span>
       <input type="checkbox" name="has_exam" value="true" {% if subject.has_exam %}checked{% endif %} class="checkbox checkbox-xs" />
@@ -31,6 +113,68 @@
   </form>
 
   <p class="semester-title mt-1"><span>{{semester}}</span> <span class="semester-year">{{year}}</span></p>
+
+  <div class="prerequisite-section mt-4 w-full max-w-xl mx-auto">
+    <h3 class="font-semibold mb-2">Prerequisites</h3>
+    <ul class="list-disc list-inside mb-2">
+      {% if prerequisites and prerequisites|length > 0 %}
+        {% for prereq in prerequisites %}
+          <li>
+              {% if prereq.prerequisite_subject %}
+                {{ prereq.prerequisite_subject.subject_code }} - {{ prereq.prerequisite_subject.subject_name }}
+              {% elif prereq.custom_text %}
+                {{ prereq.custom_text }}
+              {% else %}
+                Unknown prerequisite
+              {% endif %}
+            {% if prereq.is_corequisite %}<span class="badge badge-info ml-2">Co-requisite</span>{% endif %}
+              <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite/remove" style="display:inline">
+                <input type="hidden" name="year" value="{{year}}" />
+                <input type="hidden" name="prerequisite_id" value="{{ prereq.id }}" />
+                <input type="hidden" name="is_corequisite" value="{{ prereq.is_corequisite|int }}" />
+              <button type="submit" class="btn btn-xs btn-error ml-2">Remove</button>
+            </form>
+          </li>
+        {% endfor %}
+      {% else %}
+        <li class="text-gray-500">No prerequisites set.</li>
+      {% endif %}
+    </ul>
+    <button class="btn btn-sm btn-primary mb-2" id="show-add-prerequisite-form" type="button" onclick="toggleSection('add-prerequisite-form', false)">Add Prerequisite</button>
+    <div id="add-prerequisite-form-section" class="hidden">
+      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite/add" class="flex flex-col md:flex-row gap-2 items-center">
+        <input type="hidden" name="year" value="{{year}}" />
+        <div class="flex gap-2 items-center w-full">
+            <select name="prerequisite_subject_id" class="input input-xs w-48">
+              <option value="">Select subject...</option>
+              {% for subj in candidate_subjects %}
+                <option value="{{ subj.id }}">{{ subj.subject_code }} - {{ subj.subject_name }}</option>
+              {% endfor %}
+            </select>
+            <span class="text-xs">or</span>
+          <input name="custom_prerequisite" class="input input-xs flex-1" placeholder="Or enter a custom prerequisite (free text)" />
+          <label class="flex items-center gap-1 ml-2">
+            <input type="checkbox" name="is_corequisite" value="1" class="checkbox checkbox-xs" />
+            <span class="text-xs">Co-requisite</span>
+          </label>
+          <button type="submit" class="btn btn-xs btn-success">Add</button>
+          <button type="button" class="btn btn-xs" onclick="toggleSection('add-prerequisite-form', true)">Cancel</button>
+        </div>
+        <div class="text-xs text-gray-600 mt-1">Select a subject from the dropdown, or type any prerequisite code/name/description. (Selecting from the dropdown links to a real subject; custom text is saved as-is.) Use the checkbox to mark as co-requisite.</div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+  // Add Prerequisite toggle logic
+  function toggleSection(formId, hideOnly) {
+    const section = document.getElementById(formId + '-section');
+    if (section) {
+      if (hideOnly) { section.classList.add('hidden'); }
+      else section.classList.toggle('hidden');
+    }
+  }
+  </script>
 
   <div class="flex gap-2 justify-center">
     {% if return_to %}
@@ -132,7 +276,9 @@
           </thead>
          <tbody>
           {% for assignment in assignments %}
-          <tr id="assignment-row-{{ loop.index }}" class="assignment-row">
+            <tr id="assignment-row-{{ loop.index }}" class="assignment-row"
+              data-grade-type="{{ assignment.grade_type }}"
+              data-unweighted-mark="{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}{% endif %}">
             <td class="assignment-title">{{ assignment.assessment }}</td>
             <td class="assignment-mark">
               {% if assignment.grade_type in ['S','U'] %}
@@ -294,16 +440,20 @@ function startInlineEditAssignment(index, assessment, mark, weight) {
 
   // Use the correct backend URL!
   row.innerHTML = `
-    <div>
-      <label class="block text-left text-xs font-semibold mb-1" for="assignment-title">Title</label>
-      <input id="assignment-title" name="assessment" class="input input-xs w-full" placeholder="Assignment title" required />
-    </div>
-    <td>
-      <input name="weighted_mark" type="number" step="0.01" class="input input-xs w-full text-right" value="${safeMark}" required />
+    <td class="assignment-title" style="min-width:180px;">
+      <input id="assignment-title" name="assessment" class="input input-xs w-full" placeholder="Assignment title" value="${safeAssessment}" required />
     </td>
-    <td></td>
-    <td>
-      <input name="mark_weight" type="number" step="0.01" min="0" max="100" class="input input-xs w-full text-right" value="${safeWeight}" required />
+    <td class="assignment-mark" style="width:70px;">
+      <input name="weighted_mark" type="number" step="0.01" class="input input-xs w-16 text-right" value="${safeMark}" required />
+    </td>
+    <td class="assignment-raw" style="width:70px;">
+      <input name="unweighted_mark" type="number" step="0.01" class="input input-xs w-16 text-right" value="${row.dataset.unweightedMark || ''}" readonly tabindex="-1" style="background:#f3f3f3;" />
+    </td>
+    <td class="assignment-weight" style="width:70px;">
+      <input name="mark_weight" type="number" step="0.01" min="0" max="100" class="input input-xs w-16 text-right" value="${safeWeight}" required />
+    </td>
+    <td class="assignment-type" style="width:60px;">
+      <span class="inline-block w-12 text-center font-semibold">${row.dataset.gradeType || ''}</span>
     </td>
     <td class="flex gap-1">
       <button type="button" class="btn btn-xs btn-success" onclick="submitInlineEditAssignmentRow('${assessment}', '${window.subjectCode}', '${window.subjectSemester}', '${window.subjectYear}')">Save</button>
@@ -328,7 +478,7 @@ window.submitInlineEditAssignmentRow = function(assessment, code, semester, year
   if (!row) return;
   const formData = new FormData();
 
-  formData.append('new_assessment', row.querySelector('[name="new_assessment"]').value);
+  formData.append('new_assessment', row.querySelector('[name="assessment"]').value);
   formData.append('weighted_mark', row.querySelector('[name="weighted_mark"]').value);
   formData.append('mark_weight', row.querySelector('[name="mark_weight"]').value);
 
@@ -376,4 +526,5 @@ document.addEventListener('DOMContentLoaded', function() {
   updatePsFactorState();
 });
 </script>
+<script src="/static/js/subject_page.js"></script>
 {% endblock %}

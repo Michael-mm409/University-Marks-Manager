@@ -1,18 +1,19 @@
-from typing import Sequence, List, Optional, Mapping, Union
-
+from typing import Sequence, List, Optional, Mapping, Union, TYPE_CHECKING
 from typing_extensions import TypedDict
 
-from src.infrastructure.db.models import Semester, Subject, Assignment, Examination
-
+# Use TYPE_CHECKING to prevent circular imports at runtime
+if TYPE_CHECKING:
+    from src.infrastructure.db.models import Semester, Subject, Assignment, Examination, SubjectPrerequisite
+else:
+    # Fallback to avoid runtime NameErrors if needed, or keep as strings below
+    Semester = "Semester"
+    Subject = "Subject"
+    Assignment = "Assignment"
+    Examination = "Examination"
+    SubjectPrerequisite = "SubjectPrerequisite"
 
 class IndexContext(TypedDict):
-    """
-    Short description of the class.
-
-    Attributes:
-        attr1: Description.
-    """
-    semesters: Sequence[Semester]
+    semesters: Sequence["Semester"]
     years: List[int]
     selected_year: Optional[int]
     current_year: str
@@ -64,17 +65,11 @@ class SemesterContext(TypedDict):
 
 
 class SubjectContext(TypedDict):
-    """
-    Short description of the class.
-
-    Attributes:
-        attr1: Description.
-    """
     semester: str
     year: str
-    subject: Subject
-    assignments: Sequence[Assignment]
-    examinations: Sequence[Examination]
+    subject: "Subject"
+    assignments: Sequence["Assignment"]
+    examinations: Sequence["Examination"]
     total_weighted: Optional[float]
     projected_total_weighted: Optional[float]
     total_weight_percent: Optional[float]
@@ -99,9 +94,17 @@ class SubjectContext(TypedDict):
     has_assignment_exam: bool
     count_s: int
     count_u: int
+    count_hd: int
+    count_d: int
+    count_c: int
+    count_p: int
+    count_ps: int
+    count_f: int
     final_exam_mark_weight: Optional[float]
     summary_exam_mark: Optional[float]
     error_messages: List[str]
-
+    prerequisites: Sequence["SubjectPrerequisite"]
+    required_for: Sequence["SubjectPrerequisite"]
+    assignment_unweighted_sum: Optional[float]
 
 TemplateContext = Union[IndexContext, SemesterContext, SubjectContext, Mapping[str, object]]

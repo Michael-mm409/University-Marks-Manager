@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}{{ request.session.get('current_course_code') or request.session.get('current_course_name') or 'Home' }} | University Marks Manager{% endblock %}
+{% block title %}{{ request.session.get('current_course_code') or request.session.get('current_course_name') or 'Home' }} | Marks Manager{% endblock %}
 {% set breadcrumbs = [
   {'label': selected_year or 'All Years', 'url': None}
 ] %}
@@ -30,6 +30,81 @@
 
   {% include 'partials/semesters_section.html' %}
   {% endif %}
+
+  <div class="mt-6 w-full max-w-2xl mx-auto">
+    <h3 class="font-semibold mb-2">Prerequisite Graph (All Subjects)</h3>
+    <div style="position: relative;">
+      <div id="prereq-graph-index" style="height: 400px; border: 1px solid #ccc; background: #fff; border-radius: 8px;"></div>
+      <div style="position: absolute; right: 8px; bottom: 8px; background: rgba(255,255,255,0.9); border: 1px solid #ddd; border-radius: 6px; padding: 6px 8px; font-size: 0.75rem; color: #333; box-shadow: 0 1px 2px rgba(0,0,0,0.08);">
+        <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+          <span style="display:inline-block; width:14px; height:14px; background:#90caf9; border-radius:3px;"></span>
+          <span>Subject</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+          <span style="display:inline-block; width:16px; height:0; border-top:2px solid #1976d2;"></span>
+          <span>Prerequisite</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span style="display:inline-block; width:16px; height:0; border-top:2px dashed #ff9800;"></span>
+          <span>Corequisite</span>
+        </div>
+      </div>
+    </div>
+    <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const graphUrl = "{% if selected_year %}/year/{{ selected_year }}/prerequisite_graph/json{% else %}/all/prerequisite_graph/json{% endif %}";
+        fetch(graphUrl)
+          .then(r => r.json())
+          .then(data => {
+            const container = document.getElementById('prereq-graph-index');
+            if (!container || !data.nodes) return;
+            
+            const nodes = new vis.DataSet(data.nodes.map(n => ({
+              id: n.id,
+              label: n.label,
+              color: n.main ? '#1976d2' : (n.corequisite ? '#ffeb3b' : '#90caf9'),
+              font: { color: n.main ? '#fff' : '#222', size: n.main ? 22 : 16, bold: n.main },
+              x: n.x,
+              y: n.y,
+              physics: n.physics || false,
+            })));
+            const edges = new vis.DataSet(data.edges.map(e => ({
+              from: e.from,
+              to: e.to,
+              arrows: 'to',
+              color: e.type === 'corequisite' ? { color: '#ff9800' } : { color: '#1976d2' },
+              dashes: e.type === 'corequisite',
+              // Use a tooltip instead of always-visible text to avoid
+              // overlapping labels when many edges cross the same area.
+              title: e.type.charAt(0).toUpperCase() + e.type.slice(1),
+            })));
+            const network = new vis.Network(container, { nodes, edges }, {
+              layout: {
+                randomSeed: 42,
+              },
+              nodes: { shape: 'box', borderWidth: 2 },
+              edges: {
+                smooth: {
+                  enabled: true,
+                  type: 'cubicBezier',
+                  forceDirection: 'vertical',
+                  roundness: 0.4,
+                }
+              },
+              physics: {
+                enabled: false,
+              },
+            });
+
+            // Let physics spread the nodes out, then freeze layout
+            network.once('stabilizationIterationsDone', function () {
+              network.setOptions({ physics: false });
+            });
+          });
+      });
+    </script>
+  </div>
 
   <script>
     // Dynamically set the default year to the current year

@@ -1,9 +1,34 @@
-"""HTML view routes rendering Jinja templates (spaces only)."""
 from __future__ import annotations
+"""HTML view routes rendering Jinja templates (spaces only)."""
+ 
+from typing import Optional, List, cast
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
+from sqlmodel import Session, select, col
+import re
+
+from src.presentation.api.deps import get_session
+from src.infrastructure.db.models import (
+    Semester,
+    Subject,
+    SubjectPrerequisite,
+)
+from .template_helpers import _render
+from .assignment_views import assignment_router
+from .exam_views import exam_router
+from .semester_views import semester_router, build_semester_context
+from .subject_views import subject_router, build_subject_context, build_subject_page_context
+from .course_views import router as course_router
+from .settings_views import router as settings_router
+from .types import IndexContext
+from src.core.services.semester_manager import SemesterManager
+from src.core.services.course_manager import CourseManager
+from src.core.services.grade_calculator import GradeCalculator
 
 from typing import Optional, List, cast
 from datetime import datetime
-from urllib import request
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -18,7 +43,7 @@ from .template_helpers import _render
 from .assignment_views import assignment_router
 from .exam_views import exam_router
 from .semester_views import semester_router, build_semester_context
-from .subject_views import subject_router, build_subject_context
+from .subject_views import subject_router, build_subject_context, build_subject_page_context
 from .course_views import router as course_router
 from .settings_views import router as settings_router
 from .types import IndexContext
@@ -30,7 +55,7 @@ views = APIRouter()
 views.include_router(assignment_router, prefix="/semester/{semester}/subject/{code}", tags=["assignments"])
 views.include_router(exam_router, prefix="/semester/{semester}/subject/{code}", tags=["exams"])
 views.include_router(semester_router, prefix="/semester", tags=["semesters"])
-views.include_router(subject_router, prefix="/semester/{semester}", tags=["subjects"])
+views.include_router(subject_router, prefix="", tags=["subjects"])
 views.include_router(course_router, prefix="", tags=["courses"])
 views.include_router(settings_router, prefix="", tags=["settings"])
 
@@ -85,6 +110,15 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
                 if course and not sess.get("current_course_name"):
                     sess["current_course_name"] = getattr(course, "name", None)
 
+    # If still no course selected, auto-select the first (default) course
+    if cid is None:
+        default_course = all_courses[0] if all_courses else None
+        if default_course:
+            cid = default_course.id
+            sess["current_course_id"] = cid
+            sess["current_course_name"] = default_course.name
+            sess["current_course_code"] = default_course.code
+
     if cid is not None:
         all_semesters = sm.get_semesters_for_course(cid)
         years = sm.get_distinct_years_for_course(cid)
@@ -117,13 +151,14 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
             "code": sess.get("current_course_code"),
         }
 
-    # Calculate WAM
+    # Calculate grades fresh from database each time (never cached in session)
     gc = GradeCalculator(session)
     wam = gc.calculate_wam(cid)
     gpa = gc.calculate_gpa(cid)
     grade_counts = gc.calculate_grade_counts(cid)
-    print(f"[debug] Passing to template: gpa={gpa}, wam={wam}, course_id={cid}")
-    # ...existing code...
+    print(f"[DEBUG] Session data: current_course_id={cid}, course_name={sess.get('current_course_name')}, course_code={sess.get('current_course_code')}")
+    print(f"[DEBUG] Session keys: {list(sess.keys())}")
+    print(f"[DEBUG] Passing to template: gpa={gpa}, wam={wam}, course_id={cid}, grade_counts={grade_counts}")
 
     ctx: IndexContext = {
         "semesters": display_semesters,
@@ -161,6 +196,7 @@ def home(request: Request, year: Optional[str] = None, session: Session = Depend
 
     # No year provided: prefer current year if any data exists, else All
     sm = SemesterManager(session)
+    cm = CourseManager(session)
     # Determine if a course is selected
     sess = request.session
     active_course_id = sess.get("current_course_id")
@@ -174,8 +210,20 @@ def home(request: Request, year: Optional[str] = None, session: Session = Depend
         years = sm.get_distinct_years_for_course(cid)
         semesters = sm.get_semesters_for_course(cid)
     else:
-        years = sm.get_distinct_years()
-        semesters = sm.get_all_semesters()
+        # Check if any courses exist
+        all_courses = cm.get_all_courses()
+        if all_courses:
+            # Auto-select the first (default) course
+            default_course = all_courses[0]
+            cid = default_course.id
+            sess["current_course_id"] = cid
+            sess["current_course_name"] = default_course.name
+            sess["current_course_code"] = default_course.code
+            years = sm.get_distinct_years_for_course(cid)
+            semesters = sm.get_semesters_for_course(cid)
+        else:
+            years = sm.get_distinct_years()
+            semesters = sm.get_all_semesters()
     now_year = int(datetime.now().year)
     # Only redirect to current year if there are semesters for that year
     if now_year in years and any(int(s.year) == now_year for s in semesters):
@@ -185,6 +233,174 @@ def home(request: Request, year: Optional[str] = None, session: Session = Depend
         return cast(HTMLResponse, RedirectResponse(url=f"/year/{first_year}{selected_suffix}", status_code=303))
     return _render_home_body(request, session, None)
 
+
+def _infer_level_from_text(text: str) -> Optional[int]:
+    """Infer the level (1,2,3,4,...) from the numeric part in subject code.
+    
+    For undergraduate (first digit 1-5): uses the first digit as level
+    For postgraduate (first digit 6+): uses the second digit as level to separate streams
+    
+    Examples: 
+    - CSIT101 -> 101 -> first digit 1 -> level 1
+    - CSIT201 -> 201 -> first digit 2 -> level 2
+    - MADS6001 -> 6001 -> first digit 6, second digit 0 -> level 0 (or 10)
+    - MADS6101 -> 6101 -> first digit 6, second digit 1 -> level 1 (or 11)
+    """
+    if not text:
+        return None
+    # Find the first sequence of one or more digits
+    m = re.search(r"(\d+)", text)
+    if m:
+        try:
+            digit_sequence = m.group(1)
+            first_digit = int(digit_sequence[0])
+            
+            # For postgraduate (6+), use second digit for finer separation
+            if first_digit >= 6:
+                if len(digit_sequence) >= 2:
+                    second_digit = int(digit_sequence[1])
+                    # Return level as 10 + second_digit to keep postgrad separate from undergrad
+                    return 10 + second_digit
+                else:
+                    return 10
+            else:
+                # For undergraduate, use first digit
+                return max(1, first_digit)
+        except (ValueError, IndexError):
+            pass
+    return None
+
+
+@views.get("/year/{year}/prerequisite_graph/json", response_class=JSONResponse)
+def prerequisite_graph_all_subjects(
+    year: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> JSONResponse:
+    """Return prerequisite graph data for all subjects in a given year."""
+    sess = request.session
+    cm = CourseManager(session)
+    active_course_id = sess.get("current_course_id")
+    cid = None
+    if active_course_id is not None:
+        try:
+            cid = int(str(active_course_id).strip())
+        except Exception:
+            cid = None
+
+    # If no course selected, auto-select the first (default) course
+    if cid is None:
+        all_courses = cm.get_all_courses()
+        if all_courses:
+            default_course = all_courses[0]
+            cid = default_course.id
+            sess["current_course_id"] = cid
+            sess["current_course_name"] = default_course.name
+            sess["current_course_code"] = default_course.code
+
+    if cid is not None:
+        semesters = session.exec(
+            select(Semester).where(Semester.year == year, Semester.course_id == cid)
+        ).all()
+    else:
+        semesters = session.exec(select(Semester).where(Semester.year == year)).all()
+    
+    # FIX: Filter None explicitly so type becomes list[int]
+    sem_ids = [s.id for s in semesters if s.id is not None]
+    if not sem_ids:
+        return JSONResponse({"nodes": [], "edges": []})
+
+    # FIX: Use col() for .in_()
+    subjects = session.exec(select(Subject).where(col(Subject.semester_id).in_(sem_ids))).all()
+    if not subjects:
+        return JSONResponse({"nodes": [], "edges": []})
+
+    by_id = {s.id: s for s in subjects if s.id is not None}
+    subject_ids = list(by_id.keys())
+
+    # FIX: Use col() for .in_()
+    links = session.exec(
+        select(SubjectPrerequisite).where(
+            col(SubjectPrerequisite.subject_id).in_(subject_ids)
+        )
+    ).all()
+
+    edges: list[dict] = []
+    # Start with all subjects as nodes (not just those with prerequisites)
+    subject_node_ids: set[int] = set(subject_ids)
+    
+    for link in links:
+        # FIX: Check for None before casting to int
+        if link.subject_id is None:
+            continue
+            
+        sid = int(link.subject_id)
+        
+        # Only include subject-to-subject prerequisite relationships
+        if link.prerequisite_subject_id is not None:
+            try:
+                pid = int(link.prerequisite_subject_id)
+            except (TypeError, ValueError):
+                continue
+            subject_node_ids.add(sid)
+            subject_node_ids.add(pid)
+            edges.append(
+                {
+                    "from": pid,
+                    "to": sid,
+                    "type": "corequisite" if link.is_corequisite else "prerequisite",
+                }
+            )
+
+    nodes: list[dict] = []
+    # Ensure we have Subject rows for all subject_node_ids
+    missing_ids = subject_node_ids - set(by_id.keys())
+    if missing_ids:
+        # FIX: cast set to list explicitly for .in_()
+        extra = session.exec(select(Subject).where(col(Subject.id).in_(list(missing_ids)))).all()
+        for s in extra:
+            if s.id is not None:
+                by_id[s.id] = s
+
+    # Group nodes by level for positioning
+    nodes_by_level = {}
+    level_info = {}
+    for sid in sorted(subject_node_ids):
+        s = by_id.get(sid)
+        if not s:
+            continue
+        code = str(getattr(s, "subject_code", ""))
+        level = _infer_level_from_text(code)
+        level = level if level is not None else 0
+        
+        if level not in nodes_by_level:
+            nodes_by_level[level] = []
+        nodes_by_level[level].append((sid, code))
+    
+    # Calculate positions based on level
+    level_separation = 220
+    node_spacing = 260
+    
+    for level in sorted(nodes_by_level.keys()):
+        nodes_at_level = nodes_by_level[level]
+        num_nodes = len(nodes_at_level)
+        y = level * level_separation
+        
+        for index, (sid, code) in enumerate(nodes_at_level):
+            x = (index - (num_nodes - 1) / 2) * node_spacing
+            node: dict = {
+                "id": sid,
+                "label": code,
+                "main": False,
+                "corequisite": False,
+                "level": level,
+                "x": x,
+                "y": y,
+                "physics": False,
+            }
+            nodes.append(node)
+
+    return JSONResponse({"nodes": nodes, "edges": edges})
 
 @views.get("/year/{year}", response_class=HTMLResponse)
 def home_year(request: Request, year: int, session: Session = Depends(get_session)) -> HTMLResponse:
@@ -246,6 +462,122 @@ def home_all(request: Request, session: Session = Depends(get_session)) -> HTMLR
     # Otherwise, render all years view (even if empty)
     return _render_home_body(request, session, None)
 
+@views.get("/all/prerequisite_graph/json", response_class=JSONResponse)
+def prerequisite_graph_all_years(
+    request: Request,
+    session: Session = Depends(get_session),
+) -> JSONResponse:
+    """Return prerequisite graph data for all subjects in the active course (all years)."""
+    sess = request.session
+    active_course_id = sess.get("current_course_id")
+    cid = None
+    if active_course_id is not None:
+        try:
+            cid = int(str(active_course_id).strip())
+        except Exception:
+            cid = None
+
+    if cid is not None:
+        semesters = session.exec(
+            select(Semester).where(Semester.course_id == cid)
+        ).all()
+    else:
+        semesters = session.exec(select(Semester)).all()
+
+    # FIX: Filter None explicitly
+    sem_ids = [s.id for s in semesters if s.id is not None]
+    if not sem_ids:
+        return JSONResponse({"nodes": [], "edges": []})
+
+    # FIX: Use col()
+    subjects = session.exec(select(Subject).where(col(Subject.semester_id).in_(sem_ids))).all()
+    if not subjects:
+        return JSONResponse({"nodes": [], "edges": []})
+
+    by_id = {s.id: s for s in subjects if s.id is not None}
+    subject_ids = list(by_id.keys())
+
+    # FIX: Use col()
+    links = session.exec(
+        select(SubjectPrerequisite).where(
+            col(SubjectPrerequisite.subject_id).in_(subject_ids)
+        )
+    ).all()
+
+    edges: list[dict] = []
+    # Start with all subjects as nodes (not just those with prerequisites)
+    subject_node_ids: set[int] = set(subject_ids)
+    
+    for link in links:
+        # FIX: Check for None
+        if link.subject_id is None:
+            continue
+        sid = int(link.subject_id)
+
+        # Only include subject-to-subject prerequisite relationships
+        if link.prerequisite_subject_id is not None:
+            try:
+                pid = int(link.prerequisite_subject_id)
+            except (TypeError, ValueError):
+                continue
+            subject_node_ids.add(sid)
+            subject_node_ids.add(pid)
+            edges.append(
+                {
+                    "from": pid,
+                    "to": sid,
+                    "type": "corequisite" if link.is_corequisite else "prerequisite",
+                }
+            )
+
+    nodes: list[dict] = []
+    missing_ids = subject_node_ids - set(by_id.keys())
+    if missing_ids:
+        # FIX: use col() and explicit list cast
+        extra = session.exec(select(Subject).where(col(Subject.id).in_(list(missing_ids)))).all()
+        for s in extra:
+            if s.id is not None:
+                by_id[s.id] = s
+
+    # Group nodes by level for positioning
+    nodes_by_level = {}
+    for sid in sorted(subject_node_ids):
+        s = by_id.get(sid)
+        if not s:
+            continue
+        code = str(getattr(s, "subject_code", ""))
+        level = _infer_level_from_text(code)
+        level = level if level is not None else 0
+        
+        if level not in nodes_by_level:
+            nodes_by_level[level] = []
+        nodes_by_level[level].append((sid, code))
+    
+    # Calculate positions based on level
+    level_separation = 220
+    node_spacing = 260
+    
+    nodes: list[dict] = []
+    for level in sorted(nodes_by_level.keys()):
+        nodes_at_level = nodes_by_level[level]
+        num_nodes = len(nodes_at_level)
+        y = level * level_separation
+        
+        for index, (sid, code) in enumerate(nodes_at_level):
+            x = (index - (num_nodes - 1) / 2) * node_spacing
+            node: dict = {
+                "id": sid,
+                "label": code,
+                "main": False,
+                "corequisite": False,
+                "level": level,
+                "x": x,
+                "y": y,
+                "physics": False,
+            }
+            nodes.append(node)
+
+    return JSONResponse({"nodes": nodes, "edges": edges})
 
 @views.get("/year/{year}/semester/{semester}", response_class=HTMLResponse)
 def semester_detail_pretty(
@@ -265,6 +597,7 @@ def semester_detail_pretty(
     return _render(request, "semester.html", ctx)
 
 
+@views.head("/year/{year}/semester/{semester}/subject/{code}", response_class=HTMLResponse)
 @views.get("/year/{year}/semester/{semester}/subject/{code}", response_class=HTMLResponse)
 def subject_detail_pretty(
         request: Request,
@@ -291,7 +624,7 @@ def subject_detail_pretty(
         - Any ValueError during float parsing of exam_weight is caught; parsed_exam_weight
             becomes None and an attempt is made to set request.session["flash_message"]
             with an explanatory message. Errors while writing the flash message are ignored.
-        - Calls build_subject_context(session, semester, year, code, exam_weight=..., final_total=..., total_mark=..., return_to=...)
+        - Calls build_subject_page_context(session, semester, year, code, exam_weight=..., final_total=..., total_mark=..., return_to=...)
             to construct the context used to render the page.
         - If the context builder returns None, the view returns an HTMLResponse with
             a 404 status ("Subject not found").
@@ -333,14 +666,14 @@ def subject_detail_pretty(
                                 request.session["flash_message"] = "Ignored invalid exam_weight query parameter."
                         except Exception:
                                 pass
-        ctx = build_subject_context(
-                session,
-                semester=semester,
-                year=year,
-                code=code,
-                exam_weight=parsed_exam_weight,
-                final_total=final_total,
-                total_mark=total_mark,
+        ctx = build_subject_page_context(
+            session=session,
+            semester=semester,
+            year=year,
+            code=code,
+            exam_weight=parsed_exam_weight,
+            final_total=final_total,
+            total_mark=total_mark,
             return_to=qp.get("return_to"),
             error_message=qp.get("error"),
         )
@@ -355,24 +688,15 @@ def subject_detail_short(
     code: str,
     semester: Optional[str] = None,
     session: Session = Depends(get_session),
-) -> HTMLResponse:
+) -> Response:
     """Shorter subject URL. Standard joins used to satisfy Pylance and prevent Cartesian products."""
     qp = request.query_params
     offering = qp.get("offering")
     return_to = qp.get("return_to") or request.session.pop("return_to", None)
 
     if semester:
-        ctx = build_subject_context(
-            session,
-            semester=semester,
-            year=year,
-            code=code,
-            return_to=return_to,
-            error_message=qp.get("error"),
-        )
-        if ctx is None:
-            return HTMLResponse("Subject not found", status_code=404)
-        return _render(request, "subject.html", ctx)
+        # Redirect to canonical route
+        return RedirectResponse(url=f"/year/{year}/semester/{semester}/{code}", status_code=303)
 
     if offering:
         # Join using the Relationship attribute 'Subject.semester'
@@ -390,7 +714,7 @@ def subject_detail_short(
             subj = candidate[0]
             sem_obj = session.get(Semester, subj.semester_id)
             if sem_obj:
-                ctx = build_subject_context(session, semester=sem_obj.name, year=year, code=code, return_to=return_to)
+                ctx = build_subject_page_context(session, semester=sem_obj.name, year=year, code=code, return_to=return_to)
                 if ctx:
                     return _render(request, "subject.html", ctx)
 
@@ -410,7 +734,7 @@ def subject_detail_short(
                     subj = candidate[0]
                     sem_obj = session.get(Semester, subj.semester_id)
                     if sem_obj:
-                        ctx = build_subject_context(session, semester=sem_obj.name, year=year, code=code, return_to=return_to)
+                        ctx = build_subject_page_context(session, semester=sem_obj.name, year=year, code=code, return_to=return_to)
                         if ctx:
                             return _render(request, "subject.html", ctx)
 
@@ -433,8 +757,8 @@ def subject_detail_short(
         if not sem_obj:
             return HTMLResponse("Subject not found", status_code=404)
         
-        ctx = build_subject_context(
-            session,
+        ctx = build_subject_page_context(
+            session=session,
             semester=sem_obj.name,
             year=year,
             code=code,
@@ -446,11 +770,9 @@ def subject_detail_short(
 
     links = []
     for s in rows:
-        # Resolve semester name from related object since it's safer
         sem_obj = session.get(Semester, s.semester_id)
         sem_name = sem_obj.name if sem_obj else "Unknown"
-        links.append(f"<li><a href='/subjects/{year}/{code}?semester={sem_name}'>Semester {sem_name}</a></li>")
-    
+        links.append(f"<li><a href='/year/{year}/semester/{sem_name}/subject/{code}'>Semester {sem_name}</a></li>")
     body = f"<h1>Multiple semesters</h1><p>Choose semester for {code} {year}:</p><ul>{''.join(links)}</ul>"
     return HTMLResponse(body)
 
@@ -472,7 +794,7 @@ def subject_open(
             request.session["return_to"] = return_to
         except Exception:
             pass
-    return RedirectResponse(url=f"/subjects/{year}/{code}?semester={semester}", status_code=303)
+    return RedirectResponse(url=f"/year/{year}/semester/{semester}/subject/{code}", status_code=303)
 
 
 @views.head("/year/{year}/semester/{semester}")

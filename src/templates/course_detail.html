@@ -106,7 +106,7 @@
                 <ul class="mt-2 space-y-1 text-xs pl-4">
                   {% for s in subs %}
                     <li>
-                      <a class="link link-hover" href="/subjects/{{ s.year }}/{{ s.subject_code }}?semester={{ s.semester_name }}">
+                      <a class="link link-hover" href="/year/{{ s.year }}/semester/{{ s.semester_name }}/subject/{{ s.subject_code }}">
                         {{ s.subject_code }} — {{ s.subject_name }}
                       </a>
                     </li>

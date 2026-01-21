@@ -22,7 +22,13 @@
     document.getElementById('subject-name-display').classList.remove('hidden');
     document.getElementById('edit-subject-btn').classList.remove('hidden');
   };
-  window.submitSubjectEditForm = function(event) { return true; };
+  window.submitSubjectEditForm = function(event) {
+    const form = document.getElementById('subject-edit-form');
+    const oldSemester = form.querySelector('[name="old_semester"]').value;
+    const oldSubjectCode = form.querySelector('[name="old_subject_code"]').value;
+    form.action = `/semester/${encodeURIComponent(oldSemester)}/subject/${encodeURIComponent(oldSubjectCode)}/update`;
+    return true;
+  };
 
   // Inline edit state
   let editing_assignment_keys = null;

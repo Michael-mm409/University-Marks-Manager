@@ -545,7 +545,7 @@ def update_assignment_ajax(
         # Otherwise return row HTML for inline update without reload
         if new_assessment and new_assessment.strip() and new_assessment != assessment:
             logger.info(f"[ASSIGNMENT_UPDATE] Name changed from '{assessment}' to '{new_assessment}' - forcing reload")
-            reload_url = f"/subjects/{year}/{code}?semester={semester}"
+            reload_url = f"/year/{year}/semester/{semester}/subject/{code}"
             return JSONResponse({"success": True, "reload_url": reload_url})
         else:
             logger.info(f"[ASSIGNMENT_UPDATE] Values updated for '{assessment}' - inline update")

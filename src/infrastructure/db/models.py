@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import ClassVar, Optional, List
+from typing import ClassVar, Optional
 
 from sqlmodel import Field, SQLModel, Relationship
 from sqlalchemy import UniqueConstraint
@@ -13,6 +13,12 @@ class GradeType(str, Enum):
     NUMERIC = "numeric"
     SATISFACTORY = "S"
     UNSATISFACTORY = "U"
+    HIGH_DISTINCTION = "HD"
+    DISTINCTION = "D"
+    CREDIT = "C"
+    PASS = "P"
+    PASS_SUPPLEMENTARY = "PS"
+    FAIL = "F"
 
 class University(SQLModel, table=True):
     """Represents a university."""
@@ -81,13 +87,60 @@ class Subject(SQLModel, table=True):
     sync_subject: bool = False
     has_exam: bool = Field(default=True)
 
-    # FIXED: Added the missing relationship side for Semester
+    # Relationship to Semester
     semester: Optional["Semester"] = Relationship(
         sa_relationship=relationship("Semester", back_populates="subjects")
     )
 
+    # Prerequisites: subjects this subject requires
+    prerequisites: list["SubjectPrerequisite"] = Relationship(
+        sa_relationship=relationship(
+            "SubjectPrerequisite",
+            back_populates="subject",
+            primaryjoin="Subject.id==SubjectPrerequisite.subject_id",
+            cascade="all, delete-orphan"
+        )
+    )
+    # Subjects for which this subject is a prerequisite
+    required_for: list["SubjectPrerequisite"] = Relationship(
+        sa_relationship=relationship(
+            "SubjectPrerequisite",
+            back_populates="prerequisite_subject",
+            primaryjoin="Subject.id==SubjectPrerequisite.prerequisite_subject_id",
+            cascade="all, delete-orphan"
+        )
+    )
+
     __table_args__ = (
         UniqueConstraint("subject_code", "semester_id", name="uq_subject_code_semester"),
+    )
+
+
+# New model for subject prerequisites
+class SubjectPrerequisite(SQLModel, table=True):
+    __tablename__: ClassVar[str] = "subject_prerequisite"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    subject_id: int = Field(foreign_key="subjects.id", index=True)
+    # Either link to another subject (prerequisite_subject_id) or store free-text in custom_text
+    prerequisite_subject_id: Optional[int] = Field(
+        default=None, foreign_key="subjects.id", index=True
+    )
+    custom_text: Optional[str] = None
+    is_corequisite: bool = Field(default=False, nullable=False)
+
+    subject: Optional["Subject"] = Relationship(
+        sa_relationship=relationship(
+            "Subject",
+            foreign_keys="SubjectPrerequisite.subject_id",
+            back_populates="prerequisites"
+        )
+    )
+    prerequisite_subject: Optional["Subject"] = Relationship(
+        sa_relationship=relationship(
+            "Subject",
+            foreign_keys="SubjectPrerequisite.prerequisite_subject_id",
+            back_populates="required_for"
+        )
     )
 
 class Assignment(SQLModel, table=True):
