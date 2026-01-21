@@ -24,18 +24,46 @@
 <body class="min-h-screen bg-base-200">
   <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 btn btn-xs">Skip to content</a>
   <div class="w-full sm:max-w-7xl mx-auto px-1 sm:px-2 md:px-3 py-1 sm:py-2 md:py-3">
+    <!-- Top Navigation Bar -->
+    <div class="flex justify-between items-start mb-1 sm:mb-2 md:mb-3">
+      <!-- Left spacer -->
+      <div class="flex-1"></div>
+      
+      <!-- User Menu (Top Right) -->
+      {% if request.session.get('username') %}
+      <div class="flex items-center gap-2">
+        <div class="dropdown dropdown-end">
+          <label tabindex="0" class="btn btn-ghost btn-sm gap-2 cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <span class="text-sm font-medium">{{ request.session.get('username') }}</span>
+          </label>
+          <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-56">
+            <li><a href="/profile" class="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span>Edit Profile</span>
+            </a></li>
+            <li><a href="/logout" class="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              <span>Logout</span>
+            </a></li>
+          </ul>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Main Header -->
     <header class="mb-1 sm:mb-2 md:mb-3 flex flex-col items-center gap-0.5 sm:gap-1 md:gap-1.5 text-center">
       <div>
         <h1 class="site-title text-base leading-none sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black tracking-tighter drop-shadow">University Marks Manager</h1>
-              <!-- <p class="text-base md:text-lg opacity-80">FastAPI · SQLModel · HTMX · Jinja2</p> -->
-            </div>
-            <div class="flex items-center gap-2 sm:gap-4">
-              <label class="swap swap-rotate theme-toggle">
-                <input type="checkbox" id="themeToggle" />
-                <svg class="swap-on fill-current w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.64 17l-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0L7 18.37A8 8 0 0 0 17 7l1.29-1.29a1 1 0 1 0-1.41-1.41L15.59 5A8 8 0 0 0 5.64 17z"/></svg>
-                <svg class="swap-off fill-current w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5.05 11H1a1 1 0 0 0 0 2h4.05a7 7 0 0 0 13.9 0H23a1 1 0 0 0 0-2h-4.05a7 7 0 0 0-13.9 0z"/></svg>
-            </label>
       </div>
+            </div>
     </header>
     {% if flash_message %}
       <div id="flash-alert" role="status" aria-live="polite" aria-atomic="true" class="alert alert-success mb-4 flex items-start justify-between gap-4">
@@ -53,6 +81,7 @@
         </div>
       </div>
     {% endif %}
+f  {% if not no_courses_warning %}
   <div class="mb-3 sm:mb-6 flex justify-center px-2">
   <div id="course-header-container" class="w-full max-w-4xl p-2 sm:p-3 md:p-4 rounded-lg sm:rounded-xl bg-base-100 border border-base-300 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 md:gap-4 shadow-sm" hx-get="/courses/_selector" hx-trigger="load" hx-swap="outerHTML">
         <div class="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 md:gap-4 text-center sm:text-left w-full sm:w-auto">
@@ -70,6 +99,7 @@
   <div id="course-selector-container" class="flex-shrink-0 w-full sm:w-auto"></div>
       </div>
     </div>
+    {% endif %}
     {% include 'partials/breadcrumbs.html' %}
     <main id="main" class="space-y-3">
       {% block content %}{% endblock %}

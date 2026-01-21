@@ -36,37 +36,14 @@ def get_courses_page(
     request: Request,
     session: Session = Depends(get_session),
 ):
-    jinja_env = request.app.state.jinja_env
-    course_manager = CourseManager(session)
-    courses = course_manager.get_all_courses()
-    universities = session.exec(select(University)).all()
-    from src.infrastructure.db.models import GradeScale
-    grading_scales = session.exec(select(GradeScale)).all()
-    template = jinja_env.get_template("courses.html")
-    return template.render(request=request, courses=courses, universities=universities, grading_scales=grading_scales)
+    """Redirect to profile page where users manage their courses."""
+    return RedirectResponse(url="/profile", status_code=303)
 
 
 @router.head("/courses")
 def get_courses_head(request: Request, session: Session = Depends(get_session)):
-    """HEAD variant for the courses page so clients that probe with HEAD get headers/status.
-
-    Reuse the GET handler to compute headers; return a Response without a body.
-    """
-    # Call the GET handler but be defensive: template.render() returns a string
-    # so attempting to read .headers on it will raise. Return a simple 200
-    # with no body and preserve headers if the GET returned a Response-like
-    # object.
-    try:
-        resp = get_courses_page(request=request, session=session)
-        if hasattr(resp, "headers"):
-            headers = dict(resp.headers) if resp is not None else {}
-        else:
-            headers = {}
-        status = getattr(resp, "status_code", 200)
-        return Response(status_code=status, headers=headers)
-    except Exception:
-        # Fallback: return an empty 200 response for HEAD
-        return Response(status_code=200)
+    """HEAD variant for the courses redirect."""
+    return Response(status_code=303, headers={"Location": "/profile"})
 
 
 # The selector fragment must be registered before the dynamic /courses/{course_code}

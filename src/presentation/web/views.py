@@ -14,6 +14,8 @@ from src.infrastructure.db.models import (
     Semester,
     Subject,
     SubjectPrerequisite,
+    UserCourse,
+    Course,
 )
 from .template_helpers import _render
 from .assignment_views import assignment_router
@@ -22,6 +24,7 @@ from .semester_views import semester_router, build_semester_context
 from .subject_views import subject_router, build_subject_context, build_subject_page_context
 from .course_views import router as course_router
 from .settings_views import router as settings_router
+from .auth_views import router as auth_router
 from .types import IndexContext
 from src.core.services.semester_manager import SemesterManager
 from src.core.services.course_manager import CourseManager
@@ -52,6 +55,7 @@ from src.core.services.course_manager import CourseManager
 from src.core.services.grade_calculator import GradeCalculator
 
 views = APIRouter()
+views.include_router(auth_router, prefix="", tags=["auth"])
 views.include_router(assignment_router, prefix="/semester/{semester}/subject/{code}", tags=["assignments"])
 views.include_router(exam_router, prefix="/semester/{semester}/subject/{code}", tags=["exams"])
 views.include_router(semester_router, prefix="/semester", tags=["semesters"])
@@ -60,71 +64,90 @@ views.include_router(course_router, prefix="", tags=["courses"])
 views.include_router(settings_router, prefix="", tags=["settings"])
 
 
+def _require_user(request: Request) -> Optional[int]:
+    """Helper to verify user is logged in and return user_id, or None if not logged in."""
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return None
+    return int(user_id)
+
+
 def _render_home_body(request: Request, session: Session, parsed_year: Optional[int]) -> HTMLResponse:
     """Render Home with a concrete parsed_year (None means All years)."""
+    # Verify user is logged in
+    user_id = _require_user(request)
+    if not user_id:
+        return RedirectResponse(url="/login", status_code=303)
+    
     sm = SemesterManager(session)
     cm = CourseManager(session)
     
-    # Check if any courses exist - show warning if empty
-    all_courses = cm.get_all_courses()
-    if not all_courses:
-        # No courses exist - show a message prompting course creation
+    # Get only courses for this user
+    user_courses = session.exec(
+        select(UserCourse).where(UserCourse.user_id == user_id)
+    ).all()
+    user_course_ids = [uc.course_id for uc in user_courses]
+    
+    if not user_course_ids:
+        # No courses assigned to user - show helpful message
         ctx: IndexContext = {
             "semesters": [],
             "years": [],
             "selected_year": parsed_year,
             "current_year": str(datetime.now().year),
-            "flash_message": None,
+            "flash_message": "Welcome! You haven't added any courses yet. Visit your profile to add courses.",
             "course_filter": None,
             "wam": None,
             "gpa": None,
             "grade_counts": None,
             "no_courses_warning": True,
+            "user_courses": [],
+            "username": request.session.get("username"),
         }
         return _render(request, "index.html", ctx)
     
-    # If a course is selected, restrict semesters and years to that course
-    # Resolve active course id robustly (fallback to code lookup)
+    # Verify and get active course - must be in user's courses
     sess = request.session
-    # Debug: log the current session active course keys to help trace state
-    try:
-        print(f"[debug] _render_home_body session current_course_id={sess.get('current_course_id')!r} current_course_name={sess.get('current_course_name')!r} current_course_code={sess.get('current_course_code')!r}")
-    except Exception:
-        pass
     active_course_id = sess.get("current_course_id")
     cid = None
+    
     if active_course_id is not None:
         try:
             cid = int(str(active_course_id).strip())
+            # Verify user has access to this course
+            if cid not in user_course_ids:
+                cid = None
         except Exception:
             cid = None
+    
+    # If no valid active course, select the default or first available
     if cid is None:
-        code = sess.get("current_course_code")
-        if code:
-            course = cm.get_course_by_code(str(code))
-            course_id = getattr(course, "id", None)
-            if course_id is not None:
-                cid = int(course_id)
-                # Heal the session for future requests
-                sess["current_course_id"] = cid
-                if course and not sess.get("current_course_name"):
-                    sess["current_course_name"] = getattr(course, "name", None)
-
-    # If still no course selected, auto-select the first (default) course
-    if cid is None:
-        default_course = all_courses[0] if all_courses else None
-        if default_course:
-            cid = default_course.id
+        default_uc = session.exec(
+            select(UserCourse).where(
+                UserCourse.user_id == user_id,
+                UserCourse.is_default == True
+            )
+        ).first()
+        
+        if default_uc:
+            cid = default_uc.course_id
+        elif user_course_ids:
+            cid = user_course_ids[0]
+    
+    # Update session with active course info
+    if cid is not None:
+        course = session.get(Course, cid)
+        if course:
             sess["current_course_id"] = cid
-            sess["current_course_name"] = default_course.name
-            sess["current_course_code"] = default_course.code
+            sess["current_course_name"] = course.name
+            sess["current_course_code"] = course.code
 
     if cid is not None:
         all_semesters = sm.get_semesters_for_course(cid)
         years = sm.get_distinct_years_for_course(cid)
     else:
-        all_semesters = sm.get_all_semesters()
-        years = sm.get_distinct_years()
+        all_semesters = []
+        years = []
 
     # If the selected year is not in the available years for this course, fallback to All
     if parsed_year is not None and parsed_year not in years:
@@ -151,14 +174,23 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
             "code": sess.get("current_course_code"),
         }
 
+    # Get user's courses for the course selector in template
+    user_courses_data = []
+    for uc in user_courses:
+        course = session.get(Course, uc.course_id)
+        if course:
+            user_courses_data.append({
+                "id": uc.id,
+                "course": course,
+                "is_default": uc.is_default,
+                "is_active": uc.course_id == cid
+            })
+
     # Calculate grades fresh from database each time (never cached in session)
     gc = GradeCalculator(session)
     wam = gc.calculate_wam(cid)
     gpa = gc.calculate_gpa(cid)
     grade_counts = gc.calculate_grade_counts(cid)
-    print(f"[DEBUG] Session data: current_course_id={cid}, course_name={sess.get('current_course_name')}, course_code={sess.get('current_course_code')}")
-    print(f"[DEBUG] Session keys: {list(sess.keys())}")
-    print(f"[DEBUG] Passing to template: gpa={gpa}, wam={wam}, course_id={cid}, grade_counts={grade_counts}")
 
     ctx: IndexContext = {
         "semesters": display_semesters,
@@ -170,6 +202,8 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
         "wam": wam,
         "gpa": gpa,
         "grade_counts": grade_counts,
+        "user_courses": user_courses_data,
+        "username": sess.get("username"),
         "no_courses_warning": False,
     }
     return _render(request, "index.html", ctx)
@@ -183,6 +217,10 @@ def home(request: Request, year: Optional[str] = None, session: Session = Depend
     - /?year= or /?year=all -> 303 /all (preserving selected=1)
     - / with no year -> if current year exists -> 303 /year/<current>, else render All
     """
+    # Check if user is logged in
+    if not request.session.get("user_id"):
+        return RedirectResponse(url="/login", status_code=303)
+    
     qp = request.query_params
     selected_suffix = "?selected=1" if qp.get("selected") == "1" else ""
     if "year" in qp:
@@ -197,6 +235,7 @@ def home(request: Request, year: Optional[str] = None, session: Session = Depend
     # No year provided: prefer current year if any data exists, else All
     sm = SemesterManager(session)
     cm = CourseManager(session)
+    user_id = int(request.session.get("user_id"))
     # Determine if a course is selected
     sess = request.session
     active_course_id = sess.get("current_course_id")

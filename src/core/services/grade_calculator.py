@@ -1,46 +1,81 @@
 from typing import Sequence, Any, cast
-from sqlmodel import Session, select, func, col, SQLModel
-from sqlalchemy import case  # Removed in_ import
-## Use column.in_([...]) directly; no import needed for in_
+from sqlmodel import Session, select, func, SQLModel
+from sqlalchemy import case, and_
+from sqlalchemy.dialects import postgresql
 from src.infrastructure.db.models import Subject, Semester, GradeScale, Course, ExamSettings
 
 class GradeCalculator:
     def __init__(self, session: Session):
         self.session = session
     
+    def _print_sql(self, query, label="SQL"):
+        """Helper to print raw SQL for debugging"""
+        # Uncomment below to see SQL queries during development
+        # try:
+        #     compiled = query.compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True})
+        #     print(f"[GRADE_CALCULATOR] {label}:")
+        #     print(f"  {compiled}")
+        # except Exception as e:
+        #     print(f"[GRADE_CALCULATOR] {label}: Could not compile - {e}")
+    
     def _build_base_query(self, course_id: int | None = None):
         """Build base query for subjects with valid marks, optionally filtered by course."""
-        query = (
-            select(Subject)
-            .join(Semester, col(Semester.id) == col(Subject.semester_id))
-            .where(col(Subject.total_mark).is_not(None))
-            .where(col(Subject.total_mark) > 0)
+        query = select(Subject).join(Semester)
+        
+        # Filter by course if provided
+        if course_id is not None:
+            query = query.where(Semester.course_id == course_id)
+        
+        # Only include subjects with valid marks (non-null and > 0)
+        query = query.where(
+            and_(
+                Subject.total_mark.isnot(None),
+                Subject.total_mark > 0
+            )
         )
         
-        if course_id is not None:
-            query = query.where(col(Semester.course_id) == course_id)
-        
+        self._print_sql(query, f"Base Query (course_id={course_id})")
         return query
 
     def _get_grade_scales(self, course_id: int | None = None) -> list[GradeScale]:
         """Get grade scales for the course, seeding defaults if empty. Only use band_type='both'."""
-        scale_id = None
+        scale_name = None
+        
+        # Step 1: If course_id provided, get the scale_name from the course's grading_scale_id
         if course_id:
             course = self.session.get(Course, course_id)
             if course and getattr(course, "grading_scale_id", None):
                 scale_id = course.grading_scale_id
+                print(f"[GRADE_CALCULATOR] Course {course_id} has grading_scale_id={scale_id}")
+                
+                # Get the scale row to extract scale_name
+                ref_scale = self.session.get(GradeScale, scale_id)
+                if ref_scale:
+                    scale_name = ref_scale.scale_name
+                    print(f"[GRADE_CALCULATOR] Scale ID {scale_id} maps to scale_name: {scale_name}")
 
-        if scale_id:
-            scales = self.session.exec(
-                select(GradeScale).where(GradeScale.id == scale_id, GradeScale.band_type == "both")
-            ).all()
+        # Step 2: Query for ALL scales with the determined scale_name (or Standard as fallback)
+        if scale_name:
+            query = select(GradeScale).where(
+                and_(GradeScale.scale_name == scale_name, GradeScale.band_type == "both")
+            )
+            self._print_sql(query, f"Grade Scales Query (scale_name={scale_name})")
+            scales = self.session.exec(query).all()
         else:
-            scales = self.session.exec(
-                select(GradeScale).where(GradeScale.scale_name == "Standard", GradeScale.band_type == "both")
-            ).all()
+            print(f"[GRADE_CALCULATOR] No specific scale_name, querying Standard scale")
+            query = select(GradeScale).where(
+                and_(GradeScale.scale_name == "Standard", GradeScale.band_type == "both")
+            )
+            self._print_sql(query, "Grade Scales Query (Standard scale)")
+            scales = self.session.exec(query).all()
+
+        print(f"[GRADE_CALCULATOR] Found {len(scales)} grade scales from query")
+        for s in scales:
+            print(f"  - Grade: {s.grade}, min_mark: {s.min_mark}")
 
         if not scales:
             # Seed defaults for Standard scale if missing
+            print("[GRADE_CALCULATOR] No scales found, seeding defaults...")
             defaults = [
                 GradeScale(scale_name="Standard", grade="HD", label="High Distinction", min_mark=85.0, gpa_point=4.0, band_type="both"),
                 GradeScale(scale_name="Standard", grade="D", label="Distinction", min_mark=75.0, gpa_point=3.7, band_type="both"),
@@ -70,22 +105,29 @@ class GradeCalculator:
         """
         base_query = self._build_base_query(course_id)
         
-        # Define the subquery variable so it can be referenced
+        # Create subquery for aggregation
         sub = base_query.subquery()
 
         # Use SQL aggregation for efficiency
-        result = self.session.exec(
-            select(
-                func.sum(sub.c.total_mark * sub.c.credit_points).label("weighted_sum"),
-                func.sum(sub.c.credit_points).label("credit_sum")
-            )
-        ).first()
+        wam_query = select(
+            func.sum(sub.c.total_mark * sub.c.credit_points).label("weighted_sum"),
+            func.sum(sub.c.credit_points).label("credit_sum")
+        )
+        
+        self._print_sql(wam_query, f"WAM Query (course_id={course_id})")
+        
+        result = self.session.exec(wam_query).first()
+        
+        print(f"[GRADE_CALCULATOR] WAM calculation for course_id={course_id}: result={result}")
         
         if result is None or result[1] is None or result[1] == 0:
+            print(f"[GRADE_CALCULATOR] WAM result is None/0")
             return None
         
         weighted_sum, credit_sum = result
-        return round(weighted_sum / credit_sum, 2) if weighted_sum is not None else None
+        wam = round(weighted_sum / credit_sum, 2) if weighted_sum is not None else None
+        print(f"[GRADE_CALCULATOR] WAM = {weighted_sum} / {credit_sum} = {wam}")
+        return wam
 
     def calculate_grade_counts(self, course_id: int | None = None) -> dict[str, int]:
         """
@@ -106,12 +148,11 @@ class GradeCalculator:
         subjects = self.session.exec(base_query).all()
 
         # Pre-fetch all exam_settings for efficiency
-        subject_ids = [subj.id for subj in subjects]
+        subject_ids = [subj.id for subj in subjects if subj.id is not None]
         exam_settings_map = {}
         if subject_ids:
-            # Use the ExamSettings model class, not an instance
             exam_settings = self.session.exec(
-                select(ExamSettings).where(SQLModel.metadata.tables["exam_settings"].c.subject_id.in_(subject_ids))
+                select(ExamSettings).where(ExamSettings.subject_id.in_(subject_ids))
             ).all()
             exam_settings_map = {es.subject_id: es for es in exam_settings}
 
@@ -119,6 +160,7 @@ class GradeCalculator:
             mark = subject.total_mark
             subj_exam = exam_settings_map.get(subject.id) if subject.id is not None else None
             is_ps = subj_exam.ps_exam if subj_exam else False
+            
             if is_ps:
                 # Count as PS regardless of mark
                 counts['PS'] += 1
@@ -130,6 +172,7 @@ class GradeCalculator:
                 if mark is not None and mark >= scale.min_mark:
                     counts[scale.grade] += 1
                     break
+        
         return counts
 
     def calculate_gpa(self, course_id: int | None = None) -> float | None:
@@ -150,12 +193,14 @@ class GradeCalculator:
         gpa_point_expr = case(*whens, else_=0.0)
         
         # Calculate weighted GPA
-        result = self.session.exec(
-            select(
-                func.sum(gpa_point_expr * grade_subquery.c.credit_points).label("gpa_weighted_sum"),
-                func.sum(grade_subquery.c.credit_points).label("credit_sum")
-            )
-        ).first()
+        gpa_query = select(
+            func.sum(gpa_point_expr * grade_subquery.c.credit_points).label("gpa_weighted_sum"),
+            func.sum(grade_subquery.c.credit_points).label("credit_sum")
+        )
+        
+        self._print_sql(gpa_query, f"GPA Query (course_id={course_id})")
+        
+        result = self.session.exec(gpa_query).first()
         
         # Debug: Print each subject's mark, credit points, and assigned GPA point
         print("[GRADE_CALCULATOR] GPA subject breakdown (course_id={}):".format(course_id))

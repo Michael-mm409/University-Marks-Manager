@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - Marks Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.6.0/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div class="container mx-auto p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold">User Profile</h1>
+            <div class="space-x-4">
+                <a href="/" class="btn btn-primary">Back to Home</a>
+                <a href="/logout" class="btn btn-ghost">Logout</a>
+            </div>
+        </div>
+
+        {% if request.query_params.get('error') %}
+        <div class="alert alert-error mb-4">
+            <span>{{ request.query_params.get('error') }}</span>
+        </div>
+        {% endif %}
+
+        <!-- User Info -->
+        <div class="card bg-base-100 shadow-xl mb-6">
+            <div class="card-body">
+                <h2 class="card-title">Account Information</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="font-semibold">Username:</label>
+                        <p>{{ user.username }}</p>
+                    </div>
+                    <div>
+                        <label class="font-semibold">Email:</label>
+                        <p>{{ user.email }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- My Courses -->
+        <div class="card bg-base-100 shadow-xl mb-6">
+            <div class="card-body">
+                <h2 class="card-title">My Courses</h2>
+                
+                {% if courses %}
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra">
+                        <thead>
+                            <tr>
+                                <th>Course Name</th>
+                                <th>Code</th>
+                                <th>University</th>
+                                <th>Default</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in courses %}
+                            <tr>
+                                <td>{{ item.course.name }}</td>
+                                <td>{{ item.course.code }}</td>
+                                <td>{{ item.course.university.name if item.course.university else 'N/A' }}</td>
+                                <td>
+                                    {% if item.is_default %}
+                                        <span class="badge badge-success">Default</span>
+                                    {% else %}
+                                        <form method="post" action="/profile/set-default/{{ item.id }}" style="display: inline;">
+                                            <button type="submit" class="btn btn-xs btn-outline">Set Default</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="post" action="/profile/remove-course/{{ item.id }}" onsubmit="return confirm('Remove this course from your account?');">
+                                        <button type="submit" class="btn btn-xs btn-error">Remove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-gray-600">You haven't added any courses yet. Add one below to get started.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Add Course -->
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title">Add Course</h2>
+                
+                {% if available_courses %}
+                <form method="post" action="/profile/add-course" class="space-y-4">
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Select a course to add:</span>
+                        </label>
+                        <select name="course_id" class="select select-bordered" required>
+                            <option value="" disabled selected>Choose a course</option>
+                            {% for course in available_courses %}
+                            <option value="{{ course.id }}">
+                                {{ course.name }} ({{ course.code }})
+                                {% if course.university %} - {{ course.university.name }}{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Course</button>
+                </form>
+                {% else %}
+                <p class="text-gray-600">All available courses have been added to your account.</p>
+                <a href="/courses/create" class="btn btn-outline mt-4">Create New Course</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

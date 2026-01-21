@@ -51,6 +51,7 @@ services:
     restart: unless-stopped
     volumes:
       - /volume1/docker/Marks-Manager/db/data:/var/lib/postgresql/data/
+      - /volume1/docker/Marks-Manager/db/migrations:/migrations
       # - E:/NAS/Marks-Manager/db/data:/var/lib/postgresql/data/
     env_file:
       - .env

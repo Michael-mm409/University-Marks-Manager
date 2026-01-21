@@ -20,6 +20,37 @@ class GradeType(str, Enum):
     PASS_SUPPLEMENTARY = "PS"
     FAIL = "F"
 
+class User(SQLModel, table=True):
+    """Represents a user of the Marks Manager system."""
+    __tablename__: ClassVar[str] = "users"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(index=True, unique=True)
+    email: str = Field(index=True, unique=True)
+    password_hash: str  # Store hashed password, never plain text
+    
+    user_courses: list["UserCourse"] = Relationship(
+        sa_relationship=relationship("UserCourse", back_populates="user")
+    )
+
+class UserCourse(SQLModel, table=True):
+    """Association table linking users to their courses."""
+    __tablename__: ClassVar[str] = "user_courses"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", ondelete="CASCADE")
+    course_id: int = Field(foreign_key="courses.id", ondelete="CASCADE")
+    is_default: bool = Field(default=False)  # User's default/active course
+    
+    user: Optional["User"] = Relationship(
+        sa_relationship=relationship("User", back_populates="user_courses")
+    )
+    course: Optional["Course"] = Relationship(
+        sa_relationship=relationship("Course")
+    )
+    
+    __table_args__ = (
+        UniqueConstraint("user_id", "course_id", name="uq_user_course"),
+    )
+
 class University(SQLModel, table=True):
     """Represents a university."""
     __tablename__: ClassVar[str] = "university"
