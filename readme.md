@@ -405,13 +405,14 @@ See `docs/configuration.md` for environment suggestions & feature flags.
 
 ## 📘 Additional Documentation
 
-| Doc                            | Purpose                           |
-| ------------------------------ | --------------------------------- |
-| `docs/api-reference.md`        | Endpoints & form fields           |
-| `docs/configuration.md`        | Settings, calculations, structure |
-| `docs/troubleshooting.md`      | Common issues & fixes             |
-| `docs/tailwind-cli-install.md` | Local Tailwind build steps        |
-| `docs/architecture.md`         | High-level design                 |
+| Doc                            | Purpose                                                    |
+| ------------------------------ | ---------------------------------------------------------- |
+| [api-reference.md](docs/api-reference.md)               | Endpoints & form fields           |
+| [configuration.md](docs/configuration.md)               | Settings, calculations, structure |
+| [troubleshooting.md](docs/troubleshooting.md)           |Common issues & fixes              |
+| [tailwind-cli-install.md](docs/tailwind-cli-install.md) | Local Tailwind build steps        |
+| [architecture.md](docs/architecture.md)                 | High-level design                 |
+| [MULTI_USER_SETUP.md](docs/MULTI_USER_SETUP.md)         | Multi User setup file             |
 
 ## 🤝 Contributing
 
