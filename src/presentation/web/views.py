@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Optional, List, cast
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
 from sqlmodel import Session, select, col
 import re
@@ -54,33 +54,28 @@ from src.core.services.semester_manager import SemesterManager
 from src.core.services.course_manager import CourseManager
 from src.core.services.grade_calculator import GradeCalculator
 
+async def verify_user(request: Request):
+    if not request.session.get("user_id"):
+        # Redirect to login if user is not authenticated
+        raise HTTPException(status_code=307, detail="Not Logged In", headers={"location": "/login"})
+
+# Create router with verification dependency (but will exclude auth routes)
 views = APIRouter()
 views.include_router(auth_router, prefix="", tags=["auth"])
-views.include_router(assignment_router, prefix="/semester/{semester}/subject/{code}", tags=["assignments"])
-views.include_router(exam_router, prefix="/semester/{semester}/subject/{code}", tags=["exams"])
-views.include_router(semester_router, prefix="/semester", tags=["semesters"])
-views.include_router(subject_router, prefix="", tags=["subjects"])
-views.include_router(course_router, prefix="", tags=["courses"])
-views.include_router(settings_router, prefix="", tags=["settings"])
-
-
-def _require_user(request: Request) -> Optional[int]:
-    """Helper to verify user is logged in and return user_id, or None if not logged in."""
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return None
-    return int(user_id)
-
+views.include_router(assignment_router, prefix="/semester/{semester}/subject/{code}", tags=["assignments"], dependencies=[Depends(verify_user)])
+views.include_router(exam_router, prefix="/semester/{semester}/subject/{code}", tags=["exams"], dependencies=[Depends(verify_user)])
+views.include_router(semester_router, prefix="/semester", tags=["semesters"], dependencies=[Depends(verify_user)])
+views.include_router(subject_router, prefix="", tags=["subjects"], dependencies=[Depends(verify_user)])
+views.include_router(course_router, prefix="", tags=["courses"], dependencies=[Depends(verify_user)])
+views.include_router(settings_router, prefix="", tags=["settings"], dependencies=[Depends(verify_user)])
 
 def _render_home_body(request: Request, session: Session, parsed_year: Optional[int]) -> HTMLResponse:
     """Render Home with a concrete parsed_year (None means All years)."""
-    # Verify user is logged in
-    user_id = _require_user(request)
-    if not user_id:
-        return RedirectResponse(url="/login", status_code=303)
-    
     sm = SemesterManager(session)
     cm = CourseManager(session)
+    
+    # Get user_id from session
+    user_id = int(request.session.get("user_id"))
     
     # Get only courses for this user
     user_courses = session.exec(
@@ -109,19 +104,19 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
     # Verify and get active course - must be in user's courses
     sess = request.session
     active_course_id = sess.get("current_course_id")
-    cid = None
+    course_id = None
     
     if active_course_id is not None:
         try:
-            cid = int(str(active_course_id).strip())
+            course_id = int(str(active_course_id).strip())
             # Verify user has access to this course
-            if cid not in user_course_ids:
-                cid = None
+            if course_id not in user_course_ids:
+                course_id = None
         except Exception:
-            cid = None
+            course_id = None
     
     # If no valid active course, select the default or first available
-    if cid is None:
+    if course_id is None:
         default_uc = session.exec(
             select(UserCourse).where(
                 UserCourse.user_id == user_id,
@@ -130,21 +125,21 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
         ).first()
         
         if default_uc:
-            cid = default_uc.course_id
+            course_id = default_uc.course_id
         elif user_course_ids:
-            cid = user_course_ids[0]
+            course_id = user_course_ids[0]
     
     # Update session with active course info
-    if cid is not None:
-        course = session.get(Course, cid)
+    if course_id is not None:
+        course = session.get(Course, course_id)
         if course:
-            sess["current_course_id"] = cid
+            sess["current_course_id"] = course_id
             sess["current_course_name"] = course.name
             sess["current_course_code"] = course.code
 
-    if cid is not None:
-        all_semesters = sm.get_semesters_for_course(cid)
-        years = sm.get_distinct_years_for_course(cid)
+    if course_id is not None:
+        all_semesters = sm.get_semesters_for_course(course_id)
+        years = sm.get_distinct_years_for_course(course_id)
     else:
         all_semesters = []
         years = []
@@ -168,7 +163,7 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
 
     # Helpful context for template to show filter banner
     course_filter = None
-    if cid is not None:
+    if course_id is not None:
         course_filter = {
             "name": sess.get("current_course_name"),
             "code": sess.get("current_course_code"),
@@ -183,14 +178,14 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
                 "id": uc.id,
                 "course": course,
                 "is_default": uc.is_default,
-                "is_active": uc.course_id == cid
+                "is_active": uc.course_id == course_id
             })
 
     # Calculate grades fresh from database each time (never cached in session)
     gc = GradeCalculator(session)
-    wam = gc.calculate_wam(cid)
-    gpa = gc.calculate_gpa(cid)
-    grade_counts = gc.calculate_grade_counts(cid)
+    wam = gc.calculate_wam(course_id)
+    gpa = gc.calculate_gpa(course_id)
+    grade_counts = gc.calculate_grade_counts(course_id)
 
     ctx: IndexContext = {
         "semesters": display_semesters,
@@ -239,27 +234,27 @@ def home(request: Request, year: Optional[str] = None, session: Session = Depend
     # Determine if a course is selected
     sess = request.session
     active_course_id = sess.get("current_course_id")
-    cid = None
+    course_id = None
     if active_course_id is not None:
         try:
-            cid = int(str(active_course_id).strip())
+            course_id = int(str(active_course_id).strip())
         except Exception:
-            cid = None
-    if cid is not None:
-        years = sm.get_distinct_years_for_course(cid)
-        semesters = sm.get_semesters_for_course(cid)
+            course_id = None
+    if course_id is not None:
+        years = sm.get_distinct_years_for_course(course_id)
+        semesters = sm.get_semesters_for_course(course_id)
     else:
         # Check if any courses exist
         all_courses = cm.get_all_courses()
         if all_courses:
             # Auto-select the first (default) course
             default_course = all_courses[0]
-            cid = default_course.id
-            sess["current_course_id"] = cid
+            course_id = default_course.id
+            sess["current_course_id"] = course_id
             sess["current_course_name"] = default_course.name
             sess["current_course_code"] = default_course.code
-            years = sm.get_distinct_years_for_course(cid)
-            semesters = sm.get_semesters_for_course(cid)
+            years = sm.get_distinct_years_for_course(course_id)
+            semesters = sm.get_semesters_for_course(course_id)
         else:
             years = sm.get_distinct_years()
             semesters = sm.get_all_semesters()
@@ -288,10 +283,10 @@ def _infer_level_from_text(text: str) -> Optional[int]:
     if not text:
         return None
     # Find the first sequence of one or more digits
-    m = re.search(r"(\d+)", text)
-    if m:
+    code_match = re.search(r"(\d+)", text)
+    if code_match:
         try:
-            digit_sequence = m.group(1)
+            digit_sequence = code_match.group(1)
             first_digit = int(digit_sequence[0])
             
             # For postgraduate (6+), use second digit for finer separation
@@ -312,50 +307,83 @@ def _infer_level_from_text(text: str) -> Optional[int]:
 
 @views.get("/year/{year}/prerequisite_graph/json", response_class=JSONResponse)
 def prerequisite_graph_all_subjects(
+    
     year: int,
     request: Request,
     session: Session = Depends(get_session),
 ) -> JSONResponse:
-    """Return prerequisite graph data for all subjects in a given year."""
+    """
+    Generate a prerequisite graph visualization for all subjects in a given academic year.
+    This function retrieves all subjects for the specified year (optionally filtered by the
+    user's selected course) and constructs a directed graph representing prerequisite and
+    corequisite relationships between subjects.
+    Args:
+        year: The academic year for which to retrieve subjects and prerequisites.
+        request: The HTTP request object containing session data.
+        session: SQLAlchemy session for database queries (injected via FastAPI Depends).
+    Returns:
+        JSONResponse: A JSON object containing:
+            - nodes: List of node dictionaries with properties:
+                - id: Unique identifier (positive for real subjects, negative for synthetic)
+                - label: Subject code or custom text label
+                - main: Boolean flag (always False in current implementation)
+                - corequisite: Boolean flag (always False in current implementation)
+                - level: Visual grouping level for layout
+                - x, y: Calculated 2D coordinates for graph visualization
+                - physics: Boolean flag for physics engine (always False)
+            - edges: List of edge dictionaries with properties:
+                - from: Prerequisite subject/node id
+                - to: Dependent subject id
+                - type: Either "prerequisite" or "corequisite"
+    Process:
+        1. Determines the active course (auto-selects first if none specified)
+        2. Retrieves semesters for the given year/course
+        3. Fetches all subjects in those semesters
+        4. Extracts prerequisite relationships (both subject links and custom text patterns)
+        5. Creates synthetic nodes for external prerequisites matching subject code patterns
+        6. Infers academic level from subject codes
+        7. Calculates node positions using level-based visual grouping
+        8. Returns empty graph if no subjects or relationships exist
+    """
     sess = request.session
     cm = CourseManager(session)
     active_course_id = sess.get("current_course_id")
-    cid = None
+    course_id = None
     if active_course_id is not None:
         try:
-            cid = int(str(active_course_id).strip())
+            course_id = int(str(active_course_id).strip())
         except Exception:
-            cid = None
+            course_id = None
 
     # If no course selected, auto-select the first (default) course
-    if cid is None:
+    if course_id is None:
         all_courses = cm.get_all_courses()
         if all_courses:
             default_course = all_courses[0]
-            cid = default_course.id
-            sess["current_course_id"] = cid
+            course_id = default_course.id
+            sess["current_course_id"] = course_id
             sess["current_course_name"] = default_course.name
             sess["current_course_code"] = default_course.code
 
-    if cid is not None:
+    if course_id is not None:
         semesters = session.exec(
-            select(Semester).where(Semester.year == year, Semester.course_id == cid)
+            select(Semester).where(Semester.year == year, Semester.course_id == course_id)
         ).all()
     else:
         semesters = session.exec(select(Semester).where(Semester.year == year)).all()
     
     # FIX: Filter None explicitly so type becomes list[int]
-    sem_ids = [s.id for s in semesters if s.id is not None]
-    if not sem_ids:
+    semester_ids = [s.id for s in semesters if s.id is not None]
+    if not semester_ids:
         return JSONResponse({"nodes": [], "edges": []})
 
     # FIX: Use col() for .in_()
-    subjects = session.exec(select(Subject).where(col(Subject.semester_id).in_(sem_ids))).all()
+    subjects = session.exec(select(Subject).where(col(Subject.semester_id).in_(semester_ids))).all()
     if not subjects:
         return JSONResponse({"nodes": [], "edges": []})
 
-    by_id = {s.id: s for s in subjects if s.id is not None}
-    subject_ids = list(by_id.keys())
+    subject_lookup = {s.id: s for s in subjects if s.id is not None}
+    subject_ids = list(subject_lookup.keys())
 
     # FIX: Use col() for .in_()
     links = session.exec(
@@ -367,72 +395,150 @@ def prerequisite_graph_all_subjects(
     edges: list[dict] = []
     # Start with all subjects as nodes (not just those with prerequisites)
     subject_node_ids: set[int] = set(subject_ids)
+    # Synthetic nodes for short custom-text prerequisites (e.g. external 5000-level units)
+    custom_label_to_id: dict[str, int] = {}
+    custom_nodes: dict[int, str] = {}
+    next_custom_id = -1
     
     for link in links:
         # FIX: Check for None before casting to int
         if link.subject_id is None:
             continue
             
-        sid = int(link.subject_id)
+        subject_id = int(link.subject_id)
         
-        # Only include subject-to-subject prerequisite relationships
+        # First handle subject-to-subject prerequisite relationships
         if link.prerequisite_subject_id is not None:
             try:
-                pid = int(link.prerequisite_subject_id)
+                prerequisite_id = int(link.prerequisite_subject_id)
             except (TypeError, ValueError):
                 continue
-            subject_node_ids.add(sid)
-            subject_node_ids.add(pid)
+            subject_node_ids.add(subject_id)
+            subject_node_ids.add(prerequisite_id)
             edges.append(
                 {
-                    "from": pid,
-                    "to": sid,
+                    "from": prerequisite_id,
+                    "to": subject_id,
+                    "type": "corequisite" if link.is_corequisite else "prerequisite",
+                }
+            )
+        else:
+            # If there is no linked subject but we have custom_text, only
+            # create a node when we can extract a subject-like code from it.
+            # This avoids rendering generic credit requirements such as
+            # "18cp @ 200 level CSIT" and focuses the graph on concrete
+            # prerequisite subjects (e.g. "CSC5020").
+            requirement_text = (link.custom_text or "").strip()
+            if not requirement_text:
+                continue
+
+            # Extract the first token that looks like a subject code, e.g.
+            # CSIT110, CSC5020, STAT5000. If none is found we skip.
+            code_match = re.search(r"\b[A-Za-z]{3,5}\d{3,4}\b", requirement_text)
+            if not code_match:
+                continue
+            label = code_match.group(0)
+
+            prerequisite_id = custom_label_to_id.get(label)
+            if prerequisite_id is None:
+                prerequisite_id = next_custom_id
+                next_custom_id -= 1
+                custom_label_to_id[label] = prerequisite_id
+                custom_nodes[prerequisite_id] = label
+            subject_node_ids.add(subject_id)
+            subject_node_ids.add(prerequisite_id)
+            edges.append(
+                {
+                    "from": prerequisite_id,
+                    "to": subject_id,
                     "type": "corequisite" if link.is_corequisite else "prerequisite",
                 }
             )
 
     nodes: list[dict] = []
-    # Ensure we have Subject rows for all subject_node_ids
-    missing_ids = subject_node_ids - set(by_id.keys())
+    # Ensure we have Subject rows for all real subject IDs (exclude synthetic negatives)
+    missing_ids = {subject_id for subject_id in subject_node_ids if subject_id > 0} - set(subject_lookup.keys())
     if missing_ids:
         # FIX: cast set to list explicitly for .in_()
         extra = session.exec(select(Subject).where(col(Subject.id).in_(list(missing_ids)))).all()
         for s in extra:
             if s.id is not None:
-                by_id[s.id] = s
+                subject_lookup[s.id] = s
 
-    # Group nodes by level for positioning
-    nodes_by_level = {}
-    level_info = {}
-    for sid in sorted(subject_node_ids):
-        s = by_id.get(sid)
-        if not s:
-            continue
-        code = str(getattr(s, "subject_code", ""))
-        level = _infer_level_from_text(code)
-        level = level if level is not None else 0
-        
-        if level not in nodes_by_level:
-            nodes_by_level[level] = []
-        nodes_by_level[level].append((sid, code))
-    
-    # Calculate positions based on level
-    level_separation = 220
-    node_spacing = 260
-    
-    for level in sorted(nodes_by_level.keys()):
-        nodes_at_level = nodes_by_level[level]
-        num_nodes = len(nodes_at_level)
-        y = level * level_separation
-        
-        for index, (sid, code) in enumerate(nodes_at_level):
-            x = (index - (num_nodes - 1) / 2) * node_spacing
+    # Build label and initial level for every node. For synthetic
+    # custom-text nodes, use the custom label directly.
+    labels: dict[int, str] = {}
+    levels: dict[int, int] = {}
+    for subject_id in sorted(subject_node_ids):
+        if subject_id in custom_nodes:
+            code = custom_nodes[subject_id]
+        else:
+            s = subject_lookup.get(subject_id)
+            if not s:
+                continue
+            code = str(getattr(s, "subject_code", ""))
+        labels[subject_id] = code
+        inferred = _infer_level_from_text(code)
+        levels[subject_id] = inferred if inferred is not None else 0
+
+    # Adjust levels so that a prerequisite is always placed at least
+    # one visual band above any subject that depends on it. This fixes
+    # cases like CSIT110 → CSIT121 where the codes imply the same
+    # level but we still want CSIT110 to appear above CSIT121.
+    if edges:
+        for _ in range(len(levels)):
+            changed = False
+            for edge in edges:
+                from_id = edge.get("from")
+                to_id = edge.get("to")
+                if from_id not in levels or to_id not in levels:
+                    continue
+                if levels[from_id] >= levels[to_id]:
+                    levels[from_id] = levels[to_id] - 1
+                    changed = True
+            if not changed:
+                break
+
+    if not levels:
+        return JSONResponse({"nodes": [], "edges": edges})
+
+    # Remap (possibly negative) logical levels to compact visual
+    # bands 0,1,2,... so spacing between rows stays tight.
+    unique_levels = sorted(set(levels.values()))
+    level_to_visual = {lvl: idx for idx, lvl in enumerate(unique_levels)}
+
+    # Group nodes by visual level for positioning.
+    nodes_by_visual: dict[int, list[int]] = {}
+    for subject_id in sorted(levels.keys()):
+        visual_level = level_to_visual[levels[subject_id]]
+        nodes_by_visual.setdefault(visual_level, []).append(subject_id)
+
+    # Decide orientation based on the number of levels.
+    num_levels = max(1, len(nodes_by_visual))
+    max_nodes_in_level = max((len(v) for v in nodes_by_visual.values()), default=1)
+    max_vertical_levels = 5  # up to this many levels: vertical; above: horizontal
+
+    # Base spacing: larger gap between levels than between nodes.
+    level_separation = 200.0
+    node_spacing = 150.0
+
+    nodes_orientation_vertical = num_levels <= max_vertical_levels
+
+    for visual_level, node_ids in sorted(nodes_by_visual.items()):
+        num_nodes = len(node_ids)
+        for index, subject_id in enumerate(node_ids):
+            if nodes_orientation_vertical:
+                y = visual_level * level_separation
+                x = (index - (num_nodes - 1) / 2) * node_spacing
+            else:
+                x = visual_level * level_separation
+                y = (index - (num_nodes - 1) / 2) * node_spacing
             node: dict = {
-                "id": sid,
-                "label": code,
+                "id": subject_id,
+                "label": labels[subject_id],
                 "main": False,
                 "corequisite": False,
-                "level": level,
+                "level": visual_level,
                 "x": x,
                 "y": y,
                 "physics": False,
@@ -468,6 +574,9 @@ def home_year_head(request: Request, year: int, session: Session = Depends(get_s
     """
     resp = home_year(request=request, year=year, session=session)
     headers = dict(resp.headers) if resp is not None else {}
+
+    if not request.session.get("user_id"):
+        return RedirectResponse(url="/login", status_code=303)
     return Response(status_code=resp.status_code if resp is not None else 200, headers=headers)
 
 
@@ -476,16 +585,18 @@ def home_all(request: Request, session: Session = Depends(get_session)) -> HTMLR
     """Render the All years page, or redirect to current/first year if appropriate."""
     sm = SemesterManager(session)
     sess = request.session
+    if not sess.get("user_id"):
+        return RedirectResponse(url="/login", status_code=303)
     active_course_id = sess.get("current_course_id")
-    cid = None
+    course_id = None
     if active_course_id is not None:
         try:
-            cid = int(str(active_course_id).strip())
+            course_id = int(str(active_course_id).strip())
         except Exception:
-            cid = None
-    if cid is not None:
-        years = sm.get_distinct_years_for_course(cid)
-        semesters = sm.get_semesters_for_course(cid)
+            course_id = None
+    if course_id is not None:
+        years = sm.get_distinct_years_for_course(course_id)
+        semesters = sm.get_semesters_for_course(course_id)
     else:
         years = sm.get_distinct_years()
         semesters = sm.get_all_semesters()
@@ -509,32 +620,32 @@ def prerequisite_graph_all_years(
     """Return prerequisite graph data for all subjects in the active course (all years)."""
     sess = request.session
     active_course_id = sess.get("current_course_id")
-    cid = None
+    course_id = None
     if active_course_id is not None:
         try:
-            cid = int(str(active_course_id).strip())
+            course_id = int(str(active_course_id).strip())
         except Exception:
-            cid = None
+            course_id = None
 
-    if cid is not None:
+    if course_id is not None:
         semesters = session.exec(
-            select(Semester).where(Semester.course_id == cid)
+            select(Semester).where(Semester.course_id == course_id)
         ).all()
     else:
         semesters = session.exec(select(Semester)).all()
 
     # FIX: Filter None explicitly
-    sem_ids = [s.id for s in semesters if s.id is not None]
-    if not sem_ids:
+    semester_ids = [s.id for s in semesters if s.id is not None]
+    if not semester_ids:
         return JSONResponse({"nodes": [], "edges": []})
 
     # FIX: Use col()
-    subjects = session.exec(select(Subject).where(col(Subject.semester_id).in_(sem_ids))).all()
+    subjects = session.exec(select(Subject).where(col(Subject.semester_id).in_(semester_ids))).all()
     if not subjects:
         return JSONResponse({"nodes": [], "edges": []})
 
-    by_id = {s.id: s for s in subjects if s.id is not None}
-    subject_ids = list(by_id.keys())
+    subject_lookup = {s.id: s for s in subjects if s.id is not None}
+    subject_ids = list(subject_lookup.keys())
 
     # FIX: Use col()
     links = session.exec(
@@ -546,70 +657,143 @@ def prerequisite_graph_all_years(
     edges: list[dict] = []
     # Start with all subjects as nodes (not just those with prerequisites)
     subject_node_ids: set[int] = set(subject_ids)
+    # Synthetic nodes for custom-text prerequisites
+    custom_label_to_id: dict[str, int] = {}
+    custom_nodes: dict[int, str] = {}
+    next_custom_id = -1
     
     for link in links:
         # FIX: Check for None
         if link.subject_id is None:
             continue
-        sid = int(link.subject_id)
+        subject_id = int(link.subject_id)
 
         # Only include subject-to-subject prerequisite relationships
         if link.prerequisite_subject_id is not None:
             try:
-                pid = int(link.prerequisite_subject_id)
+                prerequisite_id = int(link.prerequisite_subject_id)
             except (TypeError, ValueError):
                 continue
-            subject_node_ids.add(sid)
-            subject_node_ids.add(pid)
+            subject_node_ids.add(subject_id)
+            subject_node_ids.add(prerequisite_id)
             edges.append(
                 {
-                    "from": pid,
-                    "to": sid,
+                    "from": prerequisite_id,
+                    "to": subject_id,
+                    "type": "corequisite" if link.is_corequisite else "prerequisite",
+                }
+            )
+        else:
+            # Custom free-text prerequisite: only include when a subject-like
+            # code can be extracted (e.g. CSIT110, CSC5020). This skips
+            # generic requirements such as "18cp @ 200 level CSIT".
+            requirement_text = (link.custom_text or "").strip()
+            if not requirement_text:
+                continue
+
+            code_match = re.search(r"\b[A-Za-z]{3,5}\d{3,4}\b", requirement_text)
+            if not code_match:
+                continue
+            label = code_match.group(0)
+
+            prerequisite_id = custom_label_to_id.get(label)
+            if prerequisite_id is None:
+                prerequisite_id = next_custom_id
+                next_custom_id -= 1
+                custom_label_to_id[label] = prerequisite_id
+                custom_nodes[prerequisite_id] = label
+            subject_node_ids.add(subject_id)
+            subject_node_ids.add(prerequisite_id)
+            edges.append(
+                {
+                    "from": prerequisite_id,
+                    "to": subject_id,
                     "type": "corequisite" if link.is_corequisite else "prerequisite",
                 }
             )
 
     nodes: list[dict] = []
-    missing_ids = subject_node_ids - set(by_id.keys())
+    missing_ids = subject_node_ids - set(subject_lookup.keys())
     if missing_ids:
         # FIX: use col() and explicit list cast
         extra = session.exec(select(Subject).where(col(Subject.id).in_(list(missing_ids)))).all()
         for s in extra:
             if s.id is not None:
-                by_id[s.id] = s
+                subject_lookup[s.id] = s
 
-    # Group nodes by level for positioning
-    nodes_by_level = {}
-    for sid in sorted(subject_node_ids):
-        s = by_id.get(sid)
-        if not s:
-            continue
-        code = str(getattr(s, "subject_code", ""))
-        level = _infer_level_from_text(code)
-        level = level if level is not None else 0
-        
-        if level not in nodes_by_level:
-            nodes_by_level[level] = []
-        nodes_by_level[level].append((sid, code))
-    
-    # Calculate positions based on level
-    level_separation = 220
-    node_spacing = 260
-    
-    nodes: list[dict] = []
-    for level in sorted(nodes_by_level.keys()):
-        nodes_at_level = nodes_by_level[level]
-        num_nodes = len(nodes_at_level)
-        y = level * level_separation
-        
-        for index, (sid, code) in enumerate(nodes_at_level):
-            x = (index - (num_nodes - 1) / 2) * node_spacing
+    # Build label and initial level for every node (using either the
+    # subject_code or the synthetic custom-text label).
+    labels: dict[int, str] = {}
+    levels: dict[int, int] = {}
+    for subject_id in sorted(subject_node_ids):
+        if subject_id in custom_nodes:
+            code = custom_nodes[subject_id]
+        else:
+            s = subject_lookup.get(subject_id)
+            if not s:
+                continue
+            code = str(getattr(s, "subject_code", ""))
+        labels[subject_id] = code
+        inferred = _infer_level_from_text(code)
+        levels[subject_id] = inferred if inferred is not None else 0
+
+    # Ensure prerequisites are always at least one level above any
+    # subjects that depend on them, even when the codes imply the
+    # same level.
+    if edges:
+        for _ in range(len(levels)):
+            changed = False
+            for edge in edges:
+                from_id = edge.get("from")
+                to_id = edge.get("to")
+                if from_id not in levels or to_id not in levels:
+                    continue
+                if levels[from_id] >= levels[to_id]:
+                    levels[from_id] = levels[to_id] - 1
+                    changed = True
+            if not changed:
+                break
+
+    if not levels:
+        return JSONResponse({"nodes": [], "edges": edges})
+
+    # Map logical levels (which may be negative) to contiguous visual
+    # bands 0,1,2,... for a compact layout.
+    unique_levels = sorted(set(levels.values()))
+    level_to_visual = {lvl: idx for idx, lvl in enumerate(unique_levels)}
+
+    nodes_by_visual: dict[int, list[int]] = {}
+    for subject_id in sorted(levels.keys()):
+        visual_level = level_to_visual[levels[subject_id]]
+        nodes_by_visual.setdefault(visual_level, []).append(subject_id)
+
+    # Orientation: vertical for a small number of levels, horizontal
+    # (levels left-to-right) when the graph is deep.
+    num_levels = max(1, len(nodes_by_visual))
+    max_nodes_in_level = max((len(v) for v in nodes_by_visual.values()), default=1)
+    max_vertical_levels = 5
+
+    level_separation = 200.0
+    node_spacing = 150.0
+
+    nodes_orientation_vertical = num_levels <= max_vertical_levels
+
+    nodes = []
+    for visual_level, node_ids in sorted(nodes_by_visual.items()):
+        num_nodes = len(node_ids)
+        for index, subject_id in enumerate(node_ids):
+            if nodes_orientation_vertical:
+                y = visual_level * level_separation
+                x = (index - (num_nodes - 1) / 2) * node_spacing
+            else:
+                x = visual_level * level_separation
+                y = (index - (num_nodes - 1) / 2) * node_spacing
             node: dict = {
-                "id": sid,
-                "label": code,
+                "id": subject_id,
+                "label": labels[subject_id],
                 "main": False,
                 "corequisite": False,
-                "level": level,
+                "level": visual_level,
                 "x": x,
                 "y": y,
                 "physics": False,
@@ -680,7 +864,7 @@ def subject_detail_pretty(
         - HTMLResponse: either the rendered subject page (200) or a 404 response when the
             subject is not found.
 
-        Side effects:
+        subject_ide effects:
         - May set request.session["flash_message"] once when an invalid exam_weight is supplied.
         - Uses dependency injection to acquire a session (get_session).
 

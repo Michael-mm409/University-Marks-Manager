@@ -3,7 +3,7 @@ services:
     container_name: marks-manager-nginx
     image: nginx:1.25.3-alpine
     ports:
-      - "18000:80"
+      - "18000:80"  # Direct access on 192.168.3.12
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -16,54 +16,19 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    # Development-friendly command: enables live reload for Python/template changes
     command: uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --reload --reload-dir /app/src --reload-dir /app/src/templates --log-level debug
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}
-      - ENABLE_DEBUG_ROUTES=${ENABLE_DEBUG_ROUTES}
-      - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
-      - APP_VERSION=${APP_VERSION}
-      - ENV=${ENV}
-      - API_VERION=${API_VERSION}
+      # CHANGED: Pointing to the dedicated DB LXC instead of a local container
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@192.168.3.11:5432/${POSTGRES_DB}
       - PYTHONUNBUFFERED=1
-      # Ensure file change detection works reliably on bind mounts (Docker Desktop / Windows)
-      - WATCHFILES_FORCE_POLLING=true
     volumes:
-      # Bind-mount the source so edits update inside the container without rebuilds
       - ./:/app
-    # Mark the web app healthy only when /healthz responds OK; helps avoid transient 502s on restart
     healthcheck:
       test: [ "CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').getcode()==200 else 1)\"" ]
       interval: 10s
       timeout: 3s
       retries: 5
-      start_period: 10s
-    depends_on:
-      db:
-        condition: service_healthy
-
-  db:
-    container_name: marks-manager-db
-    image: postgres:16
-    restart: unless-stopped
-    volumes:
-      - /volume1/docker/Marks-Manager/db/data:/var/lib/postgresql/data/
-      - /volume1/docker/Marks-Manager/db/migrations:/migrations
-      # - E:/NAS/Marks-Manager/db/data:/var/lib/postgresql/data/
-    env_file:
-      - .env
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -h 127.0.0.1" ]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-      start_period: 10s
-
 

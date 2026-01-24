@@ -69,6 +69,7 @@
               x: n.x,
               y: n.y,
               physics: n.physics || false,
+              fixed: { x: true, y: true },
             })));
             const edges = new vis.DataSet(data.edges.map(e => ({
               from: e.from,
