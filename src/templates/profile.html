@@ -113,10 +113,108 @@
                 </form>
                 {% else %}
                 <p class="text-gray-600">All available courses have been added to your account.</p>
-                <a href="/courses/create" class="btn btn-outline mt-4">Create New Course</a>
+
+                <div class="mt-6 border-t pt-4">
+                    <h3 class="font-semibold mb-3">Create New Course</h3>
+                    <form method="post" action="/profile/create-course" class="space-y-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Course Name</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                name="name" 
+                                class="input input-bordered w-full" 
+                                placeholder="e.g., Bachelor of Computer Science" 
+                                required
+                            />
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Course Code</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                name="code" 
+                                class="input input-bordered w-full" 
+                                placeholder="e.g., BCS" 
+                                required
+                            />
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Grading Scale</span>
+                            </label>
+                            <select 
+                                name="grading_scale_id" 
+                                class="select select-bordered w-full" 
+                                required
+                            >
+                                <option value="" disabled selected>Select grading scale</option>
+                                {% for scale in grading_scales %}
+                                    <option value="{{ scale.id }}">{{ scale.scale_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">University</span>
+                            </label>
+                            <select 
+                                name="university_id" 
+                                id="profile_university_id" 
+                                class="select select-bordered w-full" 
+                                required 
+                                onchange="toggleProfileNewUniversity(this)"
+                            >
+                                <option value="" disabled selected>Select university</option>
+                                {% for uni in universities %}
+                                    <option value="{{ uni.id }}">{{ uni.name }}</option>
+                                {% endfor %}
+                                <option value="add_new">Add new university...</option>
+                            </select>
+                            <input 
+                                id="profile_new_university_input" 
+                                name="new_university_name" 
+                                class="input input-bordered mt-2" 
+                                placeholder="Enter new university name" 
+                                style="display:none;" 
+                                disabled
+                            />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Create Course</button>
+                    </form>
+                </div>
                 {% endif %}
             </div>
         </div>
     </div>
+    <script>
+        function toggleProfileNewUniversity(select) {
+            const input = document.getElementById('profile_new_university_input');
+            if (!input) return;
+            if (select.value === 'add_new') {
+                input.style.display = 'block';
+                input.disabled = false;
+                input.setAttribute('required', '');
+                input.focus();
+            } else {
+                input.style.display = 'none';
+                input.disabled = true;
+                input.removeAttribute('required');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const select = document.getElementById('profile_university_id');
+            if (select) {
+                toggleProfileNewUniversity(select);
+            }
+        });
+    </script>
 </body>
 </html>

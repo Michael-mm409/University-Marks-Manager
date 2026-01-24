@@ -6,7 +6,8 @@ from sqlmodel import Session, select
 import bcrypt
 
 from src.presentation.api.deps import get_session
-from src.infrastructure.db.models import User, UserCourse, Course
+from src.infrastructure.db.models import User, UserCourse, Course, GradeScale, University
+from src.core.services.course_manager import CourseManager
 from src.presentation.web.template_helpers import _render
 
 router = APIRouter()
@@ -183,11 +184,26 @@ def profile_page(request: Request, session: Session = Depends(get_session)):
         select(UserCourse.course_id).distinct()
     ).all()
     available_courses = [c for c in all_courses if c.id not in assigned_course_ids]
-    
+
+    # Build grading scale options (distinct by scale_name) for inline create form
+    all_scales = session.exec(select(GradeScale)).all()
+    seen_scale_names = set()
+    grading_scales = []
+    for scale in all_scales:
+        name = getattr(scale, "scale_name", None)
+        if name and name not in seen_scale_names:
+            seen_scale_names.add(name)
+            grading_scales.append(scale)
+
+    # All universities for the inline create form
+    universities = session.exec(select(University)).all()
+
     return _render(request, "profile.html", {
         "user": user,
         "courses": courses_data,
-        "available_courses": available_courses
+        "available_courses": available_courses,
+        "grading_scales": grading_scales,
+        "universities": universities,
     })
 
 
@@ -237,6 +253,69 @@ def add_course_to_user(
             request.session["current_course_name"] = course.name
             request.session["current_course_code"] = course.code
     
+    return RedirectResponse(url="/profile", status_code=303)
+
+
+@router.post("/profile/create-course")
+def create_course_for_user(
+    request: Request,
+    name: str = Form(...),
+    code: str = Form(...),
+    grading_scale_id: str = Form(...),
+    university_id: str = Form(None),
+    new_university_name: str = Form(None),
+    session: Session = Depends(get_session),
+):
+    """Create a brand new course and attach it to the current user.
+
+    This is used by the inline "Create New Course" form on the profile page.
+    """
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/login", status_code=303)
+
+    # Parse grading scale id
+    try:
+        gs_id = int(str(grading_scale_id))
+    except Exception:
+        return RedirectResponse(url="/profile?error=Invalid grading scale selected", status_code=303)
+
+    # Parse optional university id
+    uni_id = None
+    if university_id and university_id != "add_new":
+        try:
+            uni_id = int(university_id)
+        except Exception:
+            uni_id = None
+
+    cm = CourseManager(session)
+    course = cm.create_course(
+        name=name,
+        code=code,
+        grading_scale_id=gs_id,
+        university_id=uni_id,
+        new_university_name=new_university_name if university_id == "add_new" else None,
+    )
+
+    # Attach the new course to the user (make default if first)
+    user_courses = session.exec(
+        select(UserCourse).where(UserCourse.user_id == user_id)
+    ).all()
+    is_default = len(user_courses) == 0
+
+    user_course = UserCourse(
+        user_id=user_id,
+        course_id=course.id,  # type: ignore[arg-type]
+        is_default=is_default,
+    )
+    session.add(user_course)
+    session.commit()
+
+    if is_default:
+        request.session["current_course_id"] = course.id
+        request.session["current_course_name"] = course.name
+        request.session["current_course_code"] = course.code
+
     return RedirectResponse(url="/profile", status_code=303)
 
 
