@@ -140,33 +140,7 @@
 
   <section class="p-6 rounded-xl bg-base-100 shadow card-glow">
     <h2 class="section-card-title text-xl">Existing Courses</h2>
-    {% if courses and courses|length > 0 %}
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-      {% for course in courses %}
-            <div class="bg-base-100 rounded-lg shadow p-6 flex flex-row items-center border border-base-300 hover:shadow-lg transition-shadow">
-              <div class="flex-1 text-left">
-                <div class="text-lg font-bold text-primary mb-1">{{ course.name }}</div>
-                <div class="mb-1">
-                  <span class="badge badge-info badge-outline mr-2">Code: {{ course.code }}</span>
-                  {% if course.university %}
-                    <span class="badge badge-secondary badge-outline mr-2">University: {{ course.university.name }}</span>
-                  {% endif %}
-                  {% if course.grading_scale_id %}
-                    <span class="badge badge-accent badge-outline">Scale ID: {{ course.grading_scale_id }}</span>
-                  {% endif %}
-                </div>
-              </div>
-              <div class="flex items-center justify-center self-stretch pr-8" style="min-width: 120px;">
-                <a href="/courses/{{ course.id }}" class="btn btn-primary btn-md">
-                  Manage
-                </a>
-              </div>
-            </div>
-      {% endfor %}
-      </div>
-    {% else %}
-      <p>No courses found.</p>
-    {% endif %}
+    {% include 'partials/course_list.html' %}
   </section>
 </div>
 

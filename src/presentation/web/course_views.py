@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 from src.core.services.course_manager import CourseManager
 from src.core.services.semester_manager import SemesterManager
 from src.infrastructure.db.engine import get_session
-from src.infrastructure.db.models import Subject, Course, Semester, University
+from src.infrastructure.db.models import Subject, Course, Semester, University, GradeScale
 
 router = APIRouter()
 
@@ -335,6 +335,46 @@ async def create_course_view(
         resp.headers["HX-Trigger"] = "courseListChanged"
         return resp
     return HTMLResponse(content=content, status_code=200)
+
+
+@router.get("/courses/create", response_class=HTMLResponse)
+def create_course_page(
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    """Render the create/manage courses page used from the profile screen.
+
+    This must be declared before the dynamic /courses/{course_code} route so
+    that the literal path segment "create" is not treated as a course code.
+    """
+    jinja_env = request.app.state.jinja_env
+    course_manager = CourseManager(session)
+
+    # All existing courses for the list
+    courses = course_manager.get_all_courses()
+
+    # Distinct grading scales (by scale_name) for the dropdown
+    all_scales = session.exec(select(GradeScale)).all()
+    seen_scale_names = set()
+    grading_scales = []
+    for scale in all_scales:
+        name = getattr(scale, "scale_name", None)
+        if name and name not in seen_scale_names:
+            seen_scale_names.add(name)
+            grading_scales.append(scale)
+
+    # All universities for the university selector
+    universities = session.exec(select(University)).all()
+
+    template = jinja_env.get_template("courses.html")
+    return template.render(
+        request=request,
+        courses=courses,
+        grading_scales=grading_scales,
+        universities=universities,
+        # Hide the "Active Course" header on the global manage-courses page
+        no_courses_warning=True,
+    )
 
 
 @router.get("/courses/{course_code}", response_class=HTMLResponse)

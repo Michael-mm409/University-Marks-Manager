@@ -87,11 +87,16 @@ def settings_page(request: Request, session: Session = Depends(get_session)):
 
 @router.get("/courses", response_class=HTMLResponse)
 def courses_page(request: Request, session: Session = Depends(get_session)):
-    """Render the manage courses page, including a list of all existing courses."""
-    # Fetch all courses
+    """Render the manage courses page, including a list of all existing courses.
+
+    NOTE: The dedicated creation workflow lives at /courses/create on the courses
+    router; this endpoint is retained only for any legacy usages.
+    """
     courses = session.exec(select(Course)).all()
     return _render(request, "courses.html", {
-        "courses": courses
+        "courses": courses,
+        # Hide the Active Course header on the legacy manage-courses page
+        "no_courses_warning": True,
     })
 
 # Endpoint to update the grading scale for the active course
