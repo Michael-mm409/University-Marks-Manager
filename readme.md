@@ -68,6 +68,9 @@ conda create -n umm python=3.11 -y
 conda activate umm
 pip install -r requirements.txt
 
+# Optional: dev tools (linting, tests, migrations)
+pip install -r requirements-dev.txt
+
 # Optional: set for this session; StartMarkManager.bat will default to 'umm' if not set
 $env:CONDA_ENV = "umm"
 
