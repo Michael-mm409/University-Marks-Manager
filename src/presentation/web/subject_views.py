@@ -22,6 +22,112 @@ from .types import SubjectContext
 
 subject_router = APIRouter()
 
+
+def extract_semester_order(semester_name: str) -> int:
+    """
+    Extract the chronological order of a semester from its name.
+    
+    Supports:
+    - Named semesters: Annual (0), Autumn/Fall (1), Spring (2), Summer (3), Winter (4)
+    - Numbered semesters: Trimester 1/T1 (1), Trimester 2/T2 (2), etc.
+    - Quarters: Quarter 1/Q1 (1), Quarter 2/Q2 (2), etc.
+    
+    Returns:
+        An integer representing the semester's position within a year.
+        Higher numbers = later in the year. 0 = full year/annual course.
+    """
+    import re
+    
+    name_lower = semester_name.lower().strip()
+    
+    # Check for annual/full-year courses first (they have their own order: 0)
+    if "annual" in name_lower or "full year" in name_lower or "full-year" in name_lower:
+        return 0
+    
+    # Try to extract a number from the semester name (e.g., "Trimester 1" -> 1, "T3" -> 3, "Q2" -> 2)
+    number_match = re.search(r'(\d+)', name_lower)
+    if number_match:
+        extracted_num = int(number_match.group(1))
+        # Validate that the number is reasonable (1-4 for most systems)
+        if 1 <= extracted_num <= 4:
+            return extracted_num
+    
+    # Named semester mapping (fallback for traditional semester names)
+    named_semesters = {
+        "autumn": 1,
+        "fall": 1,
+        "spring": 2,
+        "summer": 3,
+        "winter": 4,
+    }
+    
+    return named_semesters.get(name_lower, 999)  # 999 for unknown semesters
+
+
+def check_prerequisite_violations(
+    session: Session,
+    subject: Subject,
+    target_semester_name: str,
+    target_year: int,
+) -> Optional[str]:
+    """
+    Check if moving a subject to a different semester violates prerequisite constraints.
+    
+    Returns:
+        None if no violations, otherwise a string describing the violation.
+    """
+    # Get all prerequisites for this subject
+    prerequisites = session.exec(
+        select(SubjectPrerequisite).where(
+            SubjectPrerequisite.subject_id == subject.id
+        )
+    ).all()
+    
+    if not prerequisites:
+        return None
+    
+    # Get the target semester object
+    target_semester = session.exec(
+        select(Semester).where(
+            Semester.name == target_semester_name,
+            Semester.year == target_year
+        )
+    ).first()
+    
+    if not target_semester:
+        return None
+    
+    violations = []
+    target_sem_order = extract_semester_order(target_semester_name)
+    
+    for prereq in prerequisites:
+        # Skip custom text prerequisites (they don't have subject_id)
+        if not prereq.prerequisite_subject_id:
+            continue
+        
+        prereq_subject = session.get(Subject, prereq.prerequisite_subject_id)
+        if not prereq_subject:
+            continue
+        
+        prereq_semester = session.get(Semester, prereq_subject.semester_id)
+        if not prereq_semester:
+            continue
+        
+        prereq_sem_order = extract_semester_order(prereq_semester.name)
+        
+        # If prerequisite is in a later year, that's a violation
+        if prereq_semester.year > target_year:
+            violations.append(f"{prereq_subject.subject_code}")
+        # If same year, check semester order
+        elif prereq_semester.year == target_year and prereq_sem_order > target_sem_order:
+            violations.append(f"{prereq_subject.subject_code}")
+    
+    if violations:
+        prereq_type = "corequisite" if prerequisites[0].is_corequisite else "prerequisite"
+        return f"WARNING: Moving to {target_semester_name} {target_year} would place this subject BEFORE its {prereq_type}(s): {', '.join(violations)}"
+    
+    return None
+
 templates = Jinja2Templates(directory="src/templates")
 
 
@@ -123,7 +229,7 @@ def prerequisite_graph_for_subject(
     graph = build_subject_prerequisite_graph(session, int(subj.id))
     return JSONResponse(graph)
 
-@subject_router.api_route("/subject/create", methods=["POST"])
+@subject_router.api_route("/semester/{semester}/subject/create", methods=["POST"])
 def create_subject(
     semester: str,
     year: str = Form(...),
@@ -210,15 +316,15 @@ def add_prerequisite_route(
 
 
 @subject_router.api_route(
-    "/semester/{semester}/subject/{code}/prerequisite/remove",
+    "/year/{year}/semester/{semester}/subject/{code}/prerequisite/remove",
     methods=["POST", "GET", "HEAD"],
     response_class=RedirectResponse,
 )
 def remove_prerequisite_route(
     request: Request,
+    year: str,
     semester: str,
     code: str,
-    year: str = Form(""),
     prerequisite_id: Optional[str] = Form(None),
     is_corequisite: Optional[str] = Form(None),
     session: Session = Depends(get_session),
@@ -229,9 +335,8 @@ def remove_prerequisite_route(
     - GET/HEAD simply redirect back without side effects.
     """
     if request.method != "POST":
-        target_year = year or str(request.query_params.get("year") or "")
         return RedirectResponse(
-            url=f"/year/{target_year}/semester/{semester}/subject/{code}",
+            url=f"/year/{year}/semester/{semester}/subject/{code}",
             status_code=303,
         )
 
@@ -271,12 +376,11 @@ def remove_prerequisite_route(
     )
 
 
-@subject_router.api_route("/subject/{code}", methods=["GET", "HEAD"], response_class=RedirectResponse)
+@subject_router.api_route("/semester/{semester}/subject/{code}", methods=["GET", "HEAD"], response_class=RedirectResponse)
 def subject_detail_legacy(
     request: Request,
     semester: str,
     code: str,
-    year: str,
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
     """Legacy path: redirect to canonical /year/{year}/semester/{semester}/subject/{code}.
@@ -285,6 +389,7 @@ def subject_detail_legacy(
     subject detail rendering lives under the pretty URL
     handled in views.subject_detail_pretty.
     """
+    year = request.query_params.get("year", "")
     return RedirectResponse(
         url=f"/year/{year}/semester/{semester}/subject/{code}",
         status_code=303,
@@ -321,16 +426,32 @@ def update_subject(
     ).first()
     
     if subject:
+        # Check for prerequisite violations if the subject is being moved
+        is_moving = semester != search_semester or int(year) != int(search_year)
+        if is_moving:
+            violation_message = check_prerequisite_violations(
+                session,
+                subject,
+                semester,
+                int(year)
+            )
+            if violation_message:
+                # Redirect back with error message
+                return RedirectResponse(
+                    url=f"/year/{search_year}/semester/{search_semester}/subject/{search_code}?error={violation_message}",
+                    status_code=303,
+                )
+        
         # Find or create the target semester if it's different
         target_semester = None
-        if semester != search_semester or int(year) != int(search_year):
+        if is_moving:
             target_semester = session.exec(
                 select(Semester).where(
                     Semester.name == semester,
                     Semester.year == int(year)
                 )
             ).first()
-            if target_semester:
+            if target_semester and target_semester.id is not None:
                 subject.semester_id = target_semester.id
         
         subject.subject_code = subject_code
@@ -358,7 +479,7 @@ def update_subject(
     return RedirectResponse(url=url, status_code=303)
 
 
-@subject_router.api_route("/subject/{code}/delete", methods=["POST"], response_class=RedirectResponse)
+@subject_router.api_route("/semester/{semester}/subject/{code}/delete", methods=["POST"], response_class=RedirectResponse)
 def delete_subject(
     semester: str,
     code: str,
@@ -367,13 +488,26 @@ def delete_subject(
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
     """Delete a subject and all its related data."""
-    subject = session.exec(
-        select(Subject).join(Semester, expression.true() & (Subject.semester_id == Semester.id)).where(
+    # Find the semester first to get its ID
+    sem = session.exec(
+        select(Semester).where(
             Semester.name == semester,
             Semester.year == int(year),
+        )
+    ).first()
+    
+    if not sem:
+        # Semester not found, redirect with error
+        return RedirectResponse(f"/year/{year}/semester/{semester}?error=Semester+not+found", status_code=303)
+    
+    # Find the subject by semester_id and code
+    subject = session.exec(
+        select(Subject).where(
+            Subject.semester_id == sem.id,
             Subject.subject_code == code
         )
     ).first()
+    
     if subject:
         # Delete related data (assignments, exams, settings)
         sid = getattr(subject, "id", None)

@@ -85,6 +85,12 @@
 ] %}
 
 {% block content %}
+{% if request.query_params.get('error') %}
+<div class="alert alert-error shadow-md mb-6 max-w-4xl mx-auto">
+  <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4v2m0 0v2m0-6v-2m0 6v2m0 0H9m3 0h3m0 0h3m-3 0h-3m0 0H9m6 0H9m3 0h3m-3 0h3"></path></svg>
+  <span>{{ request.query_params.get('error') }}</span>
+</div>
+{% endif %}
 <div class="flex flex-col items-center text-center gap-3 md:gap-4 mb-8">
   <h2 class="subject-title flex items-center gap-3 justify-center">
     <span id="subject-code-display">{{subject.subject_code}}</span>
@@ -129,7 +135,7 @@
                 Unknown prerequisite
               {% endif %}
             {% if prereq.is_corequisite %}<span class="badge badge-info ml-2">Co-requisite</span>{% endif %}
-              <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite/remove" style="display:inline">
+              <form method="post" action="/year/{{year}}/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite/remove" style="display:inline">
                 <input type="hidden" name="year" value="{{year}}" />
                 <input type="hidden" name="prerequisite_id" value="{{ prereq.id }}" />
                 <input type="hidden" name="is_corequisite" value="{{ prereq.is_corequisite|int }}" />
