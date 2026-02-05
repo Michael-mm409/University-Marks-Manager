@@ -149,14 +149,66 @@
                             </label>
                             <select 
                                 name="grading_scale_id" 
+                                id="profile_grading_scale_id"
                                 class="select select-bordered w-full" 
                                 required
+                                onchange="toggleProfileCustomScale(this)"
                             >
                                 <option value="" disabled selected>Select grading scale</option>
                                 {% for scale in grading_scales %}
                                     <option value="{{ scale.id }}">{{ scale.scale_name }}</option>
                                 {% endfor %}
+                                <option value="other">Other (Define Custom)</option>
                             </select>
+
+                            <p class="mt-1 text-xs text-gray-500">
+                                Want to review or edit all scales? <a href="/settings" class="link link-primary">Open grading scale settings</a>.
+                            </p>
+
+                            <div id="profile_custom_scale_div" class="mt-4 p-4 border border-base-300 rounded-lg bg-base-200/50" style="display:none;">
+                                <div class="form-control mb-4">
+                                    <label class="label"><span class="label-text font-bold">Custom Scale Name</span></label>
+                                    <input type="text" name="custom_grading_scale" class="input input-bordered w-full" placeholder="e.g. My University Scale">
+                                </div>
+
+                                <label class="label"><span class="label-text font-bold">Grade Mappings</span></label>
+                                <div class="overflow-x-auto">
+                                    <table id="profile-grading-scale-table" class="table table-sm w-full bg-base-100">
+                                        <thead>
+                                            <tr>
+                                                <th>Grade</th>
+                                                <th>Label</th>
+                                                <th>Min %</th>
+                                                <th>GPA</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>
+                                                    <input type="text" name="custom_grades[]" value="HD" class="input input-xs w-16" required>
+                                                    <input type="hidden" name="custom_band_types[]" value="both">
+                                                </td>
+                                                <td><input type="text" name="custom_labels[]" value="High Distinction" class="input input-xs w-full" required></td>
+                                                <td><input type="number" name="custom_min_marks[]" value="85" step="any" class="input input-xs w-16" required></td>
+                                                <td><input type="number" name="custom_gpa_points[]" value="4.0" step="any" class="input input-xs w-16" required></td>
+                                                <td></td>
+                                            </tr>
+                                            <tr>
+                                                <td>
+                                                    <input type="text" name="custom_grades[]" value="D" class="input input-xs w-16" required>
+                                                    <input type="hidden" name="custom_band_types[]" value="both">
+                                                </td>
+                                                <td><input type="text" name="custom_labels[]" value="Distinction" class="input input-xs w-full" required></td>
+                                                <td><input type="number" name="custom_min_marks[]" value="75" step="any" class="input input-xs w-16" required></td>
+                                                <td><input type="number" name="custom_gpa_points[]" value="3.0" step="any" class="input input-xs w-16" required></td>
+                                                <td></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <button type="button" class="btn btn-xs btn-outline mt-2" onclick="addProfileGradingScaleRow()">+ Add Grade</button>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="form-control">
@@ -209,10 +261,49 @@
             }
         }
 
+        function toggleProfileCustomScale(select) {
+            const customDiv = document.getElementById('profile_custom_scale_div');
+            if (!customDiv) return;
+            const isOther = select.value === 'other';
+            customDiv.style.display = isOther ? 'block' : 'none';
+
+            const inputs = customDiv.querySelectorAll('input');
+            inputs.forEach(input => {
+                input.disabled = !isOther;
+                if (isOther) {
+                    input.setAttribute('required', '');
+                } else {
+                    input.removeAttribute('required');
+                }
+            });
+        }
+
+        function addProfileGradingScaleRow() {
+            const tableBody = document.querySelector('#profile-grading-scale-table tbody');
+            if (!tableBody) return;
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <input type="text" name="custom_grades[]" class="input input-xs w-16" required>
+                    <input type="hidden" name="custom_band_types[]" value="both">
+                </td>
+                <td><input type="text" name="custom_labels[]" class="input input-xs w-full" required></td>
+                <td><input type="number" name="custom_min_marks[]" step="any" class="input input-xs w-16" required></td>
+                <td><input type="number" name="custom_gpa_points[]" step="any" class="input input-xs w-16" required></td>
+                <td><button type="button" class="btn btn-xs btn-ghost text-error" onclick="this.closest('tr').remove()">✕</button></td>
+            `;
+            tableBody.appendChild(row);
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             const select = document.getElementById('profile_university_id');
             if (select) {
                 toggleProfileNewUniversity(select);
+            }
+
+            const gradingSelect = document.getElementById('profile_grading_scale_id');
+            if (gradingSelect) {
+                toggleProfileCustomScale(gradingSelect);
             }
         });
     </script>

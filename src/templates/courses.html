@@ -64,6 +64,10 @@
           <option value="other">Other (Define Custom)</option>
         </select>
 
+        <p class="mt-1 text-xs text-gray-500">
+          Need to see or edit all grading scales? <a href="/settings" class="link link-primary">Open grading scale settings</a>.
+        </p>
+
         <div id="custom_scale_div" class="mt-4 p-4 border border-base-300 rounded-lg bg-base-200/50" style="display: none;">
           <div class="form-control mb-4">
             <label class="label"><span class="label-text font-bold">Custom Scale Name</span></label>
@@ -84,14 +88,20 @@
               </thead>
               <tbody>
                 <tr>
-                  <td><input type="text" name="custom_grades[]" value="HD" class="input input-xs w-16" required></td>
+                  <td>
+                    <input type="text" name="custom_grades[]" value="HD" class="input input-xs w-16" required>
+                    <input type="hidden" name="custom_band_types[]" value="both">
+                  </td>
                   <td><input type="text" name="custom_labels[]" value="High Distinction" class="input input-xs w-full" required></td>
                   <td><input type="number" name="custom_min_marks[]" value="85" step="any" class="input input-xs w-16" required></td>
                   <td><input type="number" name="custom_gpa_points[]" value="4.0" step="any" class="input input-xs w-16" required></td>
                   <td></td>
                 </tr>
                 <tr>
-                  <td><input type="text" name="custom_grades[]" value="D" class="input input-xs w-16" required></td>
+                  <td>
+                    <input type="text" name="custom_grades[]" value="D" class="input input-xs w-16" required>
+                    <input type="hidden" name="custom_band_types[]" value="both">
+                  </td>
                   <td><input type="text" name="custom_labels[]" value="Distinction" class="input input-xs w-full" required></td>
                   <td><input type="number" name="custom_min_marks[]" value="75" step="any" class="input input-xs w-16" required></td>
                   <td><input type="number" name="custom_gpa_points[]" value="3.0" step="any" class="input input-xs w-16" required></td>
@@ -167,7 +177,10 @@ function addGradingScaleRow() {
   const tableBody = document.querySelector('#grading-scale-table tbody');
   const row = document.createElement('tr');
   row.innerHTML = `
-    <td><input type="text" name="custom_grades[]" class="input input-xs w-16" required></td>
+    <td>
+      <input type="text" name="custom_grades[]" class="input input-xs w-16" required>
+      <input type="hidden" name="custom_band_types[]" value="both">
+    </td>
     <td><input type="text" name="custom_labels[]" class="input input-xs w-full" required></td>
     <td><input type="number" name="custom_min_marks[]" step="any" class="input input-xs w-16" required></td>
     <td><input type="number" name="custom_gpa_points[]" step="any" class="input input-xs w-16" required></td>

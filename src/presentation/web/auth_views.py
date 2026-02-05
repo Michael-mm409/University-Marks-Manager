@@ -1,5 +1,5 @@
 """Authentication routes for user login/signup/logout."""
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, select
@@ -27,7 +27,7 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-@router.get("/login", response_class=HTMLResponse)
+@router.api_route("/login", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def login_page(request: Request):
     """Render the login page."""
     # If already logged in, redirect to home
@@ -264,6 +264,12 @@ def create_course_for_user(
     grading_scale_id: str = Form(...),
     university_id: str = Form(None),
     new_university_name: str = Form(None),
+    custom_grading_scale: Optional[str] = Form(None),
+    custom_grades: Optional[List[str]] = Form(None),
+    custom_labels: Optional[List[str]] = Form(None),
+    custom_min_marks: Optional[List[float]] = Form(None),
+    custom_gpa_points: Optional[List[float]] = Form(None),
+    custom_band_types: Optional[List[str]] = Form(None),
     session: Session = Depends(get_session),
 ):
     """Create a brand new course and attach it to the current user.
@@ -274,11 +280,69 @@ def create_course_for_user(
     if not user_id:
         return RedirectResponse(url="/login", status_code=303)
 
-    # Parse grading scale id
-    try:
-        gs_id = int(str(grading_scale_id))
-    except Exception:
-        return RedirectResponse(url="/profile?error=Invalid grading scale selected", status_code=303)
+    # Handle grading scale: either existing id or create custom when "other" is selected
+    gs_id: Optional[int] = None
+    if grading_scale_id and grading_scale_id != "other":
+        try:
+            gs_id = int(str(grading_scale_id))
+        except Exception:
+            return RedirectResponse(url="/profile?error=Invalid grading scale selected", status_code=303)
+    elif grading_scale_id == "other":
+        # Validate custom scale data
+        if not custom_grading_scale or not custom_grades or not custom_labels or not custom_min_marks or not custom_gpa_points:
+            return RedirectResponse(url="/profile?error=Missing custom grading scale data", status_code=303)
+
+        scale_name = custom_grading_scale.strip()
+        if not scale_name:
+            return RedirectResponse(url="/profile?error=Custom scale name is required", status_code=303)
+
+        scale_ids: List[int] = []
+        for i in range(len(custom_grades)):
+            grade = (custom_grades[i] or "").strip()
+            label = (custom_labels[i] or "").strip()
+            if not grade or not label:
+                continue
+            try:
+                min_mark = float(custom_min_marks[i]) if custom_min_marks[i] is not None else 0.0
+            except Exception:
+                min_mark = 0.0
+            try:
+                gpa_point = float(custom_gpa_points[i]) if custom_gpa_points[i] is not None else 0.0
+            except Exception:
+                gpa_point = 0.0
+            band_type = (
+                custom_band_types[i]
+                if custom_band_types is not None and i < len(custom_band_types)
+                else "both"
+            )
+
+            existing = session.exec(
+                select(GradeScale).where(
+                    GradeScale.scale_name == scale_name,
+                    GradeScale.grade == grade,
+                    GradeScale.band_type == band_type,
+                )
+            ).first()
+            if existing:
+                scale_ids.append(existing.id)  # type: ignore[arg-type]
+            else:
+                gs = GradeScale(
+                    scale_name=scale_name,
+                    grade=grade,
+                    label=label,
+                    min_mark=min_mark,
+                    gpa_point=gpa_point,
+                    band_type=band_type,
+                )
+                session.add(gs)
+                session.commit()
+                session.refresh(gs)
+                scale_ids.append(gs.id)  # type: ignore[arg-type]
+
+        if not scale_ids:
+            return RedirectResponse(url="/profile?error=Failed to create custom grading scale", status_code=303)
+
+        gs_id = scale_ids[0]
 
     # Parse optional university id
     uni_id = None
@@ -287,6 +351,9 @@ def create_course_for_user(
             uni_id = int(university_id)
         except Exception:
             uni_id = None
+
+    if gs_id is None:
+        return RedirectResponse(url="/profile?error=Invalid grading scale selected", status_code=303)
 
     cm = CourseManager(session)
     course = cm.create_course(
