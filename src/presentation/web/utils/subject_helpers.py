@@ -119,9 +119,25 @@ def build_candidate_subjects(session: Session, subject: Optional[Subject]) -> Li
     prereq_manager = SubjectPrerequisiteManager(session)
     existing_prereqs = prereq_manager.get_prerequisites(int(subject.id))
 
-    existing_prereq_ids = {
-        s.id for s in existing_prereqs if s.id is not None
-    }
+    # Collect prerequisite subject IDs (both linked subjects and custom prerequisites)
+    existing_prereq_ids = set()
+    for prereq in existing_prereqs:
+        # Add prerequisite_subject_id if it exists (linked subjects)
+        if prereq.prerequisite_subject_id is not None:
+            existing_prereq_ids.add(prereq.prerequisite_subject_id)
+        # For custom text prerequisites, we need to find matching subjects by subject code or name
+        # to exclude them from the candidate list
+        if prereq.custom_text:
+            # Find subjects that match this custom text
+            matching_subjects = session.exec(
+                select(Subject).where(
+                    (col(Subject.subject_code) == prereq.custom_text) |
+                    (col(Subject.subject_name) == prereq.custom_text)
+                )
+            ).all()
+            for s in matching_subjects:
+                if s.id is not None:
+                    existing_prereq_ids.add(s.id)
 
     candidate_subjects = [
         s

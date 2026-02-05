@@ -1,6 +1,6 @@
 from __future__ import annotations
 """HTML view routes rendering Jinja templates (spaces only)."""
- 
+
 from typing import Optional, List, cast
 from datetime import datetime
 
@@ -30,30 +30,6 @@ from src.core.services.semester_manager import SemesterManager
 from src.core.services.course_manager import CourseManager
 from src.core.services.grade_calculator import GradeCalculator
 
-from typing import Optional, List, cast
-from datetime import datetime
-
-from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from sqlmodel import Session, select
-
-from src.presentation.api.deps import get_session
-from src.infrastructure.db.models import (
-    Semester,
-    Subject,
-)
-from .template_helpers import _render
-from .assignment_views import assignment_router
-from .exam_views import exam_router
-from .semester_views import semester_router, build_semester_context
-from .subject_views import subject_router, build_subject_context, build_subject_page_context
-from .course_views import router as course_router
-from .settings_views import router as settings_router
-from .types import IndexContext
-from src.core.services.semester_manager import SemesterManager
-from src.core.services.course_manager import CourseManager
-from src.core.services.grade_calculator import GradeCalculator
-
 async def verify_user(request: Request):
     if not request.session.get("user_id"):
         # Redirect to login if user is not authenticated
@@ -75,7 +51,10 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
     cm = CourseManager(session)
     
     # Get user_id from session
-    user_id = int(request.session.get("user_id"))
+    user_id_val = request.session.get("user_id")
+    if not user_id_val:
+        raise HTTPException(status_code=307, detail="Not Logged In", headers={"location": "/login"})
+    user_id = int(user_id_val)
     
     # Get only courses for this user
     user_courses = session.exec(
@@ -205,7 +184,7 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
 
 
 @views.api_route("/", methods=["GET"], response_class=HTMLResponse)
-def home(request: Request, year: Optional[str] = None, session: Session = Depends(get_session)) -> HTMLResponse:
+def home(request: Request, year: Optional[str] = None, session: Session = Depends(get_session)) -> Response:
     """Landing route that supports legacy query param and redirects to pretty URLs.
 
     - /?year=2025 -> 303 /year/2025 (preserving selected=1)
@@ -230,19 +209,24 @@ def home(request: Request, year: Optional[str] = None, session: Session = Depend
     # No year provided: prefer current year if any data exists, else All
     sm = SemesterManager(session)
     cm = CourseManager(session)
-    user_id = int(request.session.get("user_id"))
+    user_id_val = request.session.get("user_id")
+    if not user_id_val:
+        return RedirectResponse(url="/login", status_code=303)
+    user_id = int(user_id_val)
     # Determine if a course is selected
     sess = request.session
     active_course_id = sess.get("current_course_id")
-    course_id = None
+    course_id: Optional[int] = None
     if active_course_id is not None:
         try:
             course_id = int(str(active_course_id).strip())
         except Exception:
             course_id = None
     if course_id is not None:
-        years = sm.get_distinct_years_for_course(course_id)
-        semesters = sm.get_semesters_for_course(course_id)
+        # Type guard: create non-optional variable for function calls
+        course_id_int: int = course_id
+        years = sm.get_distinct_years_for_course(course_id_int)
+        semesters = sm.get_semesters_for_course(course_id_int)
     else:
         # Check if any courses exist
         all_courses = cm.get_all_courses()
@@ -250,11 +234,15 @@ def home(request: Request, year: Optional[str] = None, session: Session = Depend
             # Auto-select the first (default) course
             default_course = all_courses[0]
             course_id = default_course.id
-            sess["current_course_id"] = course_id
-            sess["current_course_name"] = default_course.name
-            sess["current_course_code"] = default_course.code
-            years = sm.get_distinct_years_for_course(course_id)
-            semesters = sm.get_semesters_for_course(course_id)
+            if course_id is not None:
+                sess["current_course_id"] = course_id
+                sess["current_course_name"] = default_course.name
+                sess["current_course_code"] = default_course.code
+                years = sm.get_distinct_years_for_course(course_id)
+                semesters = sm.get_semesters_for_course(course_id)
+            else:
+                years = sm.get_distinct_years()
+                semesters = sm.get_all_semesters()
         else:
             years = sm.get_distinct_years()
             semesters = sm.get_all_semesters()
@@ -439,12 +427,25 @@ def prerequisite_graph_all_subjects(
                 continue
             label = code_match.group(0)
 
-            prerequisite_id = custom_label_to_id.get(label)
-            if prerequisite_id is None:
-                prerequisite_id = next_custom_id
-                next_custom_id -= 1
-                custom_label_to_id[label] = prerequisite_id
-                custom_nodes[prerequisite_id] = label
+            # Check if this code matches an existing subject in the database
+            matching_subject = session.exec(
+                select(Subject).where(Subject.subject_code == label)
+            ).first()
+            
+            if matching_subject and matching_subject.id is not None:
+                # Use the existing subject ID instead of creating a synthetic node
+                prerequisite_id = int(matching_subject.id)
+                if prerequisite_id not in subject_lookup:
+                    subject_lookup[prerequisite_id] = matching_subject
+            else:
+                # Create a synthetic node for external prerequisites
+                prerequisite_id = custom_label_to_id.get(label)
+                if prerequisite_id is None:
+                    prerequisite_id = next_custom_id
+                    next_custom_id -= 1
+                    custom_label_to_id[label] = prerequisite_id
+                    custom_nodes[prerequisite_id] = label
+            
             subject_node_ids.add(subject_id)
             subject_node_ids.add(prerequisite_id)
             edges.append(
@@ -581,7 +582,7 @@ def home_year_head(request: Request, year: int, session: Session = Depends(get_s
 
 
 @views.get("/all", response_class=HTMLResponse)
-def home_all(request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
+def home_all(request: Request, session: Session = Depends(get_session)) -> Response:
     """Render the All years page, or redirect to current/first year if appropriate."""
     sm = SemesterManager(session)
     sess = request.session
