@@ -4,5 +4,10 @@
     "reportAttributeAccessIssue": "information"
   },
   "python.analysis.extraPaths": ["./"],
-  "python.analysis.stubPath": "./stubs"
+  "python.analysis.stubPath": "./stubs",
+  "remote.portsAttributes": {
+    "8001": {
+      "onAutoForward": "ignore"
+    }
+  }
 }
