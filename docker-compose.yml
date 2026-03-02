@@ -1,34 +1,29 @@
 services:
-  nginx:
-    container_name: marks-manager-nginx
-    image: nginx:1.25.3-alpine
-    ports:
-      - "18000:80"  # Direct access on 192.168.3.12
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      web:
-        condition: service_healthy
-    restart: unless-stopped
-
   web:
     container_name: marks-manager-web
     build:
       context: .
       dockerfile: Dockerfile
-    command: uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --reload --reload-dir /app/src --reload-dir /app/src/templates --log-level debug
+    command: uvicorn src.app.main:app --host 0.0.0.0 --port 8001 --proxy-headers --reload --reload-dir /app/src --reload-dir /app/src/templates --log-level info --access-log
     restart: unless-stopped
+    # network_mode: "host"  <--- REMOVE OR COMMENT THIS OUT
+    networks:
+      - proxy-tier          # <--- ADD THIS
     env_file:
       - .env
     environment:
-      # CHANGED: Pointing to the dedicated DB LXC instead of a local container
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@192.168.3.11:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
       - PYTHONUNBUFFERED=1
+      - LOG_FILTER_HEALTHCHECK=true
     volumes:
       - ./:/app
     healthcheck:
-      test: [ "CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').getcode()==200 else 1)\"" ]
-      interval: 10s
+      test: [ "CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/healthz').getcode()==200 else 1)\"" ]
+      interval: 30s
       timeout: 3s
-      retries: 5
+      retries: 3
+      start_period: 40s
 
+networks:
+  proxy-tier:
+    external: true

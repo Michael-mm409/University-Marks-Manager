@@ -32,7 +32,16 @@ from src.core.services.grade_calculator import GradeCalculator
 
 async def verify_user(request: Request):
     if not request.session.get("user_id"):
-        # Redirect to login if user is not authenticated
+        # For normal browser requests, redirect to login
+        hdr = request.headers.get
+        is_htmx = hdr("hx-request") == "true"
+        is_xrw = hdr("x-requested-with") == "XMLHttpRequest"
+        accept = (hdr("accept") or "")
+        wants_json = "application/json" in accept
+        # If this appears to be an AJAX/HTMX/fetch request, return 401 JSON
+        if is_htmx or is_xrw or wants_json:
+            raise HTTPException(status_code=401, detail="Not Logged In")
+        # Otherwise, redirect the browser to the login page
         raise HTTPException(status_code=307, detail="Not Logged In", headers={"location": "/login"})
 
 # Create router with verification dependency (but will exclude auth routes)

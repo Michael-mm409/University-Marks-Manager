@@ -8,6 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from datetime import datetime
 import os
+import logging
 from contextlib import asynccontextmanager
 
 # Third-party imports
@@ -24,6 +25,19 @@ from src.infrastructure.db import models  # noqa: F401
 from src.infrastructure.db.engine import engine, wait_for_database
 from src.presentation.api.routers import api_router as api
 from src.presentation.web.views import views
+
+
+class HealthCheckFilter(logging.Filter):
+    """Filter out healthcheck endpoint requests from access logs."""
+    
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Return False for healthcheck requests to exclude them from logs."""
+        return record.getMessage().find("/healthz") == -1
+
+
+# Configure logging to filter healthcheck requests
+if os.getenv("LOG_FILTER_HEALTHCHECK", "").lower() in ("true", "1", "yes"):
+    logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())
 
 BASE_DIR = Path(__file__).resolve().parent
 # Repo root is two levels up from src/app

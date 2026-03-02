@@ -399,7 +399,11 @@ def subject_detail_legacy(
 def update_subject(
     semester: str,
     code: str,
-    year: str = Form(...),
+    year: Optional[str] = Form(None),
+    target_semester: Optional[str] = Form(None),
+    target_year: Optional[str] = Form(None),
+    legacy_semester: Optional[str] = Form(None, alias="semester"),
+    legacy_year: Optional[str] = Form(None, alias="year"),
     subject_code: str = Form(...),
     subject_name: str = Form(...),
     credit_points: int = Form(6),
@@ -409,13 +413,25 @@ def update_subject(
     old_year: Optional[str] = Form(None),
     old_subject_code: Optional[str] = Form(None),
     return_to: Optional[str] = Form(None),
+    force_move: Optional[bool] = Form(False),
     session: Session = Depends(get_session),
 ) -> RedirectResponse:
     """Update subject details."""
+    desired_semester = target_semester or legacy_semester or semester
+    desired_year = target_year or legacy_year or year or old_year
     # Use old values if provided (for moving subjects between semesters/years)
     search_semester = old_semester if old_semester else semester
-    search_year = old_year if old_year else year
+    fallback_year = year or target_year or legacy_year or old_year
+    if not fallback_year:
+        from urllib.parse import quote
+        return RedirectResponse(
+            url=f"/?error={quote('Year is required to update this subject.')}",
+            status_code=303,
+        )
+    search_year = old_year if old_year else fallback_year
     search_code = old_subject_code if old_subject_code else code
+    if desired_year is None:
+        desired_year = search_year
     
     subject = session.exec(
         select(Subject).join(Semester,  expression.true() & (Subject.semester_id == Semester.id)).where(
@@ -425,55 +441,83 @@ def update_subject(
         )
     ).first()
     
-    if subject:
-        # Check for prerequisite violations if the subject is being moved
-        is_moving = semester != search_semester or int(year) != int(search_year)
-        if is_moving:
-            violation_message = check_prerequisite_violations(
-                session,
-                subject,
-                semester,
-                int(year)
+    if not subject:
+        from urllib.parse import quote
+        return RedirectResponse(
+            url=f"/year/{search_year}/semester/{search_semester}/subject/{search_code}?error={quote('Subject not found. Please refresh and try again.')}",
+            status_code=303,
+        )
+
+    # Check for prerequisite violations if the subject is being moved
+    is_moving = desired_semester != search_semester or int(desired_year) != int(search_year)
+    if is_moving:
+        target_semester_obj = session.exec(
+            select(Semester).where(
+                Semester.name == desired_semester,
+                Semester.year == int(desired_year)
             )
-            if violation_message:
-                # Redirect back with error message
-                return RedirectResponse(
-                    url=f"/year/{search_year}/semester/{search_semester}/subject/{search_code}?error={violation_message}",
-                    status_code=303,
+        ).first()
+        violation_message = check_prerequisite_violations(
+            session,
+            subject,
+            desired_semester,
+            int(desired_year)
+        )
+        if violation_message and not bool(force_move):
+            from urllib.parse import quote
+            # Redirect back with error message
+            return RedirectResponse(
+                url=f"/year/{search_year}/semester/{search_semester}/subject/{search_code}?error={quote(violation_message)}",
+                status_code=303,
+            )
+
+    # Find or create the target semester if it's different
+    target_semester_obj = None
+    if is_moving:
+        target_semester_obj = target_semester_obj or session.exec(
+            select(Semester).where(
+                Semester.name == desired_semester,
+                Semester.year == int(desired_year)
+            )
+        ).first()
+        if not target_semester_obj:
+            current_semester = session.get(Semester, subject.semester_id)
+            if current_semester and current_semester.course_id is not None:
+                target_semester_obj = Semester(
+                    name=desired_semester,
+                    year=int(desired_year),
+                    course_id=current_semester.course_id,
                 )
-        
-        # Find or create the target semester if it's different
-        target_semester = None
-        if is_moving:
-            target_semester = session.exec(
-                select(Semester).where(
-                    Semester.name == semester,
-                    Semester.year == int(year)
-                )
-            ).first()
-            if target_semester and target_semester.id is not None:
-                subject.semester_id = target_semester.id
-        
-        subject.subject_code = subject_code
-        subject.subject_name = subject_name
-        subject.credit_points = credit_points
-        subject.sync_subject = bool(sync_subject)
-        # Handle has_exam checkbox: if not present, set to False
-        subject.has_exam = bool(has_exam)
-        session.add(subject)
-        session.commit()
-        session.refresh(subject)
-        # If subject code changed, we need to redirect to the new code
-        new_code = subject.subject_code
-    else:
-        new_code = code
+                session.add(target_semester_obj)
+                session.commit()
+                session.refresh(target_semester_obj)
+        if not target_semester_obj:
+            from urllib.parse import quote
+            return RedirectResponse(
+                url=f"/year/{search_year}/semester/{search_semester}/subject/{search_code}?error={quote('Target semester not found and could not be created.')}",
+                status_code=303,
+            )
+        if target_semester_obj and target_semester_obj.id is not None:
+            subject.semester_id = target_semester_obj.id
+
+    subject.subject_code = subject_code
+    subject.subject_name = subject_name
+    subject.credit_points = credit_points
+    subject.sync_subject = bool(sync_subject)
+    # Handle has_exam checkbox: if not present, set to False
+    subject.has_exam = bool(has_exam)
+    session.add(subject)
+    session.commit()
+    session.refresh(subject)
+    # If subject code changed, we need to redirect to the new code
+    new_code = subject.subject_code
 
     # Redirect logic: if return_to encodes a semester context (e.g., "Autumn-2025"), go back there; else go to subject page
     if return_to:
         parts = str(return_to).split('-')
         if len(parts) == 2:
             return RedirectResponse(url=f"/year/{parts[1]}/semester/{parts[0]}", status_code=303)
-    url = f"/year/{year}/semester/{semester}/subject/{new_code}"
+    url = f"/year/{desired_year}/semester/{desired_semester}/subject/{new_code}"
     if return_to:
         url += f"?return_to={return_to}"
     return RedirectResponse(url=url, status_code=303)

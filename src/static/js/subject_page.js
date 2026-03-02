@@ -39,7 +39,12 @@
     const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
     if (!row) return;
     original_row_html = row.innerHTML;
-    fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/edit`)
+    fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/edit`, {
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      }
+    })
       .then(r => r.text())
       .then(html => { row.innerHTML = html; });
   };
@@ -56,7 +61,7 @@
   window.submitInlineEditAssignmentRow = function(assessment, code, semester, year) {
     const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
     if (!row) return false;
-    const new_assessment = row.querySelector("input[name='assessment']")?.value || assessment;
+    const new_assessment = row.querySelector("input[name='new_assessment']")?.value || assessment;
     const weighted_mark = row.querySelector("input[name='weighted_mark']")?.value || '';
     const mark_weight = row.querySelector("input[name='mark_weight']")?.value || '';
     const grade_type = row.querySelector("select[name='grade_type']")?.value || 'numeric';
@@ -71,13 +76,29 @@
     formData.append('weighted_mark', weighted_mark);
     formData.append('mark_weight', mark_weight);
     formData.append('grade_type', grade_type);
-    formData.append('is_exam', is_exam);
-    fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/update`, { method: 'POST', body: formData })
-      .then(r => r.json())
+    formData.append('is_exam', is_exam ? 'true' : 'false');
+    fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/update`, { method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
+      .then(async r => {
+        const ct = r.headers.get('content-type') || '';
+        if (!r.ok) {
+          const text = await r.text().catch(() => '');
+          console.error('Assignment update failed', r.status, text);
+          row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>Server error: ${r.status}</div></td>`;
+          return null;
+        }
+        if (ct.includes('application/json')) {
+          return r.json();
+        }
+        // Non-JSON response (likely HTML redirect to login) - show text for debugging
+        const text = await r.text().catch(() => '');
+        console.warn('Assignment update returned non-JSON response', ct, text.slice(0, 400));
+        row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>Unexpected server response.</div></td>`;
+        return null;
+      })
       .then(data => {
+        if (!data) return;
         if (data && data.success) {
           if (data.reload_url) {
-            // Force full page reload to ensure summaries/averages reflect latest changes
             window.location.assign(data.reload_url);
             return;
           }
@@ -89,7 +110,7 @@
         }
         row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>${(data && data.error) || 'Unknown error.'}</div></td>`;
       })
-      .catch(() => { row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>Error submitting edit.</div></td>`; });
+      .catch(err => { console.error(err); row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>Error submitting edit.</div></td>`; });
     return false;
   };
 
