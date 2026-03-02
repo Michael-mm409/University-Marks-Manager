@@ -279,21 +279,23 @@
             <tr>
               <th>Title</th>
               <th>Mark</th>
-              <th>Raw</th>
+              <th>Unweighted <span class="hidden md:inline">(points/total)</span></th>
               <th>Weight</th>
               <th>Type</th>
               <th>Actions</th>
             </tr>
           </thead>
          <tbody>
+          {# compute total assessment weight for this subject so we can show contribution/total #}
+          {% set total_weight = 0.0 %}
+          {% for _a in assignments %}
+            {% set total_weight = total_weight + (_a.mark_weight|float if _a.mark_weight is not none else 0.0) %}
+          {% endfor %}
+
           {% for assignment in assignments %}
-              <tr id="assignment-row-{{ loop.index }}" class="assignment-row"
-                data-grade-type="{{ assignment.grade_type }}"
-                data-unweighted-mark="{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}{% endif %}"
-                data-assessment="{{ assignment.assessment }}"
-                data-code="{{ subject.subject_code }}"
-                data-semester="{{ semester }}"
-                data-year="{{ year }}">
+            <tr id="assignment-row-{{ loop.index }}" class="assignment-row"
+              data-grade-type="{{ assignment.grade_type }}"
+              data-unweighted-mark="{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}{% endif %}">
             <td class="assignment-title">{{ assignment.assessment }}</td>
             <td class="assignment-mark">
               {% if assignment.grade_type in ['S','U'] %}
@@ -306,7 +308,10 @@
               {% if assignment.grade_type in ['S','U'] %}
                 -
               {% else %}
-                {{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}
+                {% set u = assignment.unweighted_mark|float if assignment.unweighted_mark is not none else 0.0 %}
+                {% set w = assignment.mark_weight|float if assignment.mark_weight is not none else 0.0 %}
+                {% set contrib = u * w %}
+                <span class="whitespace-nowrap">{{ '%.2f' % contrib }} / {{ '%.2f' % assignment.mark_weight }}</span>
               {% endif %}
             </td>
             <td class="assignment-weight">

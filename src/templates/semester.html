@@ -93,7 +93,7 @@
         <th class="text-left p-4">Code</th>
         <th class="text-left p-4" style="white-space:normal;word-break:break-word;">Name</th>
         <th class="text-right p-4">Mark</th>
-        <th class="text-right p-4">Raw</th>
+        <th class="text-right p-4">Unweighted (points of total)</th>
         <th class="text-right p-4">Weight</th>
         <th class="text-right p-4 font-bold">Total</th>
         <th class="text-right p-4"></th>
@@ -106,7 +106,15 @@
         <td class="p-4 font-mono">{{ row.code }}</td>
         <td class="p-4" style="white-space:normal;word-break:break-word;">{{ row.name }}</td>
         <td class="p-4 text-right">{{ '%.2f' % row.assessment_mark if row.assessment_mark is not none else '-' }}</td>
-        <td class="p-4 text-right">{% if row.assessment_unweighted is defined and row.assessment_unweighted is not none %}{{ '%.2f' % row.assessment_unweighted }}{% else %}-{% endif %}</td>
+        <td class="p-4 text-right">
+          {% if row.assessment_unweighted_contribution is defined and row.assessment_unweighted_contribution is not none %}
+            {% if row.assessment_weight is defined and row.assessment_weight is not none and row.assessment_weight != 0 %}
+              {{ '%.2f' % row.assessment_unweighted_contribution }} / {{ '%.0f' % row.assessment_weight }}
+            {% else %}
+              {{ '%.2f' % row.assessment_unweighted_contribution }}
+            {% endif %}
+          {% else %}-{% endif %}
+        </td>
         <td class="p-4 text-right">{{ '%.0f' % row.assessment_weight if row.assessment_weight is not none else '-' }}%</td>
         <td class="p-4 text-right font-bold">{{ '%.0f' % row.total_mark if row.total_mark is not none else '-' }}</td>
         <td class="p-4 text-right">

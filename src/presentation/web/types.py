@@ -38,6 +38,8 @@ class SemesterSummary(TypedDict):
     name: str
     semester_name: str
     credit_points: Optional[int]
+    assessment_unweighted: float
+    assessment_unweighted_contribution: float
     assessment_mark: float
     assessment_weight: float
     exam_mark: Optional[float]

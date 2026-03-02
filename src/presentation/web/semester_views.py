@@ -256,6 +256,10 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
 
         assess_weight_sum = 0.0
         assess_weighted_total = 0.0
+        # Sum of unweighted fractions (e.g., 0.95 + 0.00 + ...)
+        assess_unweighted_fraction_sum = 0.0
+        # Sum of contribution points (unweighted_fraction * assignment weight)
+        assess_unweighted_contrib_sum = 0.0
         assignment_weights = []
         for a in assignments:
             # Include all assignments, including those marked as is_exam
@@ -271,6 +275,14 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
                     try:
                         assess_weighted_total += float(a.weighted_mark)
                     except ValueError:
+                        pass
+                if a.unweighted_mark not in (None, ""):
+                    try:
+                        uval = float(a.unweighted_mark)
+                        assess_unweighted_fraction_sum += uval
+                        if a.mark_weight not in (None, ""):
+                            assess_unweighted_contrib_sum += uval * float(a.mark_weight)
+                    except (TypeError, ValueError):
                         pass
         print(f"[SEMESTER_SUMMARY_DEBUG] Subject: {sub.subject_code} | Assignment Weights: {assignment_weights} | Sum: {assess_weight_sum}")
 
@@ -304,6 +316,10 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
                 "semester_name": semester,
                 "credit_points": getattr(sub, "credit_points", None),
                 "assessment_mark": round(assess_weighted_total, 2),
+                # Show the normalized unweighted value: contribution sum divided by total assessment weight
+                "assessment_unweighted": round((assess_unweighted_contrib_sum / assess_weight_sum) if assess_weight_sum else assess_unweighted_fraction_sum, 2),
+                # also expose contribution sum (unweighted_fraction * weight) for other uses
+                "assessment_unweighted_contribution": round(assess_unweighted_contrib_sum, 2),
                 "assessment_weight": assess_weight_sum,
                 "exam_mark": exam_mark,
                 "exam_weight": exam_weight,
@@ -408,6 +424,10 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
             exam_assignment = next((a for a in assignments if getattr(a, "is_exam", False)), None)
             assess_weight_sum = 0.0
             assess_weighted_total = 0.0
+            # Sum of unweighted fractions for this subject
+            assess_unweighted_fraction_sum = 0.0
+            # Sum of contribution points (unweighted * weight)
+            assess_unweighted_contrib_sum = 0.0
             assignment_weights = []
             for a in assignments:
                 # Include all assignments, including those marked as is_exam
@@ -424,6 +444,14 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
                             assess_weighted_total += float(a.weighted_mark)
                         except ValueError:
                             pass
+                    if a.unweighted_mark not in (None, ""):
+                        try:
+                            uval = float(a.unweighted_mark)
+                            assess_unweighted_fraction_sum += uval
+                            if a.mark_weight not in (None, ""):
+                                assess_unweighted_contrib_sum += uval * float(a.mark_weight)
+                        except (TypeError, ValueError):
+                            pass
             total_mark = sub.total_mark if sub.total_mark not in (None, 0) else None
             exam_weight = exam.exam_weight if exam else None
             final_exam_mark_weight = exam_weight
@@ -437,6 +465,8 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
                 "name": sub.subject_name,
                 "semester_name": sem_name,
                 "assessment_mark": round(assess_weighted_total, 2),
+                "assessment_unweighted": round((assess_unweighted_contrib_sum / assess_weight_sum) if assess_weight_sum else assess_unweighted_fraction_sum, 2),
+                "assessment_unweighted_contribution": round(assess_unweighted_contrib_sum, 2),
                 "assessment_weight": assess_weight_sum,
                 "exam_mark": exam_mark,
                 "exam_weight": exam_weight,
