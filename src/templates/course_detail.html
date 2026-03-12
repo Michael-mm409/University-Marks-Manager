@@ -80,6 +80,57 @@
     <div id="course-select-alert" class="mt-4"></div>
   </section>
 
+  <!-- Subject Schedule Overview Table -->
+  <section class="flex flex-col gap-4">
+    <h2 class="section-card-title text-xl">Subject Schedule</h2>
+    {% set ns = namespace(has_subjects=false) %}
+    {% for sem in assigned_semesters %}
+      {% if subjects_by_semester.get(sem.id) %}
+        {% set ns.has_subjects = true %}
+      {% endif %}
+    {% endfor %}
+
+    {% if ns.has_subjects %}
+      <div class="overflow-x-auto rounded-xl bg-base-100 shadow card-glow">
+        <table class="table table-zebra w-full">
+          <thead>
+            <tr>
+              <th>Subject Code</th>
+              <th>Subject Name</th>
+              <th>Semester</th>
+              <th>Year</th>
+              <th class="text-right">Credit Points</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sem in assigned_semesters | sort(attribute='year') %}
+              {% set subs = subjects_by_semester.get(sem.id) %}
+              {% if subs %}
+                {% for s in subs %}
+                  <tr class="hover">
+                    <td class="font-mono text-sm">
+                      <a class="link link-primary" href="/year/{{ sem.year }}/semester/{{ sem.name }}/subject/{{ s.subject_code }}">
+                        {{ s.subject_code }}
+                      </a>
+                    </td>
+                    <td>{{ s.subject_name }}</td>
+                    <td><span class="badge badge-ghost badge-sm">{{ sem.name }}</span></td>
+                    <td class="tabular-nums">{{ sem.year }}</td>
+                    <td class="text-right tabular-nums">{{ s.credit_points }}</td>
+                  </tr>
+                {% endfor %}
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="p-6 rounded-xl border-dashed border-2 text-center opacity-60">
+        <p>No subjects have been added to any semester yet.</p>
+      </div>
+    {% endif %}
+  </section>
+
   <!-- Browse Semesters for this Course -->
   <section class="flex flex-col gap-4">
     <h2 class="section-card-title text-xl">Assigned Semesters</h2>

@@ -86,6 +86,7 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
             "no_courses_warning": True,
             "user_courses": [],
             "username": request.session.get("username"),
+            "subjects_by_semester": {},
         }
         return _render(request, "index.html", ctx)
     
@@ -175,6 +176,14 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
     gpa = gc.calculate_gpa(course_id)
     grade_counts = gc.calculate_grade_counts(course_id)
 
+    # Build subject schedule: map semester_id -> list of subjects
+    subjects_by_semester: dict[int, list] = {}
+    for sem in display_semesters:
+        sem_subjects = session.exec(
+            select(Subject).where(Subject.semester_id == sem.id)
+        ).all()
+        subjects_by_semester[int(sem.id)] = list(sem_subjects)
+
     ctx: IndexContext = {
         "semesters": display_semesters,
         "years": years,
@@ -188,6 +197,7 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
         "user_courses": user_courses_data,
         "username": sess.get("username"),
         "no_courses_warning": False,
+        "subjects_by_semester": subjects_by_semester,
     }
     return _render(request, "index.html", ctx)
 

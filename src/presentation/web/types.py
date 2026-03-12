@@ -25,6 +25,7 @@ class IndexContext(TypedDict):
     no_courses_warning: Optional[bool]
     user_courses: List[dict]
     username: Optional[str]
+    subjects_by_semester: dict[int, list]
 
 
 class SemesterSummary(TypedDict):
