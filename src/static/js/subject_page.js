@@ -30,16 +30,25 @@
     return true;
   };
 
+  function getEditingRow(assessment, code, semester, year) {
+    const escAssessment = assessment.replace(/'/g, "\\'");
+    return document.querySelector(`tr[data-assessment='${escAssessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
+  }
+
   // Inline edit state
   let editing_assignment_keys = null;
   let original_row_html = null;
   window.startInlineEditAssignment = function(assessment, code, semester, year) {
     if (editing_assignment_keys !== null) { window.cancelInlineEditAssignment(); }
     editing_assignment_keys = { assessment, code, semester, year };
-    const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
-    if (!row) return;
+    const row = getEditingRow(assessment, code, semester, year);
+    if (!row) {
+        console.error("Could not find row to edit for:", assessment);
+        return;
+    }
     original_row_html = row.innerHTML;
-    fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/edit`, {
+    const url = `/semester/${encodeURIComponent(semester)}/subject/${encodeURIComponent(code)}/assignment/${encodeURIComponent(assessment)}/${encodeURIComponent(year)}/edit`;
+    fetch(url, {
       headers: {
         'X-Requested-With': 'XMLHttpRequest',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
@@ -51,7 +60,7 @@
   window.cancelInlineEditAssignment = function() {
     if (editing_assignment_keys && typeof editing_assignment_keys === 'object') {
       const { assessment, code, semester, year } = editing_assignment_keys;
-      const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
+      const row = getEditingRow(assessment, code, semester, year);
       if (row && original_row_html) row.innerHTML = original_row_html;
       editing_assignment_keys = null; original_row_html = null;
     } else {
@@ -59,7 +68,7 @@
     }
   };
   window.submitInlineEditAssignmentRow = function(assessment, code, semester, year) {
-    const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
+    const row = getEditingRow(assessment, code, semester, year);
     if (!row) return false;
     const new_assessment = row.querySelector("input[name='new_assessment']")?.value || assessment;
     const weighted_mark = row.querySelector("input[name='weighted_mark']")?.value || '';
@@ -77,7 +86,8 @@
     formData.append('mark_weight', mark_weight);
     formData.append('grade_type', grade_type);
     formData.append('is_exam', is_exam ? 'true' : 'false');
-    fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/update`, { method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
+    const url = `/semester/${encodeURIComponent(semester)}/subject/${encodeURIComponent(code)}/assignment/${encodeURIComponent(assessment)}/${encodeURIComponent(year)}/update`;
+    fetch(url, { method: 'POST', body: formData, headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
       .then(async r => {
         const ct = r.headers.get('content-type') || '';
         if (!r.ok) {

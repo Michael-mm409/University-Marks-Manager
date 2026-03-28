@@ -1,7 +1,7 @@
 from fastapi import Depends, Form, Request, APIRouter, Response
 from typing import List, cast
 from fastapi.responses import RedirectResponse
-from sqlmodel import Session, col, select
+from sqlmodel import col, Session, col, select
 from sqlalchemy import Table
 from src.presentation.api.deps import get_session
 from src.infrastructure.db.models import Semester, Subject, Assignment, Examination, ExamSettings, GradeType
@@ -235,7 +235,7 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
         assignments = session.exec(
             select(Assignment).where(
                 Assignment.subject_id == sid,
-            ).order_by(Assignment.assessment)
+            ).order_by(col(Assignment.id))
         ).all()
         exam = session.exec(
             select(Examination).where(
@@ -414,7 +414,7 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
     # Iterate through subjects in their already-sorted order (by subject_code)
     for sub in all_subjects:
             sid = getattr(sub, "id", None)
-            assignments = session.exec(select(Assignment).where(Assignment.subject_id == sid).order_by(Assignment.assessment)).all()
+            assignments = session.exec(select(Assignment).where(Assignment.subject_id == sid).order_by(col(Assignment.id))).all()
             # Only use the 'main' exam_type row for summary
             exam = session.exec(select(Examination).where((Examination.subject_id == sid) & (Examination.exam_type == "main"))).first()
             setting = session.exec(select(ExamSettings).where(ExamSettings.subject_id == sid)).first()

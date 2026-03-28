@@ -3,10 +3,12 @@ import logging
 from typing import Optional
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from sqlmodel import Session, select
+from sqlmodel import col, Session, select
 from src.infrastructure.db.models import Assignment, ExamSettings, Examination, GradeType, Semester, Subject
 from src.presentation.api.deps import get_session
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, quote
+from html import escape as html_escape
+import json
 
 assignment_router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -165,7 +167,7 @@ def create_assignment(
             assignments = session.exec(
                 select(Assignment).where(
                     Assignment.subject_id == subject_id,
-                ).order_by(Assignment.assessment)
+                ).order_by(col(Assignment.id))
             ).all()
             assign_weight_sum = 0.0
             assign_weighted_total = 0.0
@@ -323,9 +325,16 @@ def edit_assignment_form(
     is_exam_checked = "checked" if getattr(assignment, "is_exam", False) else ""
     # exam_type is not a field on Assignment; default to 'assignment' for UI
     exam_type_val = "assignment"
+    
+    safe_assessment_text = html_escape(str(assignment.assessment or ""))
+    safe_assessment_js = json.dumps(str(assessment))
+    safe_code_js = json.dumps(str(code))
+    safe_semester_js = json.dumps(str(semester))
+    safe_year_js = json.dumps(str(year))
+    
     return HTMLResponse(f"""
 <td>
-    <input name='new_assessment' class='input input-xs w-24' value='{assignment.assessment}' required />
+    <input name='new_assessment' class='input input-xs w-24' value='{safe_assessment_text}' required />
     <div class='flex items-center mt-1 gap-2'>
         <label class='cursor-pointer label p-0'><span class='label-text text-[10px] mr-1'>Exam?</span><input type='checkbox' name='is_exam' value='true' class='checkbox checkbox-xs' {is_exam_checked} onchange="document.getElementById('edit-exam-type-select').disabled = !this.checked;" /></label>
         <select id='edit-exam-type-select' name='exam_type' class='select select-xs' {'disabled' if not getattr(assignment, 'is_exam', False) else ''}>
@@ -335,7 +344,7 @@ def edit_assignment_form(
     </div>
 </td>
 <td><input name='weighted_mark' type='number' step='any' min='0' class='input input-xs w-16' value='{assignment.weighted_mark if assignment.weighted_mark is not None else ''}' placeholder='Weighted mark' /></td>
-<td class='assignment-unweighted'><input name='unweighted_mark' type='text' class='input input-xs w-16 bg-gray-200 cursor-not-allowed' style='background-color:#e5e7eb;cursor:not-allowed;' value="{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.unweighted_mark) if assignment.unweighted_mark is not None else '0.00')}" readonly tabindex='-1' /></td>
+<td class='assignment-unweighted'><input name='unweighted_mark' type='text' class='input input-xs w-16 bg-gray-200 cursor-not-allowed' style='background-color:#e5e7eb;cursor:not-allowed;' value="{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % (float(assignment.unweighted_mark)*100) if assignment.unweighted_mark is not None else '0.00')}" readonly tabindex='-1' /></td>
 <td><input name='mark_weight' type='number' step='any' min='0' class='input input-xs w-16' value='{assignment.mark_weight if assignment.mark_weight is not None else ''}' placeholder='Mark weight' /></td>
 <td><select name='grade_type' class='select select-xs w-16'>
         <option value='numeric' {'selected' if assignment.grade_type == 'numeric' else ''}>Numeric</option>
@@ -343,7 +352,7 @@ def edit_assignment_form(
         <option value='U' {'selected' if assignment.grade_type == 'U' else ''}>U</option>
     </select></td>
 <td class='flex gap-1'>
-    <button type='button' class='btn btn-xs btn-primary' onclick="window.submitInlineEditAssignmentRow('{assessment}', '{code}', '{semester}', '{year}')">Save</button>
+    <button type='button' class='btn btn-xs btn-primary' onclick='window.submitInlineEditAssignmentRow({safe_assessment_js}, {safe_code_js}, {safe_semester_js}, {safe_year_js})'>Save</button>
     <button type='button' class='btn btn-xs' onclick='window.cancelInlineEditAssignment()'>Cancel</button>
 </td>
 """)
@@ -475,7 +484,7 @@ def update_assignment_ajax(
             assignments = session.exec(
                 select(Assignment).where(
                     Assignment.subject_id == sid,
-                ).order_by(Assignment.assessment)
+                ).order_by(col(Assignment.id))
             ).all()
             exams = session.exec(
                 select(Examination).where(
@@ -527,25 +536,37 @@ def update_assignment_ajax(
         exam_badge = "<span class='badge badge-xs badge-info ml-1'>Exam</span>" if getattr(assignment, "is_exam", False) else ""
         # Use assignment.assessment (the current/new name) for URLs and data attributes
         current_assessment = assignment.assessment
+        
+        safe_current_assessment_text = html_escape(str(current_assessment or ""))
+        encoded_current_assessment = quote(str(current_assessment or ""), safe="")
+        encoded_code = quote(str(code), safe="")
+        encoded_semester = quote(str(semester), safe="")
+        encoded_year = quote(str(year), safe="")
+        
+        safe_current_assessment_js = json.dumps(str(current_assessment))
+        safe_code_js = json.dumps(str(code))
+        safe_semester_js = json.dumps(str(semester))
+        safe_year_js = json.dumps(str(year))
+        
         row_html = (
-            f"<td class='assignment-assessment'>{current_assessment}{exam_badge}</td>"
+            f"<td class='assignment-assessment'>{safe_current_assessment_text}{exam_badge}</td>"
             f"<td class='assignment-weighted'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.weighted_mark) if assignment.weighted_mark is not None else '0.00')}</td>"
-            f"<td class='assignment-unweighted'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.unweighted_mark) if assignment.unweighted_mark is not None else '0.00')}</td>"
+            f"<td class='assignment-unweighted'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % (float(assignment.unweighted_mark)*100) if assignment.unweighted_mark is not None else '0.00')}</td>"
             f"<td class='assignment-mark-weight'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.mark_weight) if assignment.mark_weight is not None else '0.00')}</td>"
             f"<td class='assignment-grade-type'>{assignment.grade_type}</td>"
             f"<td class='flex gap-1'>"
-            f"<form method='post' action='/semester/{semester}/subject/{code}/assignment/{current_assessment}/{year}/delete'>"
+            f"<form method='post' action='/semester/{encoded_semester}/subject/{encoded_code}/assignment/{encoded_current_assessment}/{encoded_year}/delete'>"
             f"<input type='hidden' name='year' value='{year}' />"
             f"<button class='btn btn-xs btn-error' type='submit'>✕</button>"
             f"</form>"
-            f"<button class='btn btn-xs btn-outline' type='button' onclick=\"window.startInlineEditAssignment('{current_assessment}','{code}','{semester}','{year}')\">Edit</button>"
+            f"<button class='btn btn-xs btn-outline' type='button' onclick='window.startInlineEditAssignment({safe_current_assessment_js}, {safe_code_js}, {safe_semester_js}, {safe_year_js})'>Edit</button>"
             f"</td>"
         )
         # If assignment name changed, force full reload to update all references
         # Otherwise return row HTML for inline update without reload
         if new_assessment and new_assessment.strip() and new_assessment != assessment:
             logger.info(f"[ASSIGNMENT_UPDATE] Name changed from '{assessment}' to '{new_assessment}' - forcing reload")
-            reload_url = f"/year/{year}/semester/{semester}/subject/{code}"
+            reload_url = f"/semester/{semester}/subject/{code}?year={year}"
             return JSONResponse({"success": True, "reload_url": reload_url})
         else:
             logger.info(f"[ASSIGNMENT_UPDATE] Values updated for '{assessment}' - inline update")

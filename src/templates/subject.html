@@ -1,4 +1,4 @@
-<div class="mt-6 w-full max-w-xl mx-auto">
+c<div class="mt-6 w-full max-w-xl mx-auto">
     <h3 class="font-semibold mb-2">Prerequisite Graph</h3>
     <div style="position: relative;">
       <div id="prereq-graph" style="height: 320px; border: 1px solid #ccc; background: #fff; border-radius: 8px;"></div>
@@ -279,8 +279,8 @@
             <tr>
               <th>Title</th>
               <th>Mark</th>
-              <th>Unweighted <span class="hidden md:inline">(points/total)</span></th>
-              <th>Weight</th>
+              <th>Score (<span class="text-[10px]">%</span>)</th>
+              <th>Weight (<span class="text-[10px]">%</span>)</th>
               <th>Type</th>
               <th>Actions</th>
             </tr>
@@ -294,6 +294,10 @@
 
           {% for assignment in assignments %}
             <tr id="assignment-row-{{ loop.index }}" class="assignment-row"
+              data-assessment="{{ assignment.assessment }}"
+              data-code="{{ subject.subject_code }}"
+              data-semester="{{ semester }}"
+              data-year="{{ year }}"
               data-grade-type="{{ assignment.grade_type }}"
               data-unweighted-mark="{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}{% endif %}">
             <td class="assignment-title">{{ assignment.assessment }}</td>
@@ -309,9 +313,7 @@
                 -
               {% else %}
                 {% set u = assignment.unweighted_mark|float if assignment.unweighted_mark is not none else 0.0 %}
-                {% set w = assignment.mark_weight|float if assignment.mark_weight is not none else 0.0 %}
-                {% set contrib = u * w %}
-                <span class="whitespace-nowrap">{{ '%.2f' % contrib }} / {{ '%.2f' % assignment.mark_weight }}</span>
+                <span class="whitespace-nowrap">{{ '%.2f' % (u * 100) }}</span>
               {% endif %}
             </td>
             <td class="assignment-weight">
@@ -319,7 +321,7 @@
                 -
               {% else %}
                 {{ '%.2f' % (assignment.mark_weight|float) if assignment.mark_weight is not none else '0.00' }}
-              {% endif %}%
+              {% endif %}
             </td>
             <td class="assignment-type">{{ assignment.grade_type }}</td> <!-- Add this line -->
             <td class="flex gap-1">

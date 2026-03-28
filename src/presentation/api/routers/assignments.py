@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
-from sqlmodel import Session, select
+from sqlmodel import col, Session, select
 
 from src.infrastructure.db.models import Assignment, GradeType, Subject, Semester
 from src.presentation.api.schemas import AssignmentCreate, AssignmentRead
@@ -33,10 +33,10 @@ def list_assignments(
     Returns:
         Sequence[Assignment]: List of assignments.
     """
-    stmt = select(Assignment).order_by(Assignment.assessment)
+    stmt = select(Assignment).order_by(col(Assignment.id))
     # Prefer normalized filtering when subject_id provided
     if subject_id is not None:
-        stmt = select(Assignment).where(Assignment.subject_id == subject_id).order_by(Assignment.assessment)
+        stmt = select(Assignment).where(Assignment.subject_id == subject_id).order_by(col(Assignment.id))
         return session.exec(stmt).all()
     # Legacy filtering when composite provided
     if subject_code and semester_name and year:
@@ -51,7 +51,7 @@ def list_assignments(
         ).first()
         sid = getattr(subj, "id", None)
         if sid is not None:
-            stmt = select(Assignment).where(Assignment.subject_id == sid).order_by(Assignment.assessment)
+            stmt = select(Assignment).where(Assignment.subject_id == sid).order_by(col(Assignment.id))
             return session.exec(stmt).all()
     # Without all three parameters, return all assignments
     return session.exec(stmt).all()

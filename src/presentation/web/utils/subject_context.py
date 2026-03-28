@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from sqlmodel import Session, select
+from sqlmodel import col, Session, select
 
 from src.core.services.subject_prerequisite_manager import SubjectPrerequisiteManager
 from src.infrastructure.db.models import Assignment, Examination, ExamSettings
@@ -43,7 +43,7 @@ def build_subject_context(
     assignments = session.exec(
         select(Assignment)
         .where(Assignment.subject_id == sid)
-        .order_by(Assignment.assessment)
+        .order_by(col(Assignment.id))
     ).all()
 
     examinations = session.exec(

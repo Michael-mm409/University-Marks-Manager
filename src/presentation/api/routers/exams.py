@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import List, Optional, Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
-from sqlmodel import Session, select
+from sqlmodel import col, Session, select
 
 from src.infrastructure.db.models import Examination, Assignment, Subject, Semester
 from src.presentation.api.schemas import ExaminationCreate, ExaminationRead
@@ -103,7 +103,7 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
         assignments = session.exec(
             select(Assignment).where(
                 Assignment.subject_id == sid
-            ).order_by(Assignment.assessment)
+            ).order_by(col(Assignment.id))
         ).all()
         used = 0.0
         for a in assignments:
