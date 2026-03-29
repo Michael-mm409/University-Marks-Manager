@@ -30,6 +30,75 @@
     </div>
   </div>
 
+  <!-- Data Management -->
+  <div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+      <h3 class="card-title">Data Management</h3>
+      <p class="text-sm opacity-70 mb-4">Export all of your courses, subjects, assignments, and grades to an Excel file to keep your local app in sync, or import an Excel file to update your data.</p>
+      
+      <div class="flex flex-col sm:flex-row gap-4">
+        <!-- Export -->
+        <div class="flex-1">
+          <h4 class="font-semibold mb-2">Export Data</h4>
+          <a href="/api/1/export/{{ user.id }}" class="btn btn-primary w-full sm:w-auto" download="marks_manager_export.xlsx">Export Complete Data</a>
+        </div>
+
+        <div class="divider sm:divider-horizontal">OR</div>
+
+        <!-- Import -->
+        <div class="flex-1">
+          <h4 class="font-semibold mb-2">Import Data</h4>
+          <form id="import-form" class="flex flex-col gap-2">
+            <input type="file" id="import-file" accept=".xlsx" class="file-input file-input-bordered file-input-sm w-full max-w-xs" />
+            <button type="button" onclick="handleImport('{{ user.id }}')" class="btn btn-secondary btn-sm w-fit">Import Excel</button>
+            <p id="import-status" class="text-xs mt-1 hidden"></p>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function handleImport(userId) {
+      const fileInput = document.getElementById('import-file');
+      const statusText = document.getElementById('import-status');
+      
+      if (!fileInput.files.length) {
+        statusText.textContent = "Please select an Excel file first.";
+        statusText.className = "text-xs mt-1 text-error block";
+        return;
+      }
+
+      const file = fileInput.files[0];
+      const formData = new FormData();
+      formData.append("file", file);
+
+      statusText.textContent = "Importing data...";
+      statusText.className = "text-xs mt-1 text-info block";
+
+      try {
+        const response = await fetch(`/api/1/import/${userId}`, {
+          method: "POST",
+          body: formData,
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          statusText.textContent = "Import successful! Reloading page...";
+          statusText.className = "text-xs mt-1 text-success block";
+          setTimeout(() => window.location.reload(), 1500);
+        } else {
+          statusText.textContent = `Import failed: ${result.detail || 'Unknown error'}`;
+          statusText.className = "text-xs mt-1 text-error block";
+        }
+      } catch (error) {
+        statusText.textContent = `Error: ${error.message}`;
+        statusText.className = "text-xs mt-1 text-error block";
+      }
+    }
+  </script>
+
   <!-- My Courses -->
   <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
