@@ -111,5 +111,6 @@ class SubjectContext(TypedDict):
     prerequisites: Sequence["SubjectPrerequisite"]
     required_for: Sequence["SubjectPrerequisite"]
     assignment_unweighted_sum: Optional[float]
+    overall_assignment_unweighted: Optional[float]
 
 TemplateContext = Union[IndexContext, SemesterContext, SubjectContext, Mapping[str, object]]

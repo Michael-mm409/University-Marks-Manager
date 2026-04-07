@@ -115,5 +115,6 @@ def build_subject_context(
         "prerequisites": prerequisites,
         "required_for": required_for,
         "assignment_unweighted_sum": round(marks["assignment_unweighted_sum"], 2),
+        "overall_assignment_unweighted": round(marks["overall_assignment_unweighted"], 2),
     }
     return ctx

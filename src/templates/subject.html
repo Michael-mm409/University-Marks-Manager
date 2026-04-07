@@ -368,7 +368,7 @@ c<div class="mt-6 w-full max-w-xl mx-auto">
             <tr>
               <td>{{ subject.subject_name }}</td>
               <td>{{ '%.2f' % assignment_weighted_sum }}</td>
-              <td>{{ '%.2f' % assignment_unweighted_sum if assignment_unweighted_sum is defined else '0.00' }}</td>
+              <td>{{ '%.2f' % overall_assignment_unweighted if overall_assignment_unweighted is defined else '0.00' }}%</td>
               <td>{{ '%.0f' % assignment_weight_percent }}%</td>
               {% if subject.has_exam %}
                 <td>{{ '%.2f' % exam_weighted_sum if exam_weighted_sum is not none else '-' }}</td>

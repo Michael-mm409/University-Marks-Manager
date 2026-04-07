@@ -201,9 +201,18 @@ def compute_subject_marks_summary(
         except ValueError:
             requirement_status = "invalid"
 
+    if assignment_weight_percent > 0:
+        overall_assignment_unweighted = (assignment_weighted_sum / assignment_weight_percent) * 100
+    else:
+        overall_assignment_unweighted = 0.0
+
+    # Note: assignment_unweighted_sum is still the literal sum of assignment unweighted marks if needed elsewhere,
+    # but the overall unweighted percentage is typically more useful for the summary panel.
+
     return {
         "assignment_weighted_sum": assignment_weighted_sum,
-        "assignment_unweighted_sum": assignment_unweighted_sum,
+        "assignment_unweighted_sum": assignment_unweighted_sum,  # Could optionally be replaced by overall_assignment_unweighted
+        "overall_assignment_unweighted": overall_assignment_unweighted,
         "assignment_weight_percent": assignment_weight_percent,
         "count_s": count_s,
         "count_u": count_u,
