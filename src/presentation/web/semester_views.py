@@ -317,7 +317,12 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
                 "credit_points": getattr(sub, "credit_points", None),
                 "assessment_mark": round(assess_weighted_total, 2),
                 # Show the normalized unweighted value: contribution sum divided by total assessment weight
-                "assessment_unweighted": round((assess_unweighted_contrib_sum / assess_weight_sum) if assess_weight_sum else assess_unweighted_fraction_sum, 2),
+                "assessment_unweighted": round(
+                    ((assess_unweighted_contrib_sum / assess_weight_sum) * 100.0)
+                    if assess_weight_sum
+                    else (assess_unweighted_fraction_sum * 100.0),
+                    2,
+                ),
                 # also expose contribution sum (unweighted_fraction * weight) for other uses
                 "assessment_unweighted_contribution": round(assess_unweighted_contrib_sum, 2),
                 "assessment_weight": assess_weight_sum,
@@ -352,13 +357,43 @@ def semester_detail(
     """Legacy path: redirect to canonical /year/{year}/semester/{semester}."""
     return RedirectResponse(url=f"/year/{year}/semester/{semester}", status_code=303)
 
+def _resolve_active_course_id(request: Request, cm: CourseManager) -> int | None:
+    sess = request.session
 
-def _render_semesters_grid(request: Request, session: Session, year: str):
-    """Render the semesters section partial (heading + filter + grid/no-data) respecting course and year."""
+    # 1) Prefer cached numeric course id
+    raw_id = sess.get("current_course_id")
+    if raw_id is not None:
+        try:
+            cid = int(str(raw_id).strip())
+            return cid
+        except Exception:
+            pass
+
+    # 2) Fallback to course code -> lookup id
+    code = sess.get("current_course_code")
+    if not code:
+        return None
+
+    course = cm.get_course_by_code(str(code))
+    course_id = getattr(course, "id", None)
+    if course_id is None:
+        return None
+
+    cid = int(course_id)
+    sess["current_course_id"] = cid
+    return cid
+
+
+def _build_semesters_section_context(
+    request: Request,
+    session: Session,
+    year: str,
+    include_subject_summaries: bool = False,
+) -> dict:
     sm = SemesterManager(session)
     cm = CourseManager(session)
-    # Resolve active course from session (id preferred, fallback to code)
     sess = request.session
+
     cid = None
     active_course_id = sess.get("current_course_id")
     if active_course_id is not None:
@@ -366,6 +401,7 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
             cid = int(str(active_course_id).strip())
         except Exception:
             cid = None
+
     if cid is None:
         code = sess.get("current_course_code")
         if code:
@@ -375,10 +411,7 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
                 cid = int(course_id)
                 sess["current_course_id"] = cid
 
-    if cid is not None:
-        all_semesters = sm.get_semesters_for_course(cid)
-    else:
-        all_semesters = sm.get_all_semesters()
+    all_semesters = sm.get_semesters_for_course(cid) if cid is not None else sm.get_all_semesters()
 
     try:
         y_int = int(str(year))
@@ -386,57 +419,49 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
         y_int = None
 
     semesters = [s for s in all_semesters if (y_int is None or int(s.year) == int(y_int))]
-    # Include years and course_filter so the section header stays accurate
-    from src.core.services.semester_manager import SemesterManager as _SM
-    from src.core.services.course_manager import CourseManager as _CM
-    sm2 = _SM(session)
-    years = sm2.get_distinct_years_for_course(cid) if cid is not None else sm2.get_distinct_years()
-    course_filter = None
-    if cid is not None:
-        course_filter = {
-            "name": sess.get("current_course_name"),
-            "code": sess.get("current_course_code"),
-        }
-    # Build subject_summaries for all semesters in this year, ordered by subject_code
-    summaries = []
-    subjects_table = cast(Table, getattr(Subject, "__table__"))
-    semester_ids = [sem.id for sem in semesters]
-    # Fetch all subjects for these semesters in one query, already sorted by subject_code
-    all_subjects = session.exec(
-        select(Subject)
-        .where(col(Subject.semester_id).in_(semester_ids))
-        .order_by(subjects_table.c.subject_code.asc())
-    ).all() if semester_ids else []
-    
-    # Build semester lookup for getting semester names
-    semester_lookup = {sem.id: sem.name for sem in semesters}
-    
-    # Iterate through subjects in their already-sorted order (by subject_code)
-    for sub in all_subjects:
+    years = sm.get_distinct_years_for_course(cid) if cid is not None else sm.get_distinct_years()
+    course_filter = {"name": sess.get("current_course_name"), "code": sess.get("current_course_code")} if cid is not None else None
+
+    ctx = {
+        "semesters": semesters,
+        "selected_year": y_int,
+        "years": years,
+        "course_filter": course_filter,
+    }
+
+    if include_subject_summaries:
+        # Reuse your existing summary builder logic (or extract into another helper)
+        summaries = []
+        subjects_table = cast(Table, getattr(Subject, "__table__"))
+        semester_ids = [sem.id for sem in semesters]
+        all_subjects = session.exec(
+            select(Subject)
+            .where(col(Subject.semester_id).in_(semester_ids))
+            .order_by(subjects_table.c.subject_code.asc())
+        ).all() if semester_ids else []
+
+        semester_lookup = {sem.id: sem.name for sem in semesters}
+
+        for sub in all_subjects:
             sid = getattr(sub, "id", None)
-            assignments = session.exec(select(Assignment).where(Assignment.subject_id == sid).order_by(col(Assignment.id))).all()
-            # Only use the 'main' exam_type row for summary
-            exam = session.exec(select(Examination).where((Examination.subject_id == sid) & (Examination.exam_type == "main"))).first()
+            assignments = session.exec(
+                select(Assignment).where(Assignment.subject_id == sid).order_by(col(Assignment.id))
+            ).all()
+            exam = session.exec(
+                select(Examination).where((Examination.subject_id == sid) & (Examination.exam_type == "main"))
+            ).first()
             setting = session.exec(select(ExamSettings).where(ExamSettings.subject_id == sid)).first()
             ps_exam = bool(setting.ps_exam) if setting else False
             ps_factor = setting.ps_factor if setting else 40.0
             scaling = (ps_factor / 100.0) if ps_exam else 1.0
-            exam_assignment = next((a for a in assignments if getattr(a, "is_exam", False)), None)
+
             assess_weight_sum = 0.0
             assess_weighted_total = 0.0
-            # Sum of unweighted fractions for this subject
-            assess_unweighted_fraction_sum = 0.0
-            # Sum of contribution points (unweighted * weight)
-            assess_unweighted_contrib_sum = 0.0
-            assignment_weights = []
             for a in assignments:
-                # Include all assignments, including those marked as is_exam
                 if a.grade_type == GradeType.NUMERIC.value:
                     if a.mark_weight not in (None, ""):
                         try:
-                            w = float(a.mark_weight)
-                            assess_weight_sum += w
-                            assignment_weights.append(w)
+                            assess_weight_sum += float(a.mark_weight)
                         except ValueError:
                             pass
                     if a.weighted_mark not in (None, ""):
@@ -444,80 +469,40 @@ def _render_semesters_grid(request: Request, session: Session, year: str):
                             assess_weighted_total += float(a.weighted_mark)
                         except ValueError:
                             pass
-                    if a.unweighted_mark not in (None, ""):
-                        try:
-                            uval = float(a.unweighted_mark)
-                            assess_unweighted_fraction_sum += uval
-                            if a.mark_weight not in (None, ""):
-                                assess_unweighted_contrib_sum += uval * float(a.mark_weight)
-                        except (TypeError, ValueError):
-                            pass
-            total_mark = sub.total_mark if sub.total_mark not in (None, 0) else None
-            exam_weight = exam.exam_weight if exam else None
-            final_exam_mark_weight = exam_weight
-            effective_scoring_exam_weight = exam_weight * scaling if exam_weight is not None else None
-            exam_mark = exam.exam_mark if exam else None
-            is_exam_required = False
-            # Get semester name from lookup
+
+            exam_weight = exam.exam_weight if exam else 0
             sem_name = semester_lookup.get(sub.semester_id, "Unknown")
+
             summaries.append({
                 "code": sub.subject_code,
                 "name": sub.subject_name,
                 "semester_name": sem_name,
                 "assessment_mark": round(assess_weighted_total, 2),
-                "assessment_unweighted": round((assess_unweighted_contrib_sum / assess_weight_sum) if assess_weight_sum else assess_unweighted_fraction_sum, 2),
-                "assessment_unweighted_contribution": round(assess_unweighted_contrib_sum, 2),
                 "assessment_weight": assess_weight_sum,
-                "exam_mark": exam_mark,
-                "exam_weight": exam_weight,
-                "final_exam_mark_weight": final_exam_mark_weight,
-                "effective_scoring_exam_weight": effective_scoring_exam_weight,
+                "exam_mark": exam.exam_mark if exam else None,
+                "final_exam_mark_weight": exam_weight,
+                "effective_scoring_exam_weight": exam_weight * scaling if exam_weight is not None else None,
                 "ps_exam": ps_exam,
                 "ps_factor": ps_factor,
-                "total_mark": total_mark,
-                "is_exam_required": is_exam_required,
+                "total_mark": sub.total_mark if sub.total_mark not in (None, 0) else None,
+                "has_exam": getattr(sub, "has_exam", False),
             })
-    ctx = {"semesters": semesters, "selected_year": y_int, "years": years, "course_filter": course_filter, "subject_summaries": summaries}
+
+        ctx["subject_summaries"] = summaries
+
+    return ctx
+
+def _render_semesters_grid(request: Request, session: Session, year: str):
+    ctx = _build_semesters_section_context(
+        request, session, year, include_subject_summaries=True
+    )
     return _render(request, "partials/semesters_section.html", ctx)
 
-
 def _render_semesters_section_string(request: Request, session: Session, year: str, oob: bool = False) -> str:
-    """Return the rendered semesters section HTML string, optionally marked for out-of-band swap."""
     env = request.app.state.jinja_env
-    sm = SemesterManager(session)
-    cm = CourseManager(session)
-    sess = request.session
-    cid = None
-    active_course_id = sess.get("current_course_id")
-    if active_course_id is not None:
-        try:
-            cid = int(str(active_course_id).strip())
-        except Exception:
-            cid = None
-    if cid is None:
-        code = sess.get("current_course_code")
-        if code:
-            course = cm.get_course_by_code(str(code))
-            course_id = getattr(course, "id", None)
-            if course_id is not None:
-                cid = int(course_id)
-                sess["current_course_id"] = cid
-    all_semesters = sm.get_semesters_for_course(cid) if cid is not None else sm.get_all_semesters()
-    try:
-        y_int = int(str(year))
-    except Exception:
-        y_int = None
-    semesters = [s for s in all_semesters if (y_int is None or int(s.year) == int(y_int))]
-    years = sm.get_distinct_years_for_course(cid) if cid is not None else sm.get_distinct_years()
-    course_filter = None
-    if cid is not None:
-        course_filter = {"name": sess.get("current_course_name"), "code": sess.get("current_course_code")}
-    html = env.get_template("partials/semesters_section.html").render(
-        request=request,
-        semesters=semesters,
-        selected_year=y_int,
-        years=years,
-        course_filter=course_filter,
-        oob=oob,
+    ctx = _build_semesters_section_context(
+        request, session, year, include_subject_summaries=True
     )
-    return html
+    ctx["request"] = request
+    ctx["oob"] = oob
+    return env.get_template("partials/semesters_section.html").render(**ctx)
