@@ -1,8 +1,8 @@
+import re
 from typing import Sequence, Any, cast
-from sqlmodel import Session, select, func, SQLModel
-from sqlalchemy import case, and_
-from sqlalchemy.dialects import postgresql
-from src.infrastructure.db.models import Subject, Semester, GradeScale, Course, ExamSettings
+from sqlmodel import Session, select, func
+from sqlalchemy import case
+from src.infrastructure.db.models import Subject, Semester, GradeScale, Course, ExamSettings, SubjectRule, Assignment
 
 class GradeCalculator:
     def __init__(self, session: Session):
@@ -19,19 +19,25 @@ class GradeCalculator:
         #     print(f"[GRADE_CALCULATOR] {label}: Could not compile - {e}")
     
     def _build_base_query(self, course_id: int | None = None):
-        """Build base query for subjects with valid marks, optionally filtered by course."""
+        """
+        Function Description: Build base query for subjects with valid marks, optionally filtered by course.
+        
+        Parameters:
+        - course_id (int | None): If provided, filters subjects to those in semesters of the specified course.
+        
+        Returns:
+        - SQLModel Select query for Subject with joins and filters applied.
+        """
         query = select(Subject).join(Semester)
         
         # Filter by course if provided
         if course_id is not None:
             query = query.where(Semester.course_id == course_id)
         
-        # Only include subjects with valid marks (non-null and > 0)
+        # Use comma-separated conditions in .where() to avoid Pylance Optional Operand error
         query = query.where(
-            and_(
-                Subject.total_mark.isnot(None),
-                Subject.total_mark > 0
-            )
+            Subject.total_mark != None,
+            cast(Any, Subject.total_mark) > 0
         )
         
         self._print_sql(query, f"Base Query (course_id={course_id})")
@@ -57,14 +63,16 @@ class GradeCalculator:
         # Step 2: Query for ALL scales with the determined scale_name (or Standard as fallback)
         if scale_name:
             query = select(GradeScale).where(
-                and_(GradeScale.scale_name == scale_name, GradeScale.band_type == "both")
+                GradeScale.scale_name == scale_name,
+                GradeScale.band_type == "both"
             )
             self._print_sql(query, f"Grade Scales Query (scale_name={scale_name})")
             scales = self.session.exec(query).all()
         else:
             print(f"[GRADE_CALCULATOR] No specific scale_name, querying Standard scale")
             query = select(GradeScale).where(
-                and_(GradeScale.scale_name == "Standard", GradeScale.band_type == "both")
+                GradeScale.scale_name == "Standard",
+                GradeScale.band_type == "both"
             )
             self._print_sql(query, "Grade Scales Query (Standard scale)")
             scales = self.session.exec(query).all()
@@ -148,11 +156,11 @@ class GradeCalculator:
         subjects = self.session.exec(base_query).all()
 
         # Pre-fetch all exam_settings for efficiency
-        subject_ids = [subj.id for subj in subjects if subj.id is not None]
+        subject_ids: list[int] = [subj.id for subj in subjects if subj.id is not None]
         exam_settings_map = {}
         if subject_ids:
             exam_settings = self.session.exec(
-                select(ExamSettings).where(ExamSettings.subject_id.in_(subject_ids))
+                select(ExamSettings).where(ExamSettings.subject_id.in_(subject_ids))  # type: ignore[attr-defined]
             ).all()
             exam_settings_map = {es.subject_id: es for es in exam_settings}
 
@@ -223,3 +231,164 @@ class GradeCalculator:
         return round(gpa_weighted_sum / credit_sum, 2) if gpa_weighted_sum is not None else None
 
 
+    def calculate_subject_summary(self, subject: Subject) -> dict[str, Any]:
+        if not subject.id:
+            return {
+                "summaries": [],
+                "grade_goals": []
+            }
+
+        rules = self.session.exec(
+            select(SubjectRule).where(SubjectRule.subject_id == subject.id)
+        ).all()
+        
+        all_assignments = list(getattr(subject, "assignments", []) or [])
+        if not all_assignments:
+            all_assignments = self.session.exec(
+                select(Assignment).where(Assignment.subject_id == subject.id)
+            ).all()
+
+        summary = []
+        used_assignment_ids: set[int] = set()
+        # Track patterns to exclude them from the 'General' dynamic grouping later
+        rule_patterns = []
+
+        def _assignment_id(assignment: Assignment) -> int | None:
+            return assignment.id if assignment.id is not None else None
+
+        # 1. Process Rule-based Buckets
+        for rule in rules:
+            clean_pattern = (rule.sql_pattern or "").replace('%', '').lower()
+            rule_patterns.append(clean_pattern)
+            
+            matches = [
+                a for a in all_assignments
+                if not a.is_exam
+                and (aid := _assignment_id(a)) is not None
+                and aid not in used_assignment_ids
+                and clean_pattern in (a.assessment or "").lower()
+            ]
+            
+            matches.sort(key=lambda x: (x.unweighted_mark or 0), reverse=True)
+            
+            core_items = matches[:rule.max_count]
+            bonus_items = matches[rule.max_count:] # Items beyond max_count
+
+            for item in core_items:
+                aid = _assignment_id(item)
+                if aid is not None: used_assignment_ids.add(aid)
+            
+            # Mark bonus items as used so they don't appear in 'General'
+            for item in bonus_items:
+                aid = _assignment_id(item)
+                if aid is not None: used_assignment_ids.add(aid)
+                
+            # CALCULATION LOGIC:
+            # Core items contribute to both Weight and Score
+            # Bonus items contribute ONLY to Score (extra marks)
+            avg_unweighted = sum((a.unweighted_mark or 0) for a in core_items) / len(core_items) if core_items else 0
+            total_weight = sum((a.mark_weight or 0) for a in core_items)
+            
+            # Weighted score includes EVERY match (Core + Bonus)
+            weighted_score = sum((a.weighted_mark or 0) for a in matches)
+            
+            summary.append({
+                "type": "rule",
+                "label": rule.rule_label,
+                "count": len(core_items),
+                "unweighted_avg": avg_unweighted,
+                "total_weight": total_weight, # Capped by max_count
+                "weighted_score": round(weighted_score, 2), # Includes bonus marks
+                "bonus_count": len(bonus_items),
+                "core_items": core_items,
+            })
+
+        # 2. Process Exam Bucket
+        exam_assignment = next((a for a in all_assignments if a.is_exam), None)
+        if exam_assignment is not None or getattr(subject, "has_exam", False):
+            if exam_assignment:
+                aid = _assignment_id(exam_assignment)
+                if aid: used_assignment_ids.add(aid)
+                
+            unweighted = (exam_assignment.unweighted_mark or 0) if exam_assignment else 0
+            weight = (exam_assignment.mark_weight or 0) if exam_assignment else 0
+            score = (exam_assignment.weighted_mark or 0) if exam_assignment else 0
+
+            summary.append({
+                "type": "exam",
+                "label": "Final Examination",
+                "count": 1 if exam_assignment else 0,
+                "unweighted_avg": unweighted,
+                "total_weight": weight,
+                "weighted_score": round(score, 2),
+                "bonus_count": 0,
+                "core_items": [exam_assignment] if exam_assignment else [],
+            })
+
+        # 3. Process General Assignments individually for accuracy
+        remaining_assignments = [
+            a for a in all_assignments
+            if _assignment_id(a) is not None
+            and _assignment_id(a) not in used_assignment_ids
+            and not a.is_exam
+            # Keep ignoring things that match Rule patterns (like the 10th Module Review)
+            and not any(p in (a.assessment or "").lower() for p in rule_patterns)
+        ]
+
+        # No grouping—just iterate through each remaining assignment
+        for a in remaining_assignments:
+            summary.append({
+                "type": "general",
+                "label": a.assessment, # Use the full assignment title
+                "count": 1,
+                "unweighted_avg": (a.unweighted_mark or 0),
+                "total_weight": (a.mark_weight or 0),
+                "weighted_score": round((a.weighted_mark or 0), 2),
+                "bonus_count": 0,
+                "core_items": [a],
+            })
+
+        # 4. Sort the summary by category type
+        # Logic: Rules first (0), General assignments second (1), Exams last (2)
+        type_order = {
+            "rule": 0,
+            "general": 1,
+            "exam": 2
+        }
+        
+        # Sort by type first, then alphabetically by label within that type
+        summary.sort(key=lambda x: (type_order.get(x["type"], 99), x["label"]))
+
+        # 1. Current points achieved
+        total_achieved = sum(row['weighted_score'] for row in summary)
+
+        # 2. Weight of assignments marked as 0% (like Technical Artefact 2)
+        incomplete_weight = sum(row['total_weight'] for row in summary if row['unweighted_avg'] == 0)
+
+        # 3. The "Missing" weight (your Exam or unallocated weight)
+        total_recorded_weight = sum(row['total_weight'] for row in summary)
+        missing_weight = max(0, 100 - total_recorded_weight)
+
+        # 4. Total potential weight remaining to earn marks
+        remaining_weight = incomplete_weight + missing_weight
+
+        grade_goals = []
+        if remaining_weight > 0:
+            for label, target in [("Pass", 50), ("Credit", 65), ("Distinction", 75), ("High Distinction", 85)]:
+                needed = (target - total_achieved) / (remaining_weight / 100)
+                
+                status = "Achieved" if total_achieved >= target else f"{max(0, needed):.2f}%"
+                if needed > 100: status = "Impossible"
+                
+                grade_goals.append(
+                    {
+                        "label": label,
+                        "target": target,
+                        "needed": status
+                    }
+                )
+
+        return {
+            "summaries": summary,
+            "grade_goals": grade_goals
+        }
