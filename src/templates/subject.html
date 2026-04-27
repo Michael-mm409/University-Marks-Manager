@@ -1,82 +1,3 @@
-c<div class="mt-6 w-full max-w-xl mx-auto">
-    <h3 class="font-semibold mb-2">Prerequisite Graph</h3>
-    <div style="position: relative;">
-      <div id="prereq-graph" style="height: 320px; border: 1px solid #ccc; background: #fff; border-radius: 8px;"></div>
-      <div style="position: absolute; right: 8px; bottom: 8px; background: rgba(255,255,255,0.9); border: 1px solid #ddd; border-radius: 6px; padding: 6px 8px; font-size: 0.75rem; color: #333; box-shadow: 0 1px 2px rgba(0,0,0,0.08);">
-        <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
-          <span style="display:inline-block; width:14px; height:14px; background:#1976d2; border-radius:3px;"></span>
-          <span>Main subject</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
-          <span style="display:inline-block; width:14px; height:14px; background:#90caf9; border-radius:3px;"></span>
-          <span>Subject</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
-          <span style="display:inline-block; width:16px; height:0; border-top:2px solid #1976d2;"></span>
-          <span>Prerequisite</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 4px;">
-          <span style="display:inline-block; width:16px; height:0; border-top:2px dashed #ff9800;"></span>
-          <span>Corequisite</span>
-        </div>
-      </div>
-    </div>
-    <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      fetch(`/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite_graph/json?year={{year}}`)
-        .then(r => r.json())
-        .then(data => {
-          const container = document.getElementById('prereq-graph');
-          if (!container || !data.nodes) return;
-          
-          const nodes = new vis.DataSet(data.nodes.map(n => ({
-            id: n.id,
-            label: n.label,
-            color: n.main ? '#1976d2' : (n.corequisite ? '#ffeb3b' : '#90caf9'),
-            font: { color: n.main ? '#fff' : '#222', size: n.main ? 22 : 16, bold: n.main },
-            x: n.x,
-            y: n.y,
-            physics: n.physics || false,
-            fixed: { x: true, y: true },
-          })));
-          const edges = new vis.DataSet(data.edges.map(e => ({
-            from: e.from,
-            to: e.to,
-            arrows: 'to',
-            color: e.type === 'corequisite' ? { color: '#ff9800' } : { color: '#1976d2' },
-            dashes: e.type === 'corequisite',
-            // Use a tooltip instead of inline text to prevent overlapping
-            // labels when multiple edges run close together.
-            title: e.type.charAt(0).toUpperCase() + e.type.slice(1),
-          })));
-          const network = new vis.Network(container, { nodes, edges }, {
-            layout: {
-              randomSeed: 42,
-            },
-            nodes: { shape: 'box', borderWidth: 2 },
-            edges: {
-              smooth: {
-                enabled: true,
-                type: 'cubicBezier',
-                forceDirection: 'vertical',
-                roundness: 0.4,
-              }
-            },
-            physics: {
-              enabled: false,
-            },
-          });
-
-          // Let physics spread the nodes out, then freeze layout
-          network.once('stabilizationIterationsDone', function () {
-            network.setOptions({ physics: false });
-          });
-        });
-    });
-    </script>
-  </div>
-<!-- Prerequisite UI: Only custom (free text) entry is enabled -->
 {% extends 'base.html' %}
 {% block title %}{{semester}} - {{subject.subject_code}}{% endblock %}
 {% set breadcrumbs = [
@@ -91,93 +12,174 @@ c<div class="mt-6 w-full max-w-xl mx-auto">
   <span>{{ request.query_params.get('error') }}</span>
 </div>
 {% endif %}
-<div class="flex flex-col items-center text-center gap-3 md:gap-4 mb-8">
-  <h2 class="subject-title flex items-center gap-3 justify-center">
-    <span id="subject-code-display">{{subject.subject_code}}</span>
-    <span id="subject-name-display">{{subject.subject_name}}</span>
-    <button id="edit-subject-btn" class="btn btn-xs btn-circle btn-ghost" type="button" onclick="showSubjectEditForm()" title="Edit subject">&#9881;</button>
-  </h2>
 
-  <form id="subject-edit-form" method="post" class="flex flex-wrap items-center gap-2 mt-2 hidden w-full max-w-4xl mx-auto" onsubmit="return submitSubjectEditForm(event)">
-    <input type="hidden" name="old_semester" value="{{semester}}" />
-    <input type="hidden" name="old_year" value="{{year}}" />
-    <input type="hidden" name="old_subject_code" value="{{subject.subject_code}}" />
-    <input name="subject_code" class="input input-xs w-24 shrink-0" value="{{subject.subject_code}}" placeholder="Code" required />
-    <input name="subject_name" class="input input-xs flex-1 min-w-[200px]" value="{{subject.subject_name}}" placeholder="Subject name" required />
-    <input name="credit_points" type="number" class="input input-xs w-20 shrink-0 text-right" value="{{subject.credit_points}}" placeholder="CP" required />
-    <input name="target_semester" class="input input-xs w-32 shrink-0" value="{{semester}}" placeholder="Semester" required />
-    <input name="target_year" type="number" class="input input-xs w-24 shrink-0" value="{{year}}" placeholder="Year" min="2000" max="2100" required />
-    <label class="flex items-center gap-1">
-      <span class="text-xs">Has Exam?</span>
-      <input type="checkbox" name="has_exam" value="true" {% if subject.has_exam %}checked{% endif %} class="checkbox checkbox-xs" />
-    </label>
-    <label class="flex items-center gap-1">
-      <span class="text-xs">Sync Subject?</span>
-      <input type="checkbox" name="sync_subject" value="true" {% if subject.sync_subject %}checked{% endif %} class="checkbox checkbox-xs" />
-    </label>
-    <label class="flex items-center gap-1">
-      <span class="text-xs">Allow move if prerequisites are later</span>
-      <input type="checkbox" name="force_move" value="true" class="checkbox checkbox-xs" />
-    </label>
-    <button type="submit" class="btn btn-xs btn-primary shrink-0">Save</button>
-    <button type="button" class="btn btn-xs shrink-0" onclick="hideSubjectEditForm()">Cancel</button>
-  </form>
+<style>
+  /* Fallback for environments where compiled Tailwind lacks responsive variants. */
+  .target-grade-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    gap: 1rem;
+  }
 
-  <p class="semester-title mt-1"><span>{{semester}}</span> <span class="semester-year">{{year}}</span></p>
+  @media (min-width: 640px) {
+    .target-grade-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
 
-  <div class="prerequisite-section mt-4 w-full max-w-xl mx-auto">
-    <h3 class="font-semibold mb-2">Prerequisites</h3>
-    <ul class="list-disc list-inside mb-2">
-      {% if prerequisites and prerequisites|length > 0 %}
-        {% for prereq in prerequisites %}
-          <li>
-              {% if prereq.prerequisite_subject %}
-                {{ prereq.prerequisite_subject.subject_code }} - {{ prereq.prerequisite_subject.subject_name }}
-              {% elif prereq.custom_text %}
-                {{ prereq.custom_text }}
-              {% else %}
-                Unknown prerequisite
-              {% endif %}
-            {% if prereq.is_corequisite %}<span class="badge badge-info ml-2">Co-requisite</span>{% endif %}
-              <form method="post" action="/year/{{year}}/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite/remove" style="display:inline">
-                <input type="hidden" name="year" value="{{year}}" />
-                <input type="hidden" name="prerequisite_id" value="{{ prereq.id }}" />
-                <input type="hidden" name="is_corequisite" value="{{ prereq.is_corequisite|int }}" />
-              <button type="submit" class="btn btn-xs btn-error ml-2">Remove</button>
-            </form>
-          </li>
-        {% endfor %}
-      {% else %}
-        <li class="text-gray-500">No prerequisites set.</li>
-      {% endif %}
-    </ul>
-    <button class="btn btn-sm btn-primary mb-2" id="show-add-prerequisite-form" type="button" onclick="toggleSection('add-prerequisite-form', false)">Add Prerequisite</button>
-    <div id="add-prerequisite-form-section" class="hidden">
-      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite/add" class="flex flex-col md:flex-row gap-2 items-center">
-        <input type="hidden" name="year" value="{{year}}" />
-        <div class="flex gap-2 items-center w-full">
-            <select name="prerequisite_subject_id" class="input input-xs w-48">
-              <option value="">Select subject...</option>
-              {% for subj in candidate_subjects %}
-                <option value="{{ subj.id }}">{{ subj.subject_code }} - {{ subj.subject_name }}</option>
-              {% endfor %}
-            </select>
-            <span class="text-xs">or</span>
-          <input name="custom_prerequisite" class="input input-xs flex-1" placeholder="Or enter a custom prerequisite (free text)" />
-          <label class="flex items-center gap-1 ml-2">
-            <input type="checkbox" name="is_corequisite" value="1" class="checkbox checkbox-xs" />
-            <span class="text-xs">Co-requisite</span>
-          </label>
-          <button type="submit" class="btn btn-xs btn-success">Add</button>
-          <button type="button" class="btn btn-xs" onclick="toggleSection('add-prerequisite-form', true)">Cancel</button>
-        </div>
-        <div class="text-xs text-gray-600 mt-1">Select a subject from the dropdown, or type any prerequisite code/name/description. (Selecting from the dropdown links to a real subject; custom text is saved as-is.) Use the checkbox to mark as co-requisite.</div>
-      </form>
+  @media (min-width: 1024px) {
+    .target-grade-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+</style>
+
+<div class="flex flex-col gap-6">
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h2 class="subject-title flex flex-wrap items-center gap-3">
+        <span id="subject-code-display">{{ subject.subject_code }}</span>
+        <span id="subject-name-display">{{ subject.subject_name }}</span>
+      </h2>
+      <p class="semester-title mt-1"><span>{{ semester }}</span> <span class="semester-year">{{ year }}</span></p>
+    </div>
+    <a id="edit-subject-btn" class="btn btn-xs btn-circle btn-ghost" href="/year/{{ year }}/semester/{{ semester }}/subject/{{ subject.subject_code }}/settings" title="Open subject settings">&#9881;</a>
+  </div>
+
+  <div class="rounded-2xl border border-base-300 bg-base-100 shadow-sm p-4 md:p-5">
+    <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h3 class="font-semibold text-lg">Subject Overview</h3>
+        <p class="text-sm opacity-70">Use the settings cog to edit subject details and rules on a separate page.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <div class="prerequisite-section w-full">
+      <h3 class="font-semibold mb-2">Prerequisites</h3>
+      <ul class="list-disc list-inside mb-2">
+        {% if prerequisites and prerequisites|length > 0 %}
+          {% for prereq in prerequisites %}
+            <li>
+                {% if prereq.prerequisite_subject %}
+                  {{ prereq.prerequisite_subject.subject_code }} - {{ prereq.prerequisite_subject.subject_name }}
+                {% elif prereq.custom_text %}
+                  {{ prereq.custom_text }}
+                {% else %}
+                  Unknown prerequisite
+                {% endif %}
+              {% if prereq.is_corequisite %}<span class="badge badge-info ml-2">Co-requisite</span>{% endif %}
+                <form method="post" action="/year/{{year}}/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite/remove" style="display:inline">
+                  <input type="hidden" name="year" value="{{year}}" />
+                  <input type="hidden" name="prerequisite_id" value="{{ prereq.id }}" />
+                  <input type="hidden" name="is_corequisite" value="{{ prereq.is_corequisite|int }}" />
+                <button type="submit" class="btn btn-xs btn-error ml-2">Remove</button>
+              </form>
+            </li>
+          {% endfor %}
+        {% else %}
+          <li class="text-gray-500">No prerequisites set.</li>
+        {% endif %}
+      </ul>
+      <button class="btn btn-sm btn-primary mb-2" id="show-add-prerequisite-form" type="button" onclick="toggleSection('add-prerequisite-form', false)">Add Prerequisite</button>
+      <div id="add-prerequisite-form-section" class="hidden">
+        <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite/add" class="flex flex-col md:flex-row gap-2 items-center">
+          <input type="hidden" name="year" value="{{year}}" />
+          <div class="flex gap-2 items-center w-full">
+              <select name="prerequisite_subject_id" class="input input-xs w-48">
+                <option value="">Select subject...</option>
+                {% for subj in candidate_subjects %}
+                  <option value="{{ subj.id }}">{{ subj.subject_code }} - {{ subj.subject_name }}</option>
+                {% endfor %}
+              </select>
+              <span class="text-xs">or</span>
+            <input name="custom_prerequisite" class="input input-xs flex-1" placeholder="Or enter a custom prerequisite (free text)" />
+            <label class="flex items-center gap-1 ml-2">
+              <input type="checkbox" name="is_corequisite" value="1" class="checkbox checkbox-xs" />
+              <span class="text-xs">Co-requisite</span>
+            </label>
+            <button type="submit" class="btn btn-xs btn-success">Add</button>
+            <button type="button" class="btn btn-xs" onclick="toggleSection('add-prerequisite-form', true)">Cancel</button>
+          </div>
+          <div class="text-xs text-gray-600 mt-1">Select a subject from the dropdown, or type any prerequisite code/name/description. (Selecting from the dropdown links to a real subject; custom text is saved as-is.) Use the checkbox to mark as co-requisite.</div>
+        </form>
+      </div>
+    </div>
+
+    <div class="mt-6 lg:mt-0 w-full max-w-xl mx-auto mb-4 lg:mb-0">
+      <h3 class="font-semibold mb-2">Prerequisite Graph</h3>
+      <div id="prereq-graph" class="h-[320px] border border-base-300 bg-base-100 rounded-xl"></div>
+      <div class="mt-2 flex flex-wrap gap-2 text-[0.75rem]">
+        <span style="display:inline-flex;align-items:center;gap:.5rem;border:1px solid rgba(0,0,0,.12);background:#fff;border-radius:9999px;padding:.35rem .75rem;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.08);">
+          <span style="display:inline-block;width:.875rem;height:.875rem;border-radius:.2rem;background:#1976d2;border:1px solid #0d47a1;"></span>
+          <span>Main subject</span>
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:.5rem;border:1px solid rgba(0,0,0,.12);background:#fff;border-radius:9999px;padding:.35rem .75rem;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.08);">
+          <span style="display:inline-block;width:.875rem;height:.875rem;border-radius:.2rem;background:#90caf9;border:1px solid #64b5f6;"></span>
+          <span>Subject</span>
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:.5rem;border:1px solid rgba(0,0,0,.12);background:#fff;border-radius:9999px;padding:.35rem .75rem;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.08);">
+          <span style="display:inline-block;width:1.1rem;height:0;border-top:2px solid #1976d2;"></span>
+          <span>Prerequisite</span>
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:.5rem;border:1px solid rgba(0,0,0,.12);background:#fff;border-radius:9999px;padding:.35rem .75rem;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.08);">
+          <span style="display:inline-block;width:1.1rem;height:0;border-top:2px dashed #ff9800;"></span>
+          <span>Corequisite</span>
+        </span>
+      </div>
+      <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+      <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        fetch(`/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite_graph/json?year={{year}}`)
+          .then(r => r.json())
+          .then(data => {
+            const container = document.getElementById('prereq-graph');
+            if (!container || !data.nodes) return;
+
+            const nodes = new vis.DataSet(data.nodes.map(n => ({
+              id: n.id,
+              label: n.label,
+              color: n.main ? '#1976d2' : (n.corequisite ? '#ffeb3b' : '#90caf9'),
+              font: { color: n.main ? '#fff' : '#222', size: n.main ? 22 : 16, bold: n.main },
+              x: n.x,
+              y: n.y,
+              physics: n.physics || false,
+              fixed: { x: true, y: true },
+            })));
+            const edges = new vis.DataSet(data.edges.map(e => ({
+              from: e.from,
+              to: e.to,
+              arrows: 'to',
+              color: e.type === 'corequisite' ? { color: '#ff9800' } : { color: '#1976d2' },
+              dashes: e.type === 'corequisite',
+              title: e.type.charAt(0).toUpperCase() + e.type.slice(1),
+            })));
+            const network = new vis.Network(container, { nodes, edges }, {
+              layout: { randomSeed: 42 },
+              nodes: { shape: 'box', borderWidth: 2 },
+              edges: {
+                smooth: {
+                  enabled: true,
+                  type: 'cubicBezier',
+                  forceDirection: 'vertical',
+                  roundness: 0.4,
+                }
+              },
+              physics: { enabled: false },
+            });
+            network.once('stabilizationIterationsDone', function () {
+              network.setOptions({ physics: false });
+            });
+          });
+      });
+      </script>
     </div>
   </div>
 
   <script>
-  // Add Prerequisite toggle logic
   function toggleSection(formId, hideOnly) {
     const section = document.getElementById(formId + '-section');
     if (section) {
@@ -187,23 +189,7 @@ c<div class="mt-6 w-full max-w-xl mx-auto">
   }
   </script>
 
-  <div class="flex gap-2 justify-center">
-    {% if return_to %}
-      {% set ret = return_to.split('-') %}
-      <a href="/year/{{ret[1]}}/semester/{{ret[0]}}" class="btn btn-xs btn-outline">Back to Semester</a>
-    {% else %}
-      <a href="/year/{{year}}/semester/{{semester}}" class="btn btn-xs btn-outline">Back to Semester</a>
-    {% endif %}
-    <a href="/" class="btn btn-xs btn-secondary">Return to Home</a>
-    <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/delete" onsubmit="return confirm('Delete this subject and all related assignments/exams?');">
-      <input type="hidden" name="year" value="{{year}}" />
-      {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}" />{% endif %}
-      <button class="btn btn-xs btn-error" type="submit">Delete Subject</button>
-    </form>
-  </div>
-</div>
-
-<div class="mt-8">
+<div class="block w-full mt-8">
   <div class="mb-4 flex flex-row items-center gap-2">
     <div class="flex-1">
       <button class="btn btn-sm btn-primary" id="show-add-assignment-form" type="button" onclick="toggleSection('add-assignment-form', false)">Add Assignment</button>
@@ -348,41 +334,97 @@ c<div class="mt-6 w-full max-w-xl mx-auto">
     </div>
   </div>
 
-    <div id="panel-summary" class="hidden">
-      <div class="overflow-x-auto p-2">
-        <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
-          <thead>
-            <tr>
-              <th>Subject Title</th>
-              <th>Assignment Mark</th>
-              <th>Unweighted Mark</th>
-              <th>Assessment Weight</th>
-              {% if subject.has_exam %}
-                <th>Exam Contribution</th>
-                <th>Final Exam Mark Weight{% if ps_exam %} (PS Factor Applied){% endif %}</th>
-              {% endif %}
-              <th>Total Mark</th>
+   <div id="panel-summary" class="hidden block w-full clear-both">
+    <div class="overflow-x-auto p-2 w-full">        
+      <table class="table table-sm w-full border-separate border-2 border-teal-300 rounded-xl">
+        <thead class="bg-teal-600 text-white">
+          <tr>
+            <th class="text-left">Category</th>
+            <th class="text-center">Items</th>
+            <th class="text-right">Unweighted Avg (%)</th>
+            <th class="text-right">Weight Total (%)</th>
+            <th class="text-right">Weighted Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in summaries %}
+            <tr class="hover:bg-teal-50 transition-colors border-t border-teal-100">
+              <td class="px-4 py-2 font-medium border-l-4 {% if row.type == 'rule' %}border-l-blue-500{% elif row.type == 'exam' %}border-l-purple-500{% else %}border-l-teal-500{% endif %}">
+                {{ row.label }}
+                {% if row.bonus_count > 0 %}
+                  <span class="badge badge-xs badge-warning ml-1">+{{ row.bonus_count }} Bonus</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-2 text-center text-gray-600">{{ row.count }}</td>
+              <td class="px-4 py-2 text-right text-gray-600">
+                {{ "%.2f"|format(row.unweighted_avg * 100) }}%
+              </td>
+              <td class="px-4 py-2 text-right text-gray-600">
+                {{ "%.2f"|format(row.total_weight) }}%
+              </td>
+              <td class="px-4 py-2 text-right font-bold text-teal-700">
+                {{ "%.2f"|format(row.weighted_score) }}
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>{{ subject.subject_name }}</td>
-              <td>{{ '%.2f' % assignment_weighted_sum }}</td>
-              <td>{{ '%.2f' % overall_assignment_unweighted if overall_assignment_unweighted is defined else '0.00' }}%</td>
-              <td>{{ '%.0f' % assignment_weight_percent }}%</td>
-              {% if subject.has_exam %}
-                <td>{{ '%.2f' % exam_weighted_sum if exam_weighted_sum is not none else '-' }}</td>
-                <td>{{ '%.0f' % final_exam_mark_weight }}%</td>
-              {% endif %}
-              <td>{{ '%.0f' % subject.total_mark if subject.total_mark is not none else '-' }}</td>
-            </tr>
-          </tbody>
-        </table>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="bg-teal-50 font-bold">
+            <td colspan="3" class="px-4 py-3 text-right uppercase text-xs text-gray-500">Total Calculation</td>
+            <td class="px-4 py-3 text-right border-t-2 border-teal-400">
+              {{ "%.2f"|format(summaries|sum(attribute='total_weight')) }}%
+            </td>
+            <td class="px-4 py-3 text-right text-lg text-teal-900 border-t-2 border-teal-400">
+              {{ "%.2f"|format(summaries|sum(attribute='weighted_score')) }}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="mt-8 block w-full bg-base-200 rounded-xl p-6 border border-base-300">
+      <div class="flex items-center justify-between mb-4">
+        <h4 class="text-sm font-bold uppercase opacity-60 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+          Target Grade Calculator
+        </h4>
+        <button 
+        class="btn btn-xs btn-ghost btn-square opacity-40 hover:opacity-100 transition-opacity"
+        hx-get="/year/{{ year }}/semester/{{ semester }}/subject/{{ subject.subject_code }}/recalculate"
+        hx-target="#panel-summary"
+        hx-swap="outerHTML"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+          </svg>
+      </button>
+      </div>
+
+      <div class="target-grade-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 w-full">
+        {% for goal in grade_goals %}
+          <div class="bg-base-100 p-4 rounded-xl border border-base-300 shadow-sm flex flex-col items-center text-center">
+            <p class="text-[10px] font-bold uppercase opacity-50">{{ goal.label }} ({{ goal.target }}+)</p>
+            {% set needed_text = goal.needed|string %}
+            {% if needed_text == 'Achieved' %}
+              <p class="text-xl font-mono font-black text-success">{{ needed_text }}</p>
+            {% elif needed_text == 'Impossible' %}
+              <p class="text-xl font-mono font-black text-error">{{ needed_text }}</p>
+            {% else %}
+              <p class="text-xl font-mono font-black text-base-content">
+                {% if '%' in needed_text %}
+                  <span class="text-info">{{ needed_text.replace('%', '') }}</span><span class="text-info">%</span>
+                {% else %}
+                  {{ needed_text }}
+                {% endif %}
+              </p>
+            {% endif %}
+            <p class="text-[9px] opacity-40 mt-1">Required on remaining work</p>
+          </div>
+        {% endfor %}
       </div>
     </div>
   </div>
 </div>
-
 <script>
 // Shared global variables for JS logic
 window.subjectYear = "{{ year }}";
