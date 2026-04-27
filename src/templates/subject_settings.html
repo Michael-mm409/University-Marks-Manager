@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% block title %}{{ subject.subject_code }} Settings | University Marks Manager{% endblock %}
+{% set breadcrumbs = [
+  {'label': year, 'url': '/year/' ~ year},
+  {'label': semester, 'url': '/year/' ~ year ~ '/semester/' ~ semester},
+  {'label': subject.subject_code, 'url': '/year/' ~ year ~ '/semester/' ~ semester ~ '/subject/' ~ subject.subject_code},
+] %}
+
+{% block content %}
+<div class="flex flex-col gap-6">
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h1 class="site-title">{{ subject.subject_code }} Settings</h1>
+      <p class="text-sm opacity-70 mt-1">{{ subject.subject_name }} - {{ semester }} {{ year }}</p>
+    </div>
+    <a href="/year/{{ year }}/semester/{{ semester }}/subject/{{ subject.subject_code }}" class="btn btn-sm btn-outline">Back to Subject</a>
+  </div>
+
+  {% if request.query_params.get('error') %}
+  <div class="alert alert-error shadow-md">
+    <span>{{ request.query_params.get('error') }}</span>
+  </div>
+  {% endif %}
+
+  <div class="grid gap-6 xl:grid-cols-2">
+    <section class="rounded-2xl border border-base-300 bg-base-100 shadow-lg p-5 md:p-6">
+      <div class="flex items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 class="text-lg font-semibold">Subject Details</h2>
+          <p class="text-sm opacity-70">Update the subject's code, name, year, semester, and flags.</p>
+        </div>
+      </div>
+      <form method="post" action="/semester/{{ semester }}/subject/{{ subject.subject_code }}/update" class="space-y-4">
+        <input type="hidden" name="old_semester" value="{{ semester }}" />
+        <input type="hidden" name="old_year" value="{{ year }}" />
+        <input type="hidden" name="old_subject_code" value="{{ subject.subject_code }}" />
+        <table class="table table-sm w-full">
+          <tbody>
+            <tr>
+              <th class="w-40">Subject Code</th>
+              <td><input name="subject_code" class="input input-bordered input-sm w-full" value="{{ subject.subject_code }}" required /></td>
+            </tr>
+            <tr>
+              <th>Subject Name</th>
+              <td><input name="subject_name" class="input input-bordered input-sm w-full" value="{{ subject.subject_name }}" required /></td>
+            </tr>
+            <tr>
+              <th>Credit Points</th>
+              <td><input name="credit_points" type="number" min="0" class="input input-bordered input-sm w-full" value="{{ subject.credit_points }}" required /></td>
+            </tr>
+            <tr>
+              <th>Target Semester</th>
+              <td><input name="target_semester" class="input input-bordered input-sm w-full" value="{{ semester }}" required /></td>
+            </tr>
+            <tr>
+              <th>Target Year</th>
+              <td><input name="target_year" type="number" min="2000" max="2100" class="input input-bordered input-sm w-full" value="{{ year }}" required /></td>
+            </tr>
+            <tr>
+              <th>Flags</th>
+              <td class="space-y-2">
+                <label class="flex items-center gap-2"><input type="checkbox" name="has_exam" value="true" {% if subject.has_exam %}checked{% endif %} class="checkbox checkbox-sm" /> <span>Has exam</span></label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="sync_subject" value="true" {% if subject.sync_subject %}checked{% endif %} class="checkbox checkbox-sm" /> <span>Sync subject</span></label>
+                <label class="flex items-center gap-2"><input type="checkbox" name="force_move" value="true" class="checkbox checkbox-sm" /> <span>Allow move even if prerequisites are later</span></label>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="flex justify-end gap-2">
+          <a href="/year/{{ year }}/semester/{{ semester }}/subject/{{ subject.subject_code }}" class="btn btn-sm">Cancel</a>
+          <button type="submit" class="btn btn-sm btn-primary">Save Subject</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="rounded-2xl border border-base-300 bg-base-100 shadow-lg p-5 md:p-6">
+      <div class="mt-8 grid gap-6 md:grid-cols-2">
+        <div class="bg-base-200 rounded-2xl p-5 border border-base-300">
+          <h3 class="font-bold text-md mb-3 flex items-center gap-2">
+            <span class="text-secondary">#</span> How Matching Works
+          </h3>
+          <ul class="space-y-3 text-sm">
+            <li class="flex gap-3">
+              <kbd class="kbd kbd-sm bg-base-100">%</kbd>
+              <span>The <strong>Wildcard</strong>. Matches any text before or after your keyword.</span>
+            </li>
+            <li class="flex gap-3">
+              <kbd class="kbd kbd-sm bg-base-100">Waterfall</kbd>
+              <span>Rules are processed top-to-bottom. Once an assignment is "claimed" by a rule, it won't appear in others.</span>
+            </li>
+            <li class="flex gap-3">
+              <kbd class="kbd kbd-sm bg-base-100">Best Of</kbd>
+              <span>If <strong>Items Found > Max Count</strong>, the system automatically picks the highest marks to calculate your score.</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="bg-base-200 rounded-2xl p-5 border border-base-300">
+          <h3 class="font-bold text-md mb-3">Common Examples</h3>
+          <div class="space-y-2">
+            <div class="bg-base-100 p-2 rounded-lg border border-base-300 flex justify-between items-center">
+              <div>
+                <p class="text-xs font-bold uppercase opacity-50">Best 9 of 10 Reviews</p>
+                <code class="text-secondary text-sm">%Module Review%</code>
+              </div>
+              <div class="text-right">
+                <p class="text-[10px] opacity-60">Max Count</p>
+                <p class="font-mono font-bold text-sm">9</p>
+              </div>
+            </div>
+            
+            <div class="bg-base-100 p-2 rounded-lg border border-base-300 flex justify-between items-center">
+              <div>
+                <p class="text-xs font-bold uppercase opacity-50">All Weekly Quizzes</p>
+                <code class="text-secondary text-sm">Quiz%</code>
+              </div>
+              <div class="text-right">
+                <p class="text-[10px] opacity-60">Max Count</p>
+                <p class="font-mono font-bold text-sm">12</p>
+              </div>
+            </div>
+
+            <div class="bg-base-100 p-2 rounded-lg border border-base-300 flex justify-between items-center">
+              <div>
+                <p class="text-xs font-bold uppercase opacity-50">Lab Participation</p>
+                <code class="text-secondary text-sm">%Lab%</code>
+              </div>
+              <div class="text-right">
+                <p class="text-[10px] opacity-60">Max Count</p>
+                <p class="font-mono font-bold text-sm">10</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <form method="post" action="/semester/{{ semester }}/subject/{{ subject.subject_code }}/rules/update" class="space-y-4">
+        <input type="hidden" name="year" value="{{ year }}" />
+        <div class="overflow-x-auto">
+          <table class="table table-sm w-full">
+            <thead>
+              <tr>
+                <th>Rule Label</th>
+                <th>Pattern</th>
+                <th class="w-24">Max Count</th>
+                <th class="w-28">Weight Each</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for rule in subject_rules %}
+              <tr>
+                <td><input name="rule_label" class="input input-bordered input-sm w-full" value="{{ rule.rule_label|e }}" placeholder="Rule label" /></td>
+                <td><input name="sql_pattern" class="input input-bordered input-sm w-full font-mono" value="{{ rule.sql_pattern|e }}" placeholder="%Assignment%" /></td>
+                <td><input name="max_count" type="number" min="0" class="input input-bordered input-sm w-full" value="{{ rule.max_count }}" /></td>
+                <td><input name="weight_each" type="number" step="0.01" min="0" class="input input-bordered input-sm w-full" value="{{ '%.2f'|format(rule.weight_each) }}" /></td>
+              </tr>
+              {% endfor %}
+              <tr class="opacity-80">
+                <td><input name="rule_label" class="input input-bordered input-sm w-full" placeholder="Add new rule label" /></td>
+                <td><input name="sql_pattern" class="input input-bordered input-sm w-full font-mono" placeholder="%Assignment%" /></td>
+                <td><input name="max_count" type="number" min="0" class="input input-bordered input-sm w-full" placeholder="9" /></td>
+                <td><input name="weight_each" type="number" step="0.01" min="0" class="input input-bordered input-sm w-full" placeholder="2.00" /></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="flex justify-end gap-2">
+          <a href="/year/{{ year }}/semester/{{ semester }}/subject/{{ subject.subject_code }}" class="btn btn-sm">Cancel</a>
+          <button type="submit" class="btn btn-sm btn-secondary">Save Rules</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <section class="rounded-2xl border border-base-300 bg-base-100 shadow-lg p-5 md:p-6">
+    <div class="flex items-center justify-between gap-3 mb-4">
+      <div>
+        <h2 class="text-lg font-semibold">Current Rule Summary</h2>
+        <p class="text-sm opacity-70">Read-only summary used by the dashboard.</p>
+      </div>
+    </div>
+    {% if subject_rule_summary and subject_rule_summary|length > 0 %}
+    <div class="overflow-x-auto">
+      <table class="table table-sm w-full">
+        <thead>
+          <tr>
+            <th>Rule Label</th>
+            <th>Pattern</th>
+            <th>Max Count</th>
+            <th>Weight Each</th>
+            <th>Core Count</th>
+            <th>Bonus Count</th>
+            <th>Weighted Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for rule in subject_rule_summary %}
+          <tr>
+            <td class="font-semibold">{{ rule.rule_label }}</td>
+            <td class="font-mono">{{ rule.sql_pattern }}</td>
+            <td>{{ rule.max_count }}</td>
+            <td>{{ '%.2f'|format(rule.weight_each) }}</td>
+            <td>{{ rule.core_count }}</td>
+            <td>{{ rule.bonus_count }}</td>
+            <td class="font-mono">{{ '%.2f'|format(rule.weighted_score) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-sm opacity-70">No subject rules have been defined yet.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

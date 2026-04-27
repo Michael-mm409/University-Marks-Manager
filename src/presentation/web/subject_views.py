@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlmodel import Session, select, col
-from typing import List, Optional
+from typing import Any, List, Optional, cast
 from sqlalchemy.sql import expression
 from fastapi.templating import Jinja2Templates
 
 from src.presentation.api.deps import get_session
-from src.infrastructure.db.models import Subject, Assignment, Examination, ExamSettings, GradeType, Semester, SubjectPrerequisite
+from src.core.services.grade_calculator import GradeCalculator
+from src.infrastructure.db.models import Subject, Assignment, Examination, ExamSettings, GradeType, Semester, SubjectPrerequisite, SubjectRule
 from src.presentation.web.utils.subject_helpers import (
     resolve_subject_for_context,
     build_candidate_subjects,
@@ -19,6 +20,9 @@ from .utils.subject_commands import (
 )
 from .utils.subject_context import build_subject_context as build_subject_context_core
 from .types import SubjectContext
+
+from sqlalchemy.orm import selectinload # Add this import
+
 
 subject_router = APIRouter()
 
@@ -523,6 +527,72 @@ def update_subject(
     return RedirectResponse(url=url, status_code=303)
 
 
+@subject_router.post("/semester/{semester}/subject/{code}/rules/update", response_class=RedirectResponse)
+async def update_subject_rules(
+    request: Request,
+    semester: str,
+    code: str,
+    year: str = Form(...),
+    session: Session = Depends(get_session),
+) -> RedirectResponse:
+    """Replace the subject's rule set using the rows submitted from the edit table."""
+    form = await request.form()
+
+    subject = session.exec(
+        select(Subject).join(Semester, expression.true() & (Subject.semester_id == Semester.id)).where(
+            Semester.name == semester,
+            Semester.year == int(year),
+            Subject.subject_code == code,
+        )
+    ).first()
+
+    if not subject or subject.id is None:
+        return RedirectResponse(
+            f"/year/{year}/semester/{semester}?error=Subject+not+found",
+            status_code=303,
+        )
+
+    existing_rules = session.exec(
+        select(SubjectRule).where(SubjectRule.subject_id == subject.id)
+    ).all()
+    for rule in existing_rules:
+        session.delete(rule)
+
+    rule_labels = form.getlist("rule_label")
+    sql_patterns = form.getlist("sql_pattern")
+    max_counts = form.getlist("max_count")
+    weight_eachs = form.getlist("weight_each")
+
+    for index, rule_label in enumerate(rule_labels):
+        pattern = sql_patterns[index] if index < len(sql_patterns) else ""
+        if not str(rule_label).strip() or not str(pattern).strip():
+            continue
+
+        try:
+            max_count_raw = str(max_counts[index]) if index < len(max_counts) else ""
+            max_count = int(max_count_raw) if max_count_raw.strip() else 9
+        except Exception:
+            max_count = 9
+        try:
+            weight_each_raw = str(weight_eachs[index]) if index < len(weight_eachs) else ""
+            weight_each = float(weight_each_raw) if weight_each_raw.strip() else 2.0
+        except Exception:
+            weight_each = 2.0
+
+        session.add(
+            SubjectRule(
+                subject_id=subject.id,
+                rule_label=str(rule_label).strip(),
+                sql_pattern=str(pattern).strip(),
+                max_count=max_count,
+                weight_each=weight_each,
+            )
+        )
+
+    session.commit()
+    return RedirectResponse(url=f"/year/{year}/semester/{semester}/subject/{code}", status_code=303)
+
+
 @subject_router.api_route("/semester/{semester}/subject/{code}/delete", methods=["POST"], response_class=RedirectResponse)
 def delete_subject(
     semester: str,
@@ -591,4 +661,45 @@ def get_subject(
             status_code=303,
         )
 
+    # Inject GradeCalculator and compute subject rule summary
+    grade_calculator = GradeCalculator(session)
+    subject = ctx.get("subject")
+    subject_summary = []
+    if subject:
+        subject_obj = cast(Subject, subject)
+        if subject_obj.id is not None:
+            statement = (
+                select(Subject)
+                .where(Subject.id == subject_obj.id)
+                .options(selectinload(cast(Any, Subject.assignments)))
+            )
+            subject_obj = session.exec(statement).first() or subject_obj
+            ctx["subject"] = subject_obj
+        subject_summary = grade_calculator.calculate_subject_summary(subject_obj)
+        subject_rules = session.exec(
+            select(SubjectRule).where(SubjectRule.subject_id == subject_obj.id)
+        ).all() if subject_obj.id is not None else []
+    else:
+        subject_rules = []
+
+    ctx["subject_summary"] = subject_summary
+    ctx["subject_rules"] = subject_rules
     return templates.TemplateResponse("subject.html", {"request": request, **ctx})
+
+@subject_router.get("/subjects/{subject_id}")
+async def get_subject_detail(request: Request, subject_id: int, session: Session = Depends(get_session)):
+    # Fetch subject AND assignments in one go
+    statement = select(Subject).where(Subject.id == subject_id).options(selectinload(cast(Any, Subject.assignments)))
+    subject = session.exec(statement).first()
+    
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+
+    calc = GradeCalculator(session)
+    summaries = calc.calculate_subject_summary(subject)
+    
+    return templates.TemplateResponse("subject.html", {
+        "request": request,
+        "subject": subject,
+        "summaries": summaries
+    })

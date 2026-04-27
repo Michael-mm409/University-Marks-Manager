@@ -1,12 +1,13 @@
 from __future__ import annotations
 """HTML view routes rendering Jinja templates (spaces only)."""
 
-from typing import Optional, List, cast
+from typing import Any, Optional, List, cast
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
 from sqlmodel import Session, select, col
+from sqlalchemy.orm import selectinload
 import re
 
 from src.presentation.api.deps import get_session
@@ -14,6 +15,7 @@ from src.infrastructure.db.models import (
     Semester,
     Subject,
     SubjectPrerequisite,
+    SubjectRule,
     UserCourse,
     Course,
 )
@@ -182,7 +184,8 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
         sem_subjects = session.exec(
             select(Subject).where(Subject.semester_id == sem.id)
         ).all()
-        subjects_by_semester[int(sem.id)] = list(sem_subjects)
+        if sem.id is not None:
+            subjects_by_semester[sem.id] = list(sem_subjects)
 
     ctx: IndexContext = {
         "semesters": display_semesters,
@@ -910,19 +913,102 @@ def subject_detail_pretty(
                         except Exception:
                                 pass
         ctx = build_subject_page_context(
-            session=session,
-            semester=semester,
-            year=year,
-            code=code,
-            exam_weight=parsed_exam_weight,
-            final_total=final_total,
-            total_mark=total_mark,
-            return_to=qp.get("return_to"),
-            error_message=qp.get("error"),
-        )
+        session=session,
+        semester=semester,
+        year=year,
+        code=code,
+        exam_weight=parsed_exam_weight,
+        final_total=final_total,
+        total_mark=total_mark,
+        return_to=qp.get("return_to"),
+        error_message=qp.get("error"),
+         )
         if ctx is None:
-                return HTMLResponse("Subject not found", status_code=404)
+            return HTMLResponse("Subject not found", status_code=404)
+
+        subject_obj = ctx.get("subject")
+
+        # Initialize result with defaults so it is never unbound
+        result = {"summaries": [], "grade_goals": []}
+
+        # Use 'isinstance' to narrow the type so Pylance knows 'id' exists
+        if isinstance(subject_obj, Subject) and subject_obj.id is not None:
+            statement = (
+                select(Subject)
+                .where(Subject.id == subject_obj.id)
+                .options(selectinload(cast(Any, Subject.assignments)))
+            )
+            loaded_subject = session.exec(statement).first()
+            if loaded_subject is not None:
+                ctx["subject"] = loaded_subject
+                subject_obj = loaded_subject
+            
+            calc = GradeCalculator(session)
+            # Now result is properly assigned inside the scope
+            result = calc.calculate_subject_summary(cast(Subject, subject_obj))
+
+        ctx["summaries"] = result["summaries"]
+        ctx["grade_goals"] = result["grade_goals"]
         return _render(request, "subject.html", ctx)
+
+
+@views.get("/year/{year}/semester/{semester}/subject/{code}/settings", response_class=HTMLResponse)
+def subject_settings_page(
+    request: Request,
+    year: str,
+    semester: str,
+    code: str,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Render the dedicated subject settings page."""
+    ctx = build_subject_page_context(session, semester=semester, year=year, code=code)
+    if ctx is None:
+        return HTMLResponse("Subject not found", status_code=404)
+
+    grade_calculator = GradeCalculator(session)
+    subject = ctx.get("subject")
+    
+    if subject:
+        subject_obj = cast(Subject, subject)
+        
+        # 1. Unpack the new dictionary structure from the calculator
+        calc_result = grade_calculator.calculate_subject_summary(subject_obj)
+        subject_summary_list = calc_result["summaries"]
+        grade_goals = calc_result["grade_goals"]
+
+        subject_rules = session.exec(
+            select(SubjectRule).where(SubjectRule.subject_id == subject_obj.id)
+        ).all() if subject_obj.id is not None else []
+        
+        # 2. Use the extracted list for the dictionary comprehension
+        summary_by_label: dict[str, dict[str, Any]] = {
+            str(row["label"]): row for row in subject_summary_list
+        }
+        
+        ctx["subject_rule_summary"] = [
+            {
+                "rule_label": rule.rule_label,
+                "sql_pattern": rule.sql_pattern,
+                "max_count": rule.max_count,
+                "weight_each": rule.weight_each,
+                "core_count": summary_by_label.get(str(rule.rule_label), {}).get("core_count", 0),
+                "bonus_count": summary_by_label.get(str(rule.rule_label), {}).get("bonus_count", 0),
+                "weighted_score": summary_by_label.get(str(rule.rule_label), {}).get("weighted_score", 0),
+            }
+            for rule in subject_rules
+        ]
+        
+        # 3. Pass both variables to the template
+        ctx["subject_summary"] = subject_summary_list
+        ctx["grade_goals"] = grade_goals
+        ctx["subject_rules"] = subject_rules
+    else:
+        ctx["subject_summary"] = []
+        ctx["subject_rules"] = []
+        ctx["subject_rule_summary"] = []
+        ctx["grade_goals"] = []
+
+    return _render(request, "subject_settings.html", ctx)
 
 @views.get("/subjects/{year}/{code}", response_class=HTMLResponse)
 def subject_detail_short(
