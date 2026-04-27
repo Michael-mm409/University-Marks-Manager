@@ -9,6 +9,7 @@ from sqlmodel import Session, select
 
 from src.core.services.course_manager import CourseManager
 from src.core.services.semester_manager import SemesterManager
+from src.core.services.grade_calculator import GradeCalculator
 from src.infrastructure.db.engine import get_session
 from src.infrastructure.db.models import Subject, Course, Semester, University, GradeScale
 
@@ -387,6 +388,7 @@ def get_course_detail_page(
     jinja_env = request.app.state.jinja_env
     course_manager = CourseManager(session)
     semester_manager = SemesterManager(session)
+    grade_calculator = GradeCalculator(session)
 
     course = _resolve_course(course_manager, course_code)
     if not course:
@@ -410,6 +412,11 @@ def get_course_detail_page(
         ).all()
         subjects_by_semester[getattr(sem, "id")] = list(candidates)
 
+    # Calculate grade statistics for dashboard
+    wam = grade_calculator.calculate_wam(course.id) if course.id else None
+    gpa = grade_calculator.calculate_gpa(course.id) if course.id else None
+    grade_counts = grade_calculator.calculate_grade_counts(course.id) if course.id else {}
+
     # Get all universities for the dropdown
     from src.infrastructure.db.models import University
     universities = session.exec(select(University)).all()
@@ -422,6 +429,9 @@ def get_course_detail_page(
         unassigned_years=unassigned_years,
         subjects_by_semester=subjects_by_semester,
         universities=universities,
+        wam=wam,
+        gpa=gpa,
+        grade_counts=grade_counts,
     )
 
 

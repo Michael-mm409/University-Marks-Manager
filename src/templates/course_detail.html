@@ -18,6 +18,60 @@
     <a href="/courses" class="btn btn-sm md:btn-md btn-outline">← Back to Courses</a>
   </div>
 
+  <!-- Grade Statistics Dashboard -->
+  {% if wam is not none or gpa is not none or grade_counts %}
+  <section class="grid gap-4 md:grid-cols-3">
+    <!-- WAM Card -->
+    {% if wam is not none %}
+    <div class="card bg-base-100 shadow card-glow">
+      <div class="card-body">
+        <h3 class="card-title text-lg">Weighted Average Mark</h3>
+        <div class="flex items-center justify-between">
+          <div class="text-4xl font-bold text-primary">{{ "%.2f"|format(wam) }}</div>
+          <div class="text-sm opacity-70">out of 100</div>
+        </div>
+        <div class="mt-2 text-xs opacity-60">
+          WAM = Sum(Mark × Credit Points) ÷ Sum(Credit Points)
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- GPA Card -->
+    {% if gpa is not none %}
+    <div class="card bg-base-100 shadow card-glow">
+      <div class="card-body">
+        <h3 class="card-title text-lg">Grade Point Average</h3>
+        <div class="flex items-center justify-between">
+          <div class="text-4xl font-bold text-secondary">{{ "%.2f"|format(gpa) }}</div>
+          <div class="text-sm opacity-70">out of 4.0</div>
+        </div>
+        <div class="mt-2 text-xs opacity-60">
+          GPA = Sum(Grade Points × Credit Points) ÷ Sum(Credit Points)
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Grade Distribution Card -->
+    {% if grade_counts %}
+    <div class="card bg-base-100 shadow card-glow">
+      <div class="card-body">
+        <h3 class="card-title text-lg">Grade Distribution</h3>
+        <div class="flex flex-col gap-2 text-sm">
+          {% if grade_counts.HD %}<div class="flex justify-between"><span>HD (≥85%)</span><span class="font-semibold">{{ grade_counts.HD }}</span></div>{% endif %}
+          {% if grade_counts.D %}<div class="flex justify-between"><span>D (≥75%)</span><span class="font-semibold">{{ grade_counts.D }}</span></div>{% endif %}
+          {% if grade_counts.C %}<div class="flex justify-between"><span>C (≥65%)</span><span class="font-semibold">{{ grade_counts.C }}</span></div>{% endif %}
+          {% if grade_counts.P %}<div class="flex justify-between"><span>P (≥50%)</span><span class="font-semibold">{{ grade_counts.P }}</span></div>{% endif %}
+          {% if grade_counts.PS %}<div class="flex justify-between"><span>PS (Supp.)</span><span class="font-semibold">{{ grade_counts.PS }}</span></div>{% endif %}
+          {% if grade_counts.F %}<div class="flex justify-between"><span>F (&lt;50%)</span><span class="font-semibold">{{ grade_counts.F }}</span></div>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+
   <!-- Header -->
   <section class="p-6 rounded-xl bg-base-100 shadow card-glow">
     <div class="flex flex-col md:flex-row justify-between items-start gap-4">
