@@ -404,17 +404,20 @@
         {% for goal in grade_goals %}
           <div class="bg-base-100 p-4 rounded-xl border border-base-300 shadow-sm flex flex-col items-center text-center">
             <p class="text-[10px] font-bold uppercase opacity-50">{{ goal.label }} ({{ goal.target }}+)</p>
-            {% set needed_text = goal.needed|string %}
-            {% if needed_text == 'Achieved' %}
-              <p class="text-xl font-mono font-black text-success">{{ needed_text }}</p>
-            {% elif needed_text == 'Impossible' %}
-              <p class="text-xl font-mono font-black text-error">{{ needed_text }}</p>
+            {% set goal_status = goal.status if goal.status is defined else goal.needed|string %}
+            {% set goal_required = goal.required_percent if goal.required_percent is defined else none %}
+            {% if goal_status == 'Achieved' %}
+              <p class="text-xl font-mono font-black text-success">Achieved</p>
+            {% elif goal_status == 'Impossible' %}
+              <p class="text-xl font-mono font-black text-error">Impossible</p>
             {% else %}
               <p class="text-xl font-mono font-black text-base-content">
-                {% if '%' in needed_text %}
-                  <span class="text-info">{{ needed_text.replace('%', '') }}</span><span class="text-info">%</span>
+                {% if goal_required is not none %}
+                  <span class="text-info">{{ "%.2f"|format(goal_required) }}</span><span class="text-info">%</span>
+                {% elif '%' in goal_status %}
+                  <span class="text-info">{{ goal_status.replace('%', '') }}</span><span class="text-info">%</span>
                 {% else %}
-                  {{ needed_text }}
+                  {{ goal_status }}
                 {% endif %}
               </p>
             {% endif %}
