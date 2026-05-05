@@ -2,7 +2,7 @@ from fastapi import Depends, Form, Request, APIRouter, Response
 from typing import List, cast
 from fastapi.responses import RedirectResponse
 from sqlmodel import col, Session, col, select
-from sqlalchemy import Table
+from sqlalchemy import Table, func, literal, union_all
 from src.presentation.api.deps import get_session
 from src.infrastructure.db.models import Semester, Subject, Assignment, Examination, ExamSettings, GradeType
 from .template_helpers import _render
@@ -191,41 +191,46 @@ def update_semester(
 
 def build_semester_context(session: Session, semester: str, year: str) -> SemesterContext:
     """Build the context used by the semester detail page for rendering."""
-    # Order at the database level by subject_code for predictable display
-    # First resolve semester_id
+    # Resolve the semester and build a SQL query that deduplicates by subject_code
+    # while preferring subjects from the current semester over synced subjects.
     sem = session.exec(select(Semester).where(Semester.name == semester, Semester.year == int(year))).first()
     sem_id = getattr(sem, "id", None)
     subjects_table = cast(Table, getattr(Subject, "__table__"))
-    # Only fetch subjects for the current semester
-    current_subjects = session.exec(
-        select(Subject)
-        .where(Subject.semester_id == sem_id)
-        .order_by(subjects_table.c.subject_code.asc())
-    ).all() if sem_id else []
+    current_subjects = []
+    if sem_id:
+        other_semester_ids = session.exec(
+            select(Semester.id)
+            .where(Semester.year == int(year), Semester.id != sem_id)
+        ).all()
 
-    # Fetch all sync_subject subjects from other semesters in the same year
-    other_semesters = session.exec(
-        select(Semester.id)
-        .where(Semester.year == int(year), Semester.id != sem_id)
-    ).all() if sem_id else []
-    other_semester_ids = session.exec(
-        select(Semester.id)
-        .where(Semester.year == int(year), Semester.id != sem_id)
-    )
-    sync_subjects = []
-    if other_semester_ids:
-        sync_subjects = session.exec(
+        current_subjects_stmt = select(
+            subjects_table.c.id.label("subject_id"),
+            subjects_table.c.subject_code.label("subject_code"),
+            literal(0).label("sort_priority"),
+        ).where(subjects_table.c.semester_id == sem_id)
+
+        sync_subjects_stmt = select(
+            subjects_table.c.id.label("subject_id"),
+            subjects_table.c.subject_code.label("subject_code"),
+            literal(1).label("sort_priority"),
+        ).where(col(subjects_table.c.semester_id).in_(other_semester_ids), subjects_table.c.sync_subject == True)
+
+        deduped_subjects = union_all(current_subjects_stmt, sync_subjects_stmt).cte("deduped_subjects")
+        ranked_subjects = select(
+            deduped_subjects.c.subject_id,
+            deduped_subjects.c.subject_code,
+            func.row_number().over(
+                partition_by=deduped_subjects.c.subject_code,
+                order_by=deduped_subjects.c.sort_priority.asc(),
+            ).label("row_number"),
+        ).cte("ranked_subjects")
+
+        current_subjects = session.exec(
             select(Subject)
-            .where(col(Subject.semester_id).in_(other_semester_ids), Subject.sync_subject == True)
+            .join(ranked_subjects, subjects_table.c.id == ranked_subjects.c.subject_id)
+            .where(ranked_subjects.c.row_number == 1)
             .order_by(subjects_table.c.subject_code.asc())
         ).all()
-    
-    # Combine, avoiding duplicates by subject_code
-    display_subjects = {subj.subject_code: subj for subj in current_subjects}
-    for subj in sync_subjects:
-        if subj.subject_code not in display_subjects:
-            display_subjects[subj.subject_code] = subj
-    current_subjects = list(display_subjects.values())
     summaries: List[SemesterSummary] = []
     missing_exam_subjects: List[str] = []
     import logging

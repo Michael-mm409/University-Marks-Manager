@@ -1,11 +1,12 @@
 """Web views for managing courses."""
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, cast
 
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from sqlmodel import Session, select
+from sqlalchemy import Table
 
 from src.core.services.course_manager import CourseManager
 from src.core.services.semester_manager import SemesterManager
@@ -404,11 +405,14 @@ def get_course_detail_page(
 
     # Map assigned semester -> subjects within that term for optional display
     subjects_by_semester: dict[int, list[Subject]] = {}
+    subjects_table = cast(Table, getattr(Subject, "__table__"))
     for sem in assigned_semesters:
         candidates = session.exec(
-            select(Subject).where(
+            select(Subject)
+            .where(
                 Subject.semester_id == sem.id,
             )
+            .order_by(subjects_table.c.subject_code.asc())
         ).all()
         subjects_by_semester[getattr(sem, "id")] = list(candidates)
 

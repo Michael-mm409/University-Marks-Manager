@@ -7,6 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Form, Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
 from sqlmodel import Session, select, col
+from sqlalchemy import Table
 from sqlalchemy.orm import selectinload
 import re
 
@@ -180,9 +181,12 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
 
     # Build subject schedule: map semester_id -> list of subjects
     subjects_by_semester: dict[int, list] = {}
+    subjects_table = cast(Table, getattr(Subject, "__table__"))
     for sem in display_semesters:
         sem_subjects = session.exec(
-            select(Subject).where(Subject.semester_id == sem.id)
+            select(Subject)
+            .where(Subject.semester_id == sem.id)
+            .order_by(subjects_table.c.subject_code.asc())
         ).all()
         if sem.id is not None:
             subjects_by_semester[sem.id] = list(sem_subjects)
