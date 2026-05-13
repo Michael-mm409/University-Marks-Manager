@@ -285,7 +285,7 @@
               data-semester="{{ semester }}"
               data-year="{{ year }}"
               data-grade-type="{{ assignment.grade_type }}"
-              data-unweighted-mark="{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % ((assignment.unweighted_mark|float) * 100) if assignment.unweighted_mark is not none else '0.00' }}{% endif %}">
+              data-unweighted-mark="{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % ((assignment.unweighted_mark|float) * 100) if assignment.unweighted_mark is not none else 'Pending' }}{% endif %}">
             <td class="assignment-title">{{ assignment.assessment }}</td>
             <td class="assignment-mark">
               {% if assignment.grade_type in ['S','U'] %}
@@ -298,8 +298,12 @@
               {% if assignment.grade_type in ['S','U'] %}
                 -
               {% else %}
-                {% set u = assignment.unweighted_mark|float if assignment.unweighted_mark is not none else 0.0 %}
-                <span class="whitespace-nowrap">{{ '%.2f' % (u * 100) }}</span>
+                {% if assignment.unweighted_mark is not none %}
+                  {% set u = assignment.unweighted_mark|float %}
+                  <span class="whitespace-nowrap">{{ '%.2f' % (u * 100) }}</span>
+                {% else %}
+                  Pending
+                {% endif %}
               {% endif %}
             </td>
             <td class="assignment-weight">
@@ -375,7 +379,7 @@
               {{ "%.2f"|format(summaries|sum(attribute='total_weight')) }}%
             </td>
             <td class="px-4 py-3 text-right text-lg text-teal-900 border-t-2 border-teal-400">
-              {{ "%.2f"|format(summaries|sum(attribute='weighted_score')) }}
+              {{ "%.2f"|format(total_achieved if total_achieved is defined and total_achieved is not none else summaries|sum(attribute='weighted_score')) }}
             </td>
           </tr>
         </tfoot>
