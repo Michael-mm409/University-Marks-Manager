@@ -2,7 +2,7 @@ import re
 from typing import Sequence, Any, cast
 from sqlmodel import Session, select, func
 from sqlalchemy import case
-from src.infrastructure.db.models import Subject, Semester, GradeScale, Course, ExamSettings, SubjectRule, Assignment
+from src.infrastructure.db.models import Subject, Semester, GradeScale, Course, ExamSettings, SubjectRule, Assignment, Examination
 
 class GradeCalculator:
     def __init__(self, session: Session):
@@ -236,8 +236,6 @@ class GradeCalculator:
             return {"summaries": [], "grade_goals": []}
 
         # 1. Setup Data
-        from src.infrastructure.db.models import Examination, SubjectRule, Assignment
-        
         rules = self.session.exec(select(SubjectRule).where(SubjectRule.subject_id == subject.id)).all()
         all_assignments = list(getattr(subject, "assignments", []) or [])
         
@@ -247,6 +245,24 @@ class GradeCalculator:
         summary = []
         used_assignment_ids: set[int] = set()
         rule_patterns = []
+
+        def _item_score(item: Any) -> float | None:
+            if isinstance(item, Examination):
+                return float(item.exam_mark) if item.exam_mark is not None else None
+            score = getattr(item, "unweighted_mark", None)
+            return float(score) if score is not None else None
+
+        def _item_weight(item: Any) -> float:
+            if isinstance(item, Examination):
+                return float(item.exam_weight) if item.exam_weight is not None else 0.0
+            weight = getattr(item, "mark_weight", None)
+            return float(weight) if weight is not None else 0.0
+
+        def _item_weighted_score(item: Any) -> float:
+            if isinstance(item, Examination):
+                return float(item.exam_mark) if item.exam_mark is not None else 0.0
+            weighted_mark = getattr(item, "weighted_mark", None)
+            return float(weighted_mark) if weighted_mark is not None else 0.0
 
         def _assignment_id(assignment: Assignment) -> int | None:
             return assignment.id if assignment.id is not None else None
@@ -261,6 +277,7 @@ class GradeCalculator:
             
             matches.sort(key=lambda x: (x.unweighted_mark or 0), reverse=True)
             core_items = matches[:rule.max_count]
+            scored_items = [item for item in matches if _item_score(item) is not None]
             
             for item in matches: # Mark all as used
                 if (aid := _assignment_id(item)) is not None: used_assignment_ids.add(aid)
@@ -271,9 +288,10 @@ class GradeCalculator:
                 "count": len(core_items),
                 "unweighted_avg": sum((a.unweighted_mark or 0) for a in core_items) / len(core_items) if core_items else 0,
                 "total_weight": sum((a.mark_weight or 0) for a in core_items),
-                "weighted_score": round(sum((a.weighted_mark or 0) for a in matches), 2),
+                "weighted_score": round(sum(_item_weighted_score(a) for a in scored_items), 2),
                 "bonus_count": max(0, len(matches) - rule.max_count),
                 "core_items": core_items,
+                "all_items": matches,
             })
 
         # 3. Process Exam (The Hybrid Check)
@@ -289,14 +307,14 @@ class GradeCalculator:
                 # Logic: Calculate the actual percentage of the exam first
                 # If you got 45.66 out of 60, your percentage is 76.10
                 unweighted = (raw_mark / weight)  if weight > 0 else 0
-                score = raw_mark # The weighted points contribute to total_mark
+                score = raw_mark if exam_record.exam_mark is not None else None # The weighted points contribute to total_mark
             elif exam_assignment:
                 # Standard assignment logic
                 unweighted = (exam_assignment.unweighted_mark or 0) * 100 if (exam_assignment.unweighted_mark or 0) <= 1 else (exam_assignment.unweighted_mark or 0)
                 weight = (exam_assignment.mark_weight or 0)
-                score = (exam_assignment.weighted_mark or 0)
+                score = float(exam_assignment.weighted_mark) if exam_assignment.weighted_mark is not None else None
             else:
-                unweighted, weight, score = 0, 0, 0
+                unweighted, weight, score = 0, 0, None
 
             summary.append({
                 "type": "exam",
@@ -304,7 +322,7 @@ class GradeCalculator:
                 "count": 1 if (exam_record or exam_assignment) else 0,
                 "unweighted_avg": round(unweighted, 2), # This will now be 76.10
                 "total_weight": weight,
-                "weighted_score": round(score, 2),
+                "weighted_score": round(score, 2) if score is not None else 0.0,
                 "bonus_count": 0,
                 "core_items": [exam_record] if exam_record else ([exam_assignment] if exam_assignment else []),
             })
@@ -318,6 +336,7 @@ class GradeCalculator:
                 "type": "general", "label": a.assessment, "count": 1,
                 "unweighted_avg": (a.unweighted_mark or 0), "total_weight": (a.mark_weight or 0),
                 "weighted_score": round((a.weighted_mark or 0), 2), "bonus_count": 0, "core_items": [a],
+                "all_items": [a],
             })
 
         # 5. Final Calculations & Grade Goals
@@ -326,7 +345,18 @@ class GradeCalculator:
 
         # Check for Total Mark override (The "79")
         db_total_mark = float(getattr(subject, "total_mark", 0) or 0)
-        total_achieved = db_total_mark if db_total_mark > 0 else sum(row["weighted_score"] for row in summary)
+        if db_total_mark > 0:
+            total_achieved = round(db_total_mark, 2)
+        else:
+            total_achieved = round(
+                sum(
+                    _item_weighted_score(item)
+                    for row in summary
+                    for item in row.get("all_items", row["core_items"])
+                    if _item_score(item) is not None
+                ),
+                2,
+            )
         
         # Weight synthesis for the UI
         non_exam_weight = sum(row["total_weight"] for row in summary if row["type"] != "exam")
@@ -338,8 +368,15 @@ class GradeCalculator:
         if db_total_mark > 0:
             remaining_weight = 0.0
         else:
-            marked_weight = sum(row["total_weight"] for row in summary if any(getattr(i, 'unweighted_mark', None) is not None for i in row["core_items"]))
-            remaining_weight = max(0.0, 100.0 - marked_weight)
+            remaining_weight = round(
+                sum(
+                    _item_weight(item)
+                    for row in summary
+                    for item in row.get("all_items", row["core_items"])
+                    if _item_score(item) is None
+                ),
+                2,
+            )
 
         grade_goals = []
         for label, target in [("Pass", 50), ("Credit", 65), ("Distinction", 75), ("High Distinction", 85)]:
@@ -357,4 +394,4 @@ class GradeCalculator:
                 "remaining_weight": round(remaining_weight, 2),
             })
 
-        return {"summaries": summary, "grade_goals": grade_goals}
+        return {"summaries": summary, "grade_goals": grade_goals, "total_achieved": total_achieved, "remaining_weight": round(remaining_weight, 2)}
