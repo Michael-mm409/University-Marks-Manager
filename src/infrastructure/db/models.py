@@ -188,6 +188,7 @@ class Assignment(SQLModel, table=True):
     __tablename__: ClassVar[str] = "assignments"  # type: ignore[assignment]
     id: Optional[int] = Field(default=None, primary_key=True)
     assessment: str = Field(index=True)
+    category: Optional[str] = Field(default=None, index=True)
     subject_id: int = Field(foreign_key="subjects.id", index=True)
     weighted_mark: Optional[float] = Field(default=None, nullable=True)
     unweighted_mark: Optional[float] = Field(default=None, nullable=True)

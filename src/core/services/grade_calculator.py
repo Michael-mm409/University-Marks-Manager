@@ -4,6 +4,81 @@ from sqlmodel import Session, select, func
 from sqlalchemy import case
 from src.infrastructure.db.models import Subject, Semester, GradeScale, Course, ExamSettings, SubjectRule, Assignment, Examination
 
+WEIGHT_THRESHOLD = 40.0
+
+
+def _derive_assessment_category(name: str, explicit_category: Any = None) -> str:
+    if explicit_category:
+        return str(explicit_category)
+    derived = re.sub(r"\s*[-_:]*\s*\d+\s*$", "", name).strip()
+    return derived or name or "Assessments"
+
+
+def process_assessments(assessments: Sequence[Any], rules: Sequence[SubjectRule] | None = None) -> dict[str, Any]:
+    standalone_assessments: list[dict[str, Any]] = []
+    grouped_assessments: dict[str, dict[str, Any]] = {}
+
+    rule_patterns: list[tuple[str, str]] = []
+    for rule in rules or []:
+        pattern = (getattr(rule, "sql_pattern", "") or "").replace("%", "").strip().lower()
+        label = str(getattr(rule, "rule_label", "") or "").strip()
+        if pattern and label:
+            rule_patterns.append((pattern, label))
+
+    def _derive_category(name: str, explicit_category: Any = None) -> str:
+        lowered_name = (name or "").lower()
+        for pattern, label in rule_patterns:
+            if pattern in lowered_name:
+                return label
+        return _derive_assessment_category(name, explicit_category)
+
+    for index, assessment in enumerate(assessments, start=1):
+        name = getattr(assessment, "name", None) or getattr(assessment, "assessment", None) or f"Assessment {index}"
+        weight_val = getattr(assessment, "weight", None) or getattr(assessment, "mark_weight", 0.0)
+        score_val = getattr(assessment, "score", None) or getattr(assessment, "weighted_mark", None) or getattr(assessment, "unweighted_mark", None)
+        
+        category = _derive_category(name, getattr(assessment, "category", None))
+
+        # Fix: Ensure types are cast safely once
+        weight = float(weight_val) if weight_val is not None else 0.0
+        score = float(score_val) if score_val is not None else None
+
+        row = {
+            "name": name,
+            "weight": weight,
+            "score": score,
+            "category": category,
+        }
+
+        if weight > WEIGHT_THRESHOLD:
+            standalone_assessments.append(row)
+            continue
+
+        group = grouped_assessments.setdefault(
+            category,
+            {"rows": [], "weight": 0.0, "score_total": 0.0, "scored_weight": 0.0},
+        )
+        group["rows"].append(row)
+        group["weight"] += weight
+        
+        # Fix: Only add to totals if a score exists to avoid NoneType errors
+        if score is not None:
+            group["score_total"] += score
+            group["scored_weight"] += weight
+
+    for category, group in grouped_assessments.items():
+        scored_weight = group.pop("scored_weight")
+        score_total = group.pop("score_total")
+        group["score"] = round((score_total / group["weight"]) * 100.0, 2) if group["weight"] else None
+        group["rows"] = sorted(group["rows"], key=lambda row: row["name"].lower())
+
+    standalone_assessments.sort(key=lambda row: row["name"].lower())
+
+    return {
+        "standalone_assessments": standalone_assessments,
+        "grouped_assessments": dict(sorted(grouped_assessments.items(), key=lambda item: item[0].lower())),
+    }
+
 class GradeCalculator:
     def __init__(self, session: Session):
         self.session = session
@@ -238,8 +313,6 @@ class GradeCalculator:
         # 1. Setup Data
         rules = self.session.exec(select(SubjectRule).where(SubjectRule.subject_id == subject.id)).all()
         all_assignments = list(getattr(subject, "assignments", []) or [])
-        
-        # Check dedicated examinations table
         exam_record = self.session.exec(select(Examination).where(Examination.subject_id == subject.id)).first()
 
         summary = []
@@ -264,119 +337,143 @@ class GradeCalculator:
             weighted_mark = getattr(item, "weighted_mark", None)
             return float(weighted_mark) if weighted_mark is not None else 0.0
 
-        def _assignment_id(assignment: Assignment) -> int | None:
-            return assignment.id if assignment.id is not None else None
-
-        # 2. Process Rules (Module Reviews, etc.)
+        # 2. Process Rules
         for rule in rules:
             clean_pattern = (rule.sql_pattern or "").replace('%', '').lower()
             rule_patterns.append(clean_pattern)
             
-            matches = [a for a in all_assignments if not a.is_exam and (aid := _assignment_id(a)) is not None 
-                       and aid not in used_assignment_ids and clean_pattern in (a.assessment or "").lower()]
+            matches = [a for a in all_assignments if not a.is_exam and a.id is not None 
+                       and a.id not in used_assignment_ids and clean_pattern in (a.assessment or "").lower()]
             
             matches.sort(key=lambda x: (x.unweighted_mark or 0), reverse=True)
             core_items = matches[:rule.max_count]
-            scored_items = [item for item in matches if _item_score(item) is not None]
+            scored_core_items = [item for item in core_items if _item_score(item) is not None]
+            scored_core_weight = sum(_item_weight(item) for item in scored_core_items)
+            weighted_score = sum(_item_weighted_score(item) for item in scored_core_items)
             
-            for item in matches: # Mark all as used
-                if (aid := _assignment_id(item)) is not None: used_assignment_ids.add(aid)
+            for item in matches:
+                if item.id is not None: used_assignment_ids.add(item.id)
             
             summary.append({
                 "type": "rule",
                 "label": rule.rule_label,
                 "count": len(core_items),
-                "unweighted_avg": sum((a.unweighted_mark or 0) for a in core_items) / len(core_items) if core_items else 0,
+                "unweighted_avg": (weighted_score / scored_core_weight) if scored_core_weight > 0 else None,
                 "total_weight": sum((a.mark_weight or 0) for a in core_items),
-                "weighted_score": round(sum(_item_weighted_score(a) for a in scored_items), 2),
-                "bonus_count": max(0, len(matches) - rule.max_count),
+                "weighted_score": round(weighted_score, 2),
+                "bonus_count": max(0, len(matches) - rule.max_count),  # Required by template
+                "display_status": "Grouped",
+                "has_scored_items": bool(scored_core_items),
                 "core_items": core_items,
-                "all_items": matches,
             })
 
-        # 3. Process Exam (The Hybrid Check)
-        exam_assignment = next((a for a in all_assignments if a.is_exam), None)
-        
         # 3. Process Exam
-        if exam_record or exam_assignment or getattr(subject, "has_exam", False):
+        if exam_record or next((a for a in all_assignments if a.is_exam), None) or getattr(subject, "has_exam", False):
+            exam_assignment = next((a for a in all_assignments if a.is_exam), None)
             if exam_record:
-                # Raw mark (e.g., 45.66) and Weight (e.g., 60.0)
-                raw_mark = float(exam_record.exam_mark or 0)
-                weight = float(exam_record.exam_weight or 60.0)
-                
-                # Logic: Calculate the actual percentage of the exam first
-                # If you got 45.66 out of 60, your percentage is 76.10
-                unweighted = (raw_mark / weight)  if weight > 0 else 0
-                score = raw_mark if exam_record.exam_mark is not None else None # The weighted points contribute to total_mark
+                e_mark = exam_record.exam_mark
+                e_weight = exam_record.exam_weight
+                raw_mark = float(e_mark) if e_mark is not None else 0.0
+                weight = float(e_weight) if e_weight is not None else 60.0
+                unweighted = (raw_mark / weight) if weight > 0 else 0
+                score = raw_mark if e_mark is not None else None
             elif exam_assignment:
-                # Standard assignment logic
-                unweighted = (exam_assignment.unweighted_mark or 0) * 100 if (exam_assignment.unweighted_mark or 0) <= 1 else (exam_assignment.unweighted_mark or 0)
-                weight = (exam_assignment.mark_weight or 0)
+                u_mark = float(exam_assignment.unweighted_mark or 0.0)
+                unweighted = (u_mark / 100) if u_mark > 1 else u_mark
+                weight = float(exam_assignment.mark_weight or 0.0)
                 score = float(exam_assignment.weighted_mark) if exam_assignment.weighted_mark is not None else None
             else:
-                unweighted, weight, score = 0, 0, None
+                unweighted, weight, score = 0.0, 0.0, None
 
             summary.append({
                 "type": "exam",
                 "label": "Final Examination",
-                "count": 1 if (exam_record or exam_assignment) else 0,
-                "unweighted_avg": round(unweighted, 2), # This will now be 76.10
+                "count": 1,
+                "unweighted_avg": round(unweighted, 4) if unweighted is not None else None,
                 "total_weight": weight,
                 "weighted_score": round(score, 2) if score is not None else 0.0,
-                "bonus_count": 0,
+                "bonus_count": 0,  # Required by template
+                "display_status": "Standalone",
+                "has_scored_items": score is not None,
                 "core_items": [exam_record] if exam_record else ([exam_assignment] if exam_assignment else []),
             })
 
         # 4. Process General Assignments
-        remaining = [a for a in all_assignments if _assignment_id(a) not in used_assignment_ids 
-                     and not a.is_exam and not any(p in (a.assessment or "").lower() for p in rule_patterns)]
+        remaining = [a for a in all_assignments if a.id not in used_assignment_ids 
+                    and not a.is_exam and not any(p in (a.assessment or "").lower() for p in rule_patterns)]
 
+        grouped_general: dict[str, list[Assignment]] = {}
         for a in remaining:
+            a_weight = _item_weight(a)
+            a_score = _item_score(a)
+            if a_weight >= WEIGHT_THRESHOLD:
+                summary.append({
+                    "type": "general",
+                    "label": a.assessment or "Assessment",
+                    "count": 1,
+                    "unweighted_avg": round(a_score, 4) if a_score is not None else None,
+                    "total_weight": round(a_weight, 2),
+                    "weighted_score": round(_item_weighted_score(a), 2),
+                    "bonus_count": 0,  # Required by template
+                    "display_status": "Standalone",
+                    "has_scored_items": a_score is not None,
+                    "core_items": [a],
+                })
+            else:
+                cat = _derive_assessment_category(str(a.assessment or ""), getattr(a, "category", None))
+                grouped_general.setdefault(cat, []).append(a)
+
+        for category, items in grouped_general.items():
+            scored_items = [item for item in items if _item_score(item) is not None]
+            total_weight = sum(_item_weight(item) for item in items)
+            weighted_score = sum(_item_weighted_score(item) for item in scored_items)
+            scored_weight = sum(_item_weight(item) for item in scored_items)
+            unweighted_avg = (weighted_score / scored_weight) if scored_weight > 0 else None
+            
             summary.append({
-                "type": "general", "label": a.assessment, "count": 1,
-                "unweighted_avg": (a.unweighted_mark or 0), "total_weight": (a.mark_weight or 0),
-                "weighted_score": round((a.weighted_mark or 0), 2), "bonus_count": 0, "core_items": [a],
-                "all_items": [a],
+                "type": "general",
+                "label": category,
+                "count": len(items),
+                "unweighted_avg": round(unweighted_avg, 4) if unweighted_avg is not None else None,
+                "total_weight": total_weight,
+                "weighted_score": round(weighted_score, 2),
+                "bonus_count": 0,  # Required by template
+                "display_status": "Grouped",
+                "has_scored_items": bool(scored_items),
+                "core_items": items,
             })
 
         # 5. Final Calculations & Grade Goals
         type_order = {"rule": 0, "general": 1, "exam": 2}
         summary.sort(key=lambda x: (type_order.get(x["type"], 99), x["label"]))
 
-        # Check for Total Mark override (The "79")
-        db_total_mark = float(getattr(subject, "total_mark", 0) or 0)
+        # Check for Total Mark override (e.g., if a final grade is already uploaded)
+        raw_total = getattr(subject, "total_mark", 0.0)
+        db_total_mark = float(raw_total) if raw_total is not None else 0.0
+        
+        total_achieved = 0.0
+        remaining_weight_value = 0.0
+
         if db_total_mark > 0:
             total_achieved = round(db_total_mark, 2)
+            remaining_weight_value = 0.0
         else:
-            total_achieved = round(
-                sum(
-                    _item_weighted_score(item)
-                    for row in summary
-                    for item in row.get("all_items", row["core_items"])
-                    if _item_score(item) is not None
-                ),
-                2,
-            )
-        
-        # Weight synthesis for the UI
-        non_exam_weight = sum(row["total_weight"] for row in summary if row["type"] != "exam")
-        for row in summary:
-            if row["type"] == "exam" and row["total_weight"] <= 0:
-                row["total_weight"] = max(0.0, 100.0 - non_exam_weight)
+            # Calculate from summary items
+            for row in summary:
+                total_achieved += row["weighted_score"]
+                
+                # Logic: If the whole row has no scores, add its full weight to remaining
+                if not row["has_scored_items"]:
+                    remaining_weight_value += float(row["total_weight"] or 0.0)
+                else:
+                    # If it's a group, check for individual unscored items
+                    # We use the 'core_items' list to find assignments without a mark
+                    for item in row["core_items"]:
+                        if _item_score(item) is None:
+                            remaining_weight_value += _item_weight(item)
 
-        # Remaining weight logic
-        if db_total_mark > 0:
-            remaining_weight = 0.0
-        else:
-            remaining_weight = round(
-                sum(
-                    _item_weight(item)
-                    for row in summary
-                    for item in row.get("all_items", row["core_items"])
-                    if _item_score(item) is None
-                ),
-                2,
-            )
+        remaining_weight = round(remaining_weight_value, 2)
+        total_achieved = round(total_achieved, 2)
 
         grade_goals = []
         for label, target in [("Pass", 50), ("Credit", 65), ("Distinction", 75), ("High Distinction", 85)]:
@@ -385,13 +482,23 @@ class GradeCalculator:
             elif remaining_weight <= 0:
                 status, req_p = "Impossible", 0.0
             else:
+                # How much of the remaining % do we need to hit the target?
                 req_p = ((target - total_achieved) / remaining_weight) * 100
                 status = "Impossible" if req_p > 100 else f"{max(0.0, req_p):.2f}%"
 
             grade_goals.append({
-                "label": label, "target": target, "needed": status, "status": status,
-                "required_percent": round(req_p, 2), "current_weighted_score": round(total_achieved, 2),
-                "remaining_weight": round(remaining_weight, 2),
+                "label": label, 
+                "target": target, 
+                "needed": status, 
+                "status": status,
+                "required_percent": round(req_p, 2), 
+                "current_weighted_score": total_achieved,
+                "remaining_weight": remaining_weight,
             })
 
-        return {"summaries": summary, "grade_goals": grade_goals, "total_achieved": total_achieved, "remaining_weight": round(remaining_weight, 2)}
+        return {
+            "summaries": summary, 
+            "grade_goals": grade_goals, 
+            "total_achieved": total_achieved, 
+            "remaining_weight": remaining_weight
+        }
