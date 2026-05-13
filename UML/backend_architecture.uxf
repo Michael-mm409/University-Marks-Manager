@@ -1,17 +1,5 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<diagram program="umlet" version="15.1">
-  <help_text>Backend Architecture - FastAPI Application
-Layer: Presentation (API/Web) → Core (Services) → Infrastructure (DB)</help_text>
-  <zoom_level>8</zoom_level>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>96</x>
-      <y>776</y>
-      <w>320</w>
-      <h>224</h>
-    </coordinates>
-    <panel_attributes>&lt;&lt;Infrastructure Layer&gt;&gt;
+<diagram program="umletino" version="15.1"><zoom_level>8</zoom_level><help_text>Backend Architecture - FastAPI Application
+Layer: Presentation (API/Web) → Core (Services) → Infrastructure (DB)</help_text><element><id>UMLClass</id><coordinates><x>0</x><y>760</y><w>320</w><h>224</h></coordinates><panel_attributes>&lt;&lt;Infrastructure Layer&gt;&gt;
 engine.py
 --
 Database connection and session management
@@ -26,18 +14,7 @@ Dependencies:
 - PostgreSQL or SQLite
 --
 Pattern: Factory + Context Manager
-Creates DB sessions for dependency injection</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>456</x>
-      <y>776</y>
-      <w>320</w>
-      <h>224</h>
-    </coordinates>
-    <panel_attributes>&lt;&lt;Infrastructure Layer&gt;&gt;
+Creates DB sessions for dependency injection</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>360</x><y>760</y><w>320</w><h>224</h></coordinates><panel_attributes>&lt;&lt;Infrastructure Layer&gt;&gt;
 models.py
 --
 ORM table definitions (SQLModel)
@@ -52,18 +29,7 @@ ORM table definitions (SQLModel)
 + CourseSubjectLink(course_id, subject_id)
 --
 Pattern: Active Record (ORM)
-Defines database schema and relationships</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>96</x>
-      <y>456</y>
-      <w>320</w>
-      <h>240</h>
-    </coordinates>
-    <panel_attributes>&lt;&lt;Core Service Layer&gt;&gt;
+Defines database schema and relationships</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>0</x><y>440</y><w>320</w><h>240</h></coordinates><panel_attributes>&lt;&lt;Core Service Layer&gt;&gt;
 CourseManager
 --
 Manages course business logic
@@ -83,18 +49,7 @@ Manages course business logic
 + delete_course(id) → bool
 --
 Pattern: Service Layer
-Encapsulates course-related operations</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>456</x>
-      <y>456</y>
-      <w>320</w>
-      <h>160</h>
-    </coordinates>
-    <panel_attributes>&lt;&lt;Core Service Layer&gt;&gt;
+Encapsulates course-related operations</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>360</x><y>440</y><w>320</w><h>160</h></coordinates><panel_attributes>&lt;&lt;Core Service Layer&gt;&gt;
 SubjectManager
 --
 Manages subject business logic
@@ -105,18 +60,7 @@ Manages subject business logic
 --
 Pattern: Service Layer
 Provides subject-related operations
-(Currently minimal, extensible for future)</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>816</x>
-      <y>456</y>
-      <w>320</w>
-      <h>200</h>
-    </coordinates>
-    <panel_attributes>&lt;&lt;Core Service Layer&gt;&gt;
+(Currently minimal, extensible for future)</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>720</x><y>440</y><w>320</w><h>200</h></coordinates><panel_attributes>&lt;&lt;Core Service Layer&gt;&gt;
 SemesterManager
 --
 Manages semester business logic
@@ -130,18 +74,7 @@ Manages semester business logic
 --
 Pattern: Service Layer
 Handles semester queries and aggregations
-Orders results (newest first)</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>1232</x>
-      <y>456</y>
-      <w>304</w>
-      <h>240</h>
-    </coordinates>
-    <panel_attributes>&lt;&lt;Core Service Layer&gt;&gt;
+Orders results (newest first)</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>1136</x><y>440</y><w>304</w><h>240</h></coordinates><panel_attributes>&lt;&lt;Core Service Layer&gt;&gt;
 GradeCalculator
 --
 Calculates academic metrics
@@ -157,18 +90,7 @@ Pattern: Service Layer + Strategy
 Computes WAM (weighted average mark),
 GPA (grade point average), and grade distributions
 Uses GradeScale from DB for configurable grading
-Auto-seeds default "Standard" scale if missing</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>96</x>
-      <y>136</y>
-      <w>320</w>
-      <h>240</h>
-    </coordinates>
-    <panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
+Auto-seeds default "Standard" scale if missing</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>0</x><y>120</y><w>320</w><h>240</h></coordinates><panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
 routers/courses.py
 --
 FastAPI router for course endpoints
@@ -186,18 +108,7 @@ GET    /courses/unassigned-semesters
 --
 Pattern: Controller (API Router)
 Uses CourseManager service
-Dependency injection: Depends(get_session)</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>456</x>
-      <y>136</y>
-      <w>320</w>
-      <h>240</h>
-    </coordinates>
-    <panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
+Dependency injection: Depends(get_session)</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>360</x><y>120</y><w>320</w><h>240</h></coordinates><panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
 routers/subjects.py
 --
 FastAPI router for subject endpoints
@@ -213,18 +124,7 @@ DELETE /subjects/{code}/{sem}/{year}
 Pattern: Controller (API Router)
 Uses models directly with JOINs
 Validates semester existence
-Dependency injection: Depends(get_session)</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>816</x>
-      <y>136</y>
-      <w>320</w>
-      <h>240</h>
-    </coordinates>
-    <panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
+Dependency injection: Depends(get_session)</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>720</x><y>120</y><w>320</w><h>240</h></coordinates><panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
 routers/assignments.py
 routers/exams.py
 routers/semesters.py
@@ -238,18 +138,7 @@ Semester endpoints (CRUD)
 Pattern: Controller (API Router)
 Uses normalized schema with JOINs
 Validates foreign key relationships
-Type-safe parameter handling</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>1176</x>
-      <y>136</y>
-      <w>360</w>
-      <h>240</h>
-    </coordinates>
-    <panel_attributes>&lt;&lt;Presentation Layer - Web&gt;&gt;
+Type-safe parameter handling</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>1080</x><y>120</y><w>360</w><h>240</h></coordinates><panel_attributes>&lt;&lt;Presentation Layer - Web&gt;&gt;
 views.py + web/*.py
 --
 Jinja2 template-based web interface
@@ -266,18 +155,7 @@ Key modules:
 --
 Pattern: MVC (Controller + View)
 Uses Service Layer for business logic
-Returns rendered HTML (HTMX + Tailwind)</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>1576</x>
-      <y>136</y>
-      <w>280</w>
-      <h>200</h>
-    </coordinates>
-    <panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
+Returns rendered HTML (HTMX + Tailwind)</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>1480</x><y>120</y><w>280</w><h>200</h></coordinates><panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
 deps.py
 --
 FastAPI dependency providers
@@ -287,18 +165,7 @@ FastAPI dependency providers
 Pattern: Dependency Injection
 Provides DB session to API routes
 Ensures session lifecycle management
-(Created per request, auto-closed)</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>1576</x>
-      <y>376</y>
-      <w>280</w>
-      <h>240</h>
-    </coordinates>
-    <panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
+(Created per request, auto-closed)</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>1480</x><y>360</y><w>280</w><h>240</h></coordinates><panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
 schemas.py
 --
 Pydantic request/response models
@@ -311,18 +178,7 @@ Pydantic request/response models
 Pattern: DTO (Data Transfer Object)
 Separates API contracts from ORM models
 Enables validation and serialization
-Uses Pydantic v2 model_config</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>816</x>
-      <y>760</y>
-      <w>360</w>
-      <h>224</h>
-    </coordinates>
-    <panel_attributes>&lt;&lt;Application Entry&gt;&gt;
+Uses Pydantic v2 model_config</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>720</x><y>744</y><w>360</w><h>224</h></coordinates><panel_attributes>&lt;&lt;Application Entry&gt;&gt;
 main.py
 --
 FastAPI application initialization
@@ -340,212 +196,36 @@ Responsibilities:
 - Health check endpoint (/healthz)
 --
 Pattern: Application Factory
-Orchestrates all layers</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>240</x>
-      <y>368</y>
-      <w>56</w>
-      <h>104</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
+Orchestrates all layers</panel_attributes><additional_attributes></additional_attributes></element><element><id>Relation</id><coordinates><x>144</x><y>352</y><w>56</w><h>104</h></coordinates><panel_attributes>lt=&lt;.
 &lt;&lt;uses&gt;&gt;
-creates</panel_attributes>
-    <additional_attributes>10.0;110.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>608</x>
-      <y>368</y>
-      <w>56</w>
-      <h>104</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
+creates</panel_attributes><additional_attributes>10;110;10;10</additional_attributes></element><element><id>Relation</id><coordinates><x>512</x><y>352</y><w>56</w><h>104</h></coordinates><panel_attributes>lt=&lt;.
 &lt;&lt;uses&gt;&gt;
-queries</panel_attributes>
-    <additional_attributes>10.0;110.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>968</x>
-      <y>368</y>
-      <w>56</w>
-      <h>104</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
+queries</panel_attributes><additional_attributes>10;110;10;10</additional_attributes></element><element><id>Relation</id><coordinates><x>872</x><y>352</y><w>56</w><h>104</h></coordinates><panel_attributes>lt=&lt;.
 &lt;&lt;uses&gt;&gt;
-queries</panel_attributes>
-    <additional_attributes>10.0;110.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>1344</x>
-      <y>368</y>
-      <w>72</w>
-      <h>104</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
+queries</panel_attributes><additional_attributes>10;110;10;10</additional_attributes></element><element><id>Relation</id><coordinates><x>1248</x><y>352</y><w>64</w><h>104</h></coordinates><panel_attributes>lt=&lt;.
 &lt;&lt;uses&gt;&gt;
-calculates</panel_attributes>
-    <additional_attributes>10.0;110.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>240</x>
-      <y>688</y>
-      <w>80</w>
-      <h>104</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
+calculates</panel_attributes><additional_attributes>10;110;10;10</additional_attributes></element><element><id>Relation</id><coordinates><x>144</x><y>672</y><w>72</w><h>104</h></coordinates><panel_attributes>lt=&lt;.
 &lt;&lt;depends&gt;&gt;
-session</panel_attributes>
-    <additional_attributes>10.0;10.0;10.0;110.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>608</x>
-      <y>608</y>
-      <w>80</w>
-      <h>184</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
+session</panel_attributes><additional_attributes>10;10;10;110</additional_attributes></element><element><id>Relation</id><coordinates><x>512</x><y>592</y><w>72</w><h>184</h></coordinates><panel_attributes>lt=&lt;.
 &lt;&lt;depends&gt;&gt;
-queries</panel_attributes>
-    <additional_attributes>10.0;10.0;10.0;210.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>400</x>
-      <y>688</y>
-      <w>120</w>
-      <h>104</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
+queries</panel_attributes><additional_attributes>10;10;10;210</additional_attributes></element><element><id>Relation</id><coordinates><x>304</x><y>672</y><w>120</w><h>104</h></coordinates><panel_attributes>lt=&lt;.
 &lt;&lt;depends&gt;&gt;
-modifies</panel_attributes>
-    <additional_attributes>130.0;110.0;130.0;40.0;10.0;40.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>768</x>
-      <y>648</y>
-      <w>136</w>
-      <h>144</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
+modifies</panel_attributes><additional_attributes>130;110;130;40;10;40;10;10</additional_attributes></element><element><id>Relation</id><coordinates><x>672</x><y>632</y><w>136</w><h>144</h></coordinates><panel_attributes>lt=&lt;.
 &lt;&lt;depends&gt;&gt;
-reads</panel_attributes>
-    <additional_attributes>10.0;160.0;10.0;80.0;150.0;80.0;150.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>1088</x>
-      <y>688</y>
-      <w>176</w>
-      <h>88</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
+reads</panel_attributes><additional_attributes>10;160;10;80;150;80;150;10</additional_attributes></element><element><id>Relation</id><coordinates><x>992</x><y>672</y><w>176</w><h>88</h></coordinates><panel_attributes>lt=&lt;.
 &lt;&lt;depends&gt;&gt;
-reads GradeScale</panel_attributes>
-    <additional_attributes>10.0;90.0;10.0;50.0;200.0;50.0;200.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>968</x>
-      <y>648</y>
-      <w>80</w>
-      <h>128</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
+reads GradeScale</panel_attributes><additional_attributes>10;90;10;50;200;50;200;10</additional_attributes></element><element><id>Relation</id><coordinates><x>872</x><y>632</y><w>72</w><h>128</h></coordinates><panel_attributes>lt=&lt;.
 &lt;&lt;depends&gt;&gt;
-queries</panel_attributes>
-    <additional_attributes>10.0;10.0;10.0;140.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>1344</x>
-      <y>688</y>
-      <w>80</w>
-      <h>104</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
+queries</panel_attributes><additional_attributes>10;10;10;140</additional_attributes></element><element><id>Relation</id><coordinates><x>1248</x><y>672</y><w>72</w><h>104</h></coordinates><panel_attributes>lt=&lt;.
 &lt;&lt;depends&gt;&gt;
-session</panel_attributes>
-    <additional_attributes>10.0;10.0;10.0;110.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>768</x>
-      <y>104</y>
-      <w>424</w>
-      <h>112</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
-&lt;&lt;injects&gt;&gt;</panel_attributes>
-    <additional_attributes>510.0;120.0;480.0;120.0;480.0;20.0;40.0;20.0;40.0;120.0;10.0;120.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>768</x>
-      <y>488</y>
-      <w>824</w>
-      <h>552</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
+session</panel_attributes><additional_attributes>10;10;10;110</additional_attributes></element><element><id>Relation</id><coordinates><x>672</x><y>88</y><w>424</w><h>112</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;injects&gt;&gt;</panel_attributes><additional_attributes>510;120;480;120;480;20;40;20;40;120;10;120</additional_attributes></element><element><id>Relation</id><coordinates><x>672</x><y>472</y><w>824</w><h>552</h></coordinates><panel_attributes>lt=&lt;.
 &lt;&lt;uses&gt;&gt;
-extends SQLModel</panel_attributes>
-    <additional_attributes>10.0;620.0;30.0;620.0;30.0;660.0;980.0;660.0;980.0;10.0;1010.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>368</x>
-      <y>256</y>
-      <w>1624</w>
-      <h>800</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
+extends SQLModel</panel_attributes><additional_attributes>10;620;30;620;30;660;980;660;980;10;1010;10</additional_attributes></element><element><id>Relation</id><coordinates><x>272</x><y>240</y><w>1624</w><h>800</h></coordinates><panel_attributes>lt=&lt;.
 &lt;&lt;provides&gt;&gt;
-wraps</panel_attributes>
-    <additional_attributes>10.0;930.0;10.0;970.0;1510.0;970.0;2010.0;980.0;2000.0;10.0;1860.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>1040</x>
-      <y>368</y>
-      <w>200</w>
-      <h>408</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
+wraps</panel_attributes><additional_attributes>10;930;10;970;1510;970;2010;980;2000;10;1860;10</additional_attributes></element><element><id>Relation</id><coordinates><x>944</x><y>352</y><w>192</w><h>408</h></coordinates><panel_attributes>lt=&lt;.
 &lt;&lt;orchestrates&gt;&gt;
-mounts routers</panel_attributes>
-    <additional_attributes>10.0;490.0;10.0;410.0;130.0;410.0;140.0;60.0;20.0;60.0;20.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>1216</x>
-      <y>776</y>
-      <w>280</w>
-      <h>136</h>
-    </coordinates>
-    <panel_attributes>&lt;&lt;Core Domain - Enums&gt;&gt;
+mounts routers</panel_attributes><additional_attributes>10;490;10;410;130;410;140;60;20;60;20;10</additional_attributes></element><element><id>UMLClass</id><coordinates><x>1120</x><y>760</y><w>280</w><h>136</h></coordinates><panel_attributes>&lt;&lt;Core Domain - Enums&gt;&gt;
 grade_type.py
 semester_name.py
 --
@@ -555,30 +235,8 @@ semester_name.py
   - Autumn, Spring, Summer
 --
 Pattern: Value Object
-Type-safe constants for domain logic</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>768</x>
-      <y>904</y>
-      <w>480</w>
-      <h>120</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
-&lt;&lt;uses&gt;&gt;</panel_attributes>
-    <additional_attributes>580.0;10.0;580.0;130.0;40.0;130.0;40.0;20.0;10.0;20.0</additional_attributes>
-  </element>
-  <element>
-    <id>UMLNote</id>
-    <coordinates>
-      <x>1576</x>
-      <y>656</y>
-      <w>280</w>
-      <h>356</h>
-    </coordinates>
-    <panel_attributes>Architecture Patterns
+Type-safe constants for domain logic</panel_attributes><additional_attributes></additional_attributes></element><element><id>Relation</id><coordinates><x>672</x><y>888</y><w>480</w><h>120</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;uses&gt;&gt;</panel_attributes><additional_attributes>580;10;580;130;40;130;40;20;10;20</additional_attributes></element><element><id>UMLNote</id><coordinates><x>1480</x><y>640</y><w>280</w><h>356</h></coordinates><panel_attributes>Architecture Patterns
 --
 1. Layered Architecture:
    Presentation → Core → Infrastructure
@@ -609,25 +267,11 @@ Type-safe constants for domain logic</panel_attributes>
    - Core has no dependencies on outer layers
    - Infrastructure provides implementations
    - Presentation depends on Core
-bg=yellow</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLNote</id>
-    <coordinates>
-      <x>96</x>
-      <y>16</y>
-      <w>1760</w>
-      <h>80</h>
-    </coordinates>
-    <panel_attributes>University Marks Manager - Backend Architecture
+bg=yellow</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLNote</id><coordinates><x>0</x><y>0</y><w>1760</w><h>80</h></coordinates><panel_attributes>University Marks Manager - Backend Architecture
 --
 FastAPI application with layered architecture following clean architecture principles.
 Presentation Layer (API/Web) → Core Service Layer → Infrastructure Layer (Database).
 Uses dependency injection, service layer pattern, and ORM (SQLModel) for data access.
 bg=#e1f5ff
 fontsize=16
-halign=center</panel_attributes>
-    <additional_attributes/>
-  </element>
-</diagram>
+halign=center</panel_attributes><additional_attributes></additional_attributes></element></diagram>
