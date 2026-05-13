@@ -368,32 +368,32 @@ class GradeCalculator:
             })
 
         # 3. Process Exam
-        if exam_record or next((a for a in all_assignments if a.is_exam), None) or getattr(subject, "has_exam", False):
-            exam_assignment = next((a for a in all_assignments if a.is_exam), None)
+        has_exam_flag = getattr(subject, "has_exam", False)
+        exam_assignment = next((a for a in all_assignments if a.is_exam), None)
+
+        if exam_record or exam_assignment or has_exam_flag:
             if exam_record:
                 e_mark = exam_record.exam_mark
                 e_weight = exam_record.exam_weight
-                raw_mark = float(e_mark) if e_mark is not None else 0.0
-                weight = float(e_weight) if e_weight is not None else 60.0
-                unweighted = (raw_mark / weight) if weight > 0 else 0
-                score = raw_mark if e_mark is not None else None
+                weight = float(e_weight) if e_weight is not None else 50.0 
+                score = float(e_mark) if e_mark is not None else None
+                unweighted = (score / weight) if (score is not None and weight > 0) else None
             elif exam_assignment:
-                u_mark = float(exam_assignment.unweighted_mark or 0.0)
-                unweighted = (u_mark / 100) if u_mark > 1 else u_mark
-                weight = float(exam_assignment.mark_weight or 0.0)
+                weight = float(exam_assignment.mark_weight or 50.0)
                 score = float(exam_assignment.weighted_mark) if exam_assignment.weighted_mark is not None else None
+                unweighted = (float(exam_assignment.unweighted_mark) / 100) if exam_assignment.unweighted_mark else None
             else:
-                unweighted, weight, score = 0.0, 0.0, None
+                weight = 50.0 
+                unweighted, score = None, None
 
             summary.append({
                 "type": "exam",
                 "label": "Final Examination",
                 "count": 1,
-                "unweighted_avg": round(unweighted, 4) if unweighted is not None else None,
+                "unweighted_avg": unweighted,
                 "total_weight": weight,
                 "weighted_score": round(score, 2) if score is not None else 0.0,
-                "bonus_count": 0,  # Required by template
-                "display_status": "Standalone",
+                "bonus_count": 0,  # Fixed: Prevents Jinja2 UndefinedError
                 "has_scored_items": score is not None,
                 "core_items": [exam_record] if exam_record else ([exam_assignment] if exam_assignment else []),
             })
@@ -478,22 +478,27 @@ class GradeCalculator:
         grade_goals = []
         for label, target in [("Pass", 50), ("Credit", 65), ("Distinction", 75), ("High Distinction", 85)]:
             if total_achieved >= target:
-                status, req_p = "Achieved", 0.0
+                status = "Achieved"
+                req_p = 0.0
             elif remaining_weight <= 0:
-                status, req_p = "Impossible", 0.0
+                # This is where your "Impossible" was triggered
+                status = "Impossible"
+                req_p = 0.0
             else:
-                # How much of the remaining % do we need to hit the target?
-                req_p = ((target - total_achieved) / remaining_weight) * 100
-                status = "Impossible" if req_p > 100 else f"{max(0.0, req_p):.2f}%"
+                # Logic: (Target - Current) / Remaining Weight
+                # Example: (50 - 44.10) / 50.0 = 5.9 / 50.0 = 0.118 (11.8%)
+                needed_from_remaining = (target - total_achieved)
+                req_p = (needed_from_remaining / remaining_weight) * 100
+                
+                if req_p > 100:
+                    status = "Impossible"
+                else:
+                    status = f"{max(0.0, req_p):.2f}%"
 
             grade_goals.append({
-                "label": label, 
-                "target": target, 
-                "needed": status, 
+                "label": label,
                 "status": status,
-                "required_percent": round(req_p, 2), 
-                "current_weighted_score": total_achieved,
-                "remaining_weight": remaining_weight,
+                "required_percent": round(req_p, 2)
             })
 
         return {

@@ -1,0 +1,29 @@
+{
+  "name": "Marks Manager",
+  "short_name": "Marks",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "description": "Academic grade and WAM/GPA tracker.",
+  "icons": [
+    {
+      "src": "/static/images/icon_upscayl_6x_digital-art-4x.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/images/icon_upscayl_16x_digital-art-4x.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/images/icon_upscayl_16x_digital-art-4x.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 
 # Third-party imports
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlmodel import SQLModel
@@ -154,4 +154,12 @@ def healthz():
         Description.
     """
     return {"status": "ok"}
+
+@APPLICATION.get("/manifest.json", include_in_schema=False)
+async def serve_manifest():
+    return FileResponse(static_dir / "manifest.json")
+
+@APPLICATION.get("/sw.js", include_in_schema=False)
+async def serve_sw():
+    return FileResponse(static_dir / "sw.js")
 
