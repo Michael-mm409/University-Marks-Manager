@@ -208,6 +208,10 @@
           <input id="assignment-title" name="assessment" class="input input-xs w-full" placeholder="Assignment title" required />
         </div>
         <div>
+          <label class="block text-left text-xs font-semibold mb-1" for="assignment-category">Category</label>
+          <input id="assignment-category" name="category" class="input input-xs w-full" placeholder="Category (defaults to title group)" />
+        </div>
+        <div>
           <label class="block text-left text-xs font-semibold mb-1" for="assignment-mark">Mark</label>
           <input id="assignment-mark" name="weighted_mark" type="number" step="0.01" class="input input-xs w-full text-right" placeholder="Mark" required />
         </div>
@@ -264,6 +268,7 @@
           <thead>
             <tr>
               <th>Title</th>
+              <th>Category</th>
               <th>Mark</th>
               <th>Score (<span class="text-[10px]">%</span>)</th>
               <th>Weight (<span class="text-[10px]">%</span>)</th>
@@ -281,12 +286,14 @@
           {% for assignment in assignments %}
             <tr id="assignment-row-{{ loop.index }}" class="assignment-row"
               data-assessment="{{ assignment.assessment }}"
+              data-category="{{ assignment.category or '' }}"
               data-code="{{ subject.subject_code }}"
               data-semester="{{ semester }}"
               data-year="{{ year }}"
               data-grade-type="{{ assignment.grade_type }}"
               data-unweighted-mark="{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % ((assignment.unweighted_mark|float) * 100) if assignment.unweighted_mark is not none else 'Pending' }}{% endif %}">
             <td class="assignment-title">{{ assignment.assessment }}</td>
+            <td class="assignment-category">{{ assignment.category or 'Uncategorized' }}</td>
             <td class="assignment-mark">
               {% if assignment.grade_type in ['S','U'] %}
                 {{ assignment.grade_type }}
@@ -324,6 +331,7 @@
                 class="btn btn-xs btn-outline edit-assignment-btn"
                 data-index="{{ loop.index }}"
                 data-assessment="{{ assignment.assessment }}"
+                data-category="{{ assignment.category or '' }}"
                 data-mark="{{ assignment.weighted_mark }}"
                 data-weight="{{ assignment.mark_weight }}"
               >Edit</button>
@@ -331,7 +339,7 @@
           </tr>
           {% endfor %}
           {% if assignments|length == 0 %}
-          <tr><td colspan="6" class="opacity-70 text-center">No assignments.</td></tr>
+          <tr><td colspan="7" class="opacity-70 text-center">No assignments.</td></tr>
           {% endif %}
         </tbody>
      </table>
@@ -340,10 +348,14 @@
 
    <div id="panel-summary" class="hidden block w-full clear-both">
     <div class="overflow-x-auto p-2 w-full">        
+      {% set assessment_summary = assessment_summary if assessment_summary is defined else {'standalone_assessments': [], 'grouped_assessments': {}} %}
+      {% set standalone_assessments = assessment_summary.standalone_assessments if assessment_summary.standalone_assessments is defined else [] %}
+      {% set grouped_assessments = assessment_summary.grouped_assessments if assessment_summary.grouped_assessments is defined else {} %}
       <table class="table table-sm w-full border-separate border-2 border-teal-300 rounded-xl">
         <thead class="bg-teal-600 text-white">
           <tr>
             <th class="text-left">Category</th>
+            <th class="text-center">Status</th>
             <th class="text-center">Items</th>
             <th class="text-right">Unweighted Avg (%)</th>
             <th class="text-right">Weight Total (%)</th>
@@ -359,22 +371,37 @@
                   <span class="badge badge-xs badge-warning ml-1">+{{ row.bonus_count }} Bonus</span>
                 {% endif %}
               </td>
+              <td class="px-4 py-2 text-center text-gray-600">
+                {% if row.display_status is defined %}
+                  <span class="badge badge-xs">{{ row.display_status }}</span>
+                {% else %}
+                  <span class="badge badge-xs">{{ 'Grouped' if row.count > 1 else 'Standalone' }}</span>
+                {% endif %}
+              </td>
               <td class="px-4 py-2 text-center text-gray-600">{{ row.count }}</td>
               <td class="px-4 py-2 text-right text-gray-600">
-                {{ "%.2f"|format(row.unweighted_avg * 100) }}%
+                {% if row.has_scored_items is defined and not row.has_scored_items %}
+                  Pending
+                {% else %}
+                  {{ "%.2f"|format(row.unweighted_avg * 100) }}%
+                {% endif %}
               </td>
               <td class="px-4 py-2 text-right text-gray-600">
                 {{ "%.2f"|format(row.total_weight) }}%
               </td>
               <td class="px-4 py-2 text-right font-bold text-teal-700">
-                {{ "%.2f"|format(row.weighted_score) }}
+                {% if row.has_scored_items is defined and not row.has_scored_items %}
+                  Pending
+                {% else %}
+                  {{ "%.2f"|format(row.weighted_score) }}
+                {% endif %}
               </td>
             </tr>
           {% endfor %}
         </tbody>
         <tfoot>
           <tr class="bg-teal-50 font-bold">
-            <td colspan="3" class="px-4 py-3 text-right uppercase text-xs text-gray-500">Total Calculation</td>
+            <td colspan="4" class="px-4 py-3 text-right uppercase text-xs text-gray-500">Total Calculation</td>
             <td class="px-4 py-3 text-right border-t-2 border-teal-400">
               {{ "%.2f"|format(summaries|sum(attribute='total_weight')) }}%
             </td>
@@ -508,11 +535,15 @@ function startInlineEditAssignment(index, assessment, mark, weight) {
   const safeAssessment = escapeHtml(assessment);
   const safeMark = escapeHtml(mark);
   const safeWeight = escapeHtml(weight);
+  const safeCategory = escapeHtml(row.dataset.category || '');
 
   // Use the correct backend URL!
   row.innerHTML = `
     <td class="assignment-title" style="min-width:180px;">
       <input id="assignment-title" name="assessment" class="input input-xs w-full" placeholder="Assignment title" value="${safeAssessment}" required />
+    </td>
+    <td class="assignment-category" style="min-width:150px;">
+      <input name="category" class="input input-xs w-full" placeholder="Category" value="${safeCategory}" />
     </td>
     <td class="assignment-mark" style="width:70px;">
       <input name="weighted_mark" type="number" step="0.01" class="input input-xs w-16 text-right" value="${safeMark}" required />
@@ -550,6 +581,7 @@ window.submitInlineEditAssignmentRow = function(assessment, code, semester, year
   const formData = new FormData();
 
   formData.append('new_assessment', row.querySelector('[name="assessment"]').value);
+  formData.append('category', row.querySelector('[name="category"]')?.value || '');
   formData.append('weighted_mark', row.querySelector('[name="weighted_mark"]').value);
   formData.append('mark_weight', row.querySelector('[name="mark_weight"]').value);
 

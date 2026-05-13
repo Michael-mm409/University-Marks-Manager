@@ -71,6 +71,7 @@
     const row = getEditingRow(assessment, code, semester, year);
     if (!row) return false;
     const new_assessment = row.querySelector("input[name='new_assessment']")?.value || assessment;
+    const category = row.querySelector("input[name='category']")?.value || '';
     const weighted_mark = row.querySelector("input[name='weighted_mark']")?.value || '';
     const mark_weight = row.querySelector("input[name='mark_weight']")?.value || '';
     const grade_type = row.querySelector("select[name='grade_type']")?.value || 'numeric';
@@ -79,6 +80,7 @@
     const formData = new FormData();
     formData.append('assessment', assessment);
     formData.append('new_assessment', new_assessment);
+    formData.append('category', category);
     formData.append('subject_code', code);
     formData.append('semester_name', semester);
     formData.append('year', year);
@@ -93,7 +95,7 @@
         if (!r.ok) {
           const text = await r.text().catch(() => '');
           console.error('Assignment update failed', r.status, text);
-          row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>Server error: ${r.status}</div></td>`;
+          row.innerHTML = `<td colspan='7'><div class='alert alert-error mb-2'>Server error: ${r.status}</div></td>`;
           return null;
         }
         if (ct.includes('application/json')) {
@@ -102,7 +104,7 @@
         // Non-JSON response (likely HTML redirect to login) - show text for debugging
         const text = await r.text().catch(() => '');
         console.warn('Assignment update returned non-JSON response', ct, text.slice(0, 400));
-        row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>Unexpected server response.</div></td>`;
+        row.innerHTML = `<td colspan='7'><div class='alert alert-error mb-2'>Unexpected server response.</div></td>`;
         return null;
       })
       .then(data => {
@@ -120,7 +122,7 @@
         }
         row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>${(data && data.error) || 'Unknown error.'}</div></td>`;
       })
-      .catch(err => { console.error(err); row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>Error submitting edit.</div></td>`; });
+      .catch(err => { console.error(err); row.innerHTML = `<td colspan='7'><div class='alert alert-error mb-2'>Error submitting edit.</div></td>`; });
     return false;
   };
 
