@@ -96,6 +96,8 @@ def create_assignment(data: AssignmentCreate, session: Session = Depends(get_ses
         except Exception:
             # If conversion fails, leave as-is and let the ORM/DB raise if invalid
             pass
+    if not payload.get("category"):
+        payload["category"] = payload.get("assessment")
     # Resolve subject_id and enforce duplicate by (subject_id, assessment)
     sid = payload.get("subject_id")
     if sid is None:
@@ -195,6 +197,8 @@ def update_assignment(assignment_id: int, data: AssignmentCreate,
             payload["weighted_mark"] = float(payload["weighted_mark"])
         except (ValueError, TypeError):
             pass
+    if not payload.get("category"):
+        payload["category"] = payload.get("assessment")
     # Guard against creating a duplicate natural key (exclude the current record)
     # Resolve subject_id for duplicate check and update the record's subject_id if changed
     sid = payload.get("subject_id")

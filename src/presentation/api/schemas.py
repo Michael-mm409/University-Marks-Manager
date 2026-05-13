@@ -27,6 +27,7 @@ class SubjectRead(SQLModel):
 
 class AssignmentCreate(SQLModel, table=False):
     assessment: str
+    category: Optional[str] = None
     subject_id: int  # FK to Subject(id)
     weighted_mark: Optional[float] = None
     unweighted_mark: Optional[float] = None
@@ -38,6 +39,7 @@ class AssignmentCreate(SQLModel, table=False):
 class AssignmentRead(SQLModel):
     id: int
     assessment: str
+    category: Optional[str] = None
     subject_id: int
     weighted_mark: Optional[float] = None
     unweighted_mark: Optional[float] = None
