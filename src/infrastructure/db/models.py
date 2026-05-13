@@ -189,8 +189,8 @@ class Assignment(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     assessment: str = Field(index=True)
     subject_id: int = Field(foreign_key="subjects.id", index=True)
-    weighted_mark: Optional[float] = None
-    unweighted_mark: Optional[float] = None
+    weighted_mark: Optional[float] = Field(default=None, nullable=True)
+    unweighted_mark: Optional[float] = Field(default=None, nullable=True)
     mark_weight: Optional[float] = None
     grade_type: str = Field(default=GradeType.NUMERIC.value)
     is_exam: bool = Field(default=False)
