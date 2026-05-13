@@ -41,7 +41,7 @@ class SemesterSummary(TypedDict):
     credit_points: Optional[int]
     assessment_unweighted: float
     assessment_unweighted_contribution: float
-    assessment_mark: float
+    assessment_mark: Optional[float]
     assessment_weight: float
     exam_mark: Optional[float]
     exam_weight: Optional[float]

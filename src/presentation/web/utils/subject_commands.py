@@ -72,6 +72,11 @@ def add_prerequisite_core(
     - "semester_not_found" if the semester does not exist
     - "subject_not_found" if the subject does not exist
     """
+    import logging
+    logger = logging.getLogger("uvicorn.error")
+    
+    logger.info(f"[ADD_PREREQ_DEBUG] semester={semester}, year={year}, code={code}, prereq_id={prerequisite_subject_id}, custom={custom_prerequisite}, coreq={is_corequisite}")
+    
     try:
         year_int = int(str(year))
     except Exception:
@@ -87,6 +92,7 @@ def add_prerequisite_core(
         ).first()
 
     if not sem or getattr(sem, "id", None) is None:
+        logger.error(f"[ADD_PREREQ_DEBUG] Semester not found: {semester}, {year_int}")
         return "semester_not_found"
 
     subject = session.exec(
@@ -96,6 +102,7 @@ def add_prerequisite_core(
         )
     ).first()
     if not subject or getattr(subject, "id", None) is None:
+        logger.error(f"[ADD_PREREQ_DEBUG] Subject not found: {code} in semester {sem.id}")
         return "subject_not_found"
 
     mgr = SubjectPrerequisiteManager(session)
@@ -104,25 +111,31 @@ def add_prerequisite_core(
     if prerequisite_subject_id:
         try:
             prereq_id = int(prerequisite_subject_id)
+            logger.info(f"[ADD_PREREQ_DEBUG] Adding prerequisite: subject_id={subject.id}, prereq_subject_id={prereq_id}, coreq={is_corequisite}")
             mgr.add_prerequisite(
                 subject_id=int(subject.id),  # type: ignore[arg-type]
                 prerequisite_subject_id=prereq_id,
                 is_corequisite=bool(int(is_corequisite or "0")),
             )
-        except Exception:
-            # Swallow and treat as benign failure, matching route behaviour
+            logger.info(f"[ADD_PREREQ_DEBUG] Successfully added prerequisite")
+        except Exception as e:
+            logger.error(f"[ADD_PREREQ_DEBUG] Failed to add prerequisite: {e}", exc_info=True)
             pass
     # Otherwise, fall back to storing a custom free-text prerequisite
     elif custom_prerequisite and custom_prerequisite.strip():
         try:
+            logger.info(f"[ADD_PREREQ_DEBUG] Adding custom prerequisite: subject_id={subject.id}, custom_text={custom_prerequisite}")
             mgr.add_prerequisite(
                 subject_id=int(subject.id),  # type: ignore[arg-type]
                 prerequisite_subject_id=None,
                 custom_text=custom_prerequisite.strip(),
                 is_corequisite=bool(int(is_corequisite or "0")),
             )
-        except Exception:
-            # Swallow and treat as benign failure, matching route behaviour
+            logger.info(f"[ADD_PREREQ_DEBUG] Successfully added custom prerequisite")
+        except Exception as e:
+            logger.error(f"[ADD_PREREQ_DEBUG] Failed to add custom prerequisite: {e}", exc_info=True)
             pass
+    else:
+        logger.warn(f"[ADD_PREREQ_DEBUG] No prerequisite_subject_id or custom_prerequisite provided")
 
     return "ok"

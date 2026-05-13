@@ -344,7 +344,7 @@ def edit_assignment_form(
     </div>
 </td>
 <td><input name='weighted_mark' type='number' step='any' min='0' class='input input-xs w-16' value='{assignment.weighted_mark if assignment.weighted_mark is not None else ''}' placeholder='Weighted mark' /></td>
-<td class='assignment-unweighted'><input name='unweighted_mark' type='text' class='input input-xs w-16 bg-gray-200 cursor-not-allowed' style='background-color:#e5e7eb;cursor:not-allowed;' value="{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % (float(assignment.unweighted_mark)*100) if assignment.unweighted_mark is not None else '0.00')}" readonly tabindex='-1' /></td>
+<td class='assignment-unweighted'><input name='unweighted_mark' type='text' class='input input-xs w-16 bg-gray-200 cursor-not-allowed' style='background-color:#e5e7eb;cursor:not-allowed;' value="{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % (float(assignment.unweighted_mark)*100) if assignment.unweighted_mark is not None else 'Pending')}" readonly tabindex='-1' /></td>
 <td><input name='mark_weight' type='number' step='any' min='0' class='input input-xs w-16' value='{assignment.mark_weight if assignment.mark_weight is not None else ''}' placeholder='Mark weight' /></td>
 <td><select name='grade_type' class='select select-xs w-16'>
         <option value='numeric' {'selected' if assignment.grade_type == 'numeric' else ''}>Numeric</option>
@@ -551,7 +551,7 @@ def update_assignment_ajax(
         row_html = (
             f"<td class='assignment-assessment'>{safe_current_assessment_text}{exam_badge}</td>"
             f"<td class='assignment-weighted'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.weighted_mark) if assignment.weighted_mark is not None else '0.00')}</td>"
-            f"<td class='assignment-unweighted'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % (float(assignment.unweighted_mark)*100) if assignment.unweighted_mark is not None else '0.00')}</td>"
+            f"<td class='assignment-unweighted'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % (float(assignment.unweighted_mark)*100) if assignment.unweighted_mark is not None else 'Pending')}</td>"
             f"<td class='assignment-mark-weight'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.mark_weight) if assignment.mark_weight is not None else '0.00')}</td>"
             f"<td class='assignment-grade-type'>{assignment.grade_type}</td>"
             f"<td class='flex gap-1'>"

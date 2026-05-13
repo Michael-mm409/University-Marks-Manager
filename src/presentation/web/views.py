@@ -953,6 +953,8 @@ def subject_detail_pretty(
 
         ctx["summaries"] = result["summaries"]
         ctx["grade_goals"] = result["grade_goals"]
+        ctx["total_achieved"] = result.get("total_achieved")
+        ctx["remaining_weight"] = result.get("remaining_weight")
         return _render(request, "subject.html", ctx)
 
 

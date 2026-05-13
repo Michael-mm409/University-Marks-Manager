@@ -266,6 +266,7 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
         # Sum of contribution points (unweighted_fraction * assignment weight)
         assess_unweighted_contrib_sum = 0.0
         assignment_weights = []
+        has_assessment_score = False
         for a in assignments:
             # Include all assignments, including those marked as is_exam
             if a.grade_type == GradeType.NUMERIC.value:
@@ -279,6 +280,7 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
                 if a.weighted_mark not in (None, ""):
                     try:
                         assess_weighted_total += float(a.weighted_mark)
+                        has_assessment_score = True
                     except ValueError:
                         pass
                 if a.unweighted_mark not in (None, ""):
@@ -320,7 +322,7 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
                 "name": sub.subject_name,
                 "semester_name": semester,
                 "credit_points": getattr(sub, "credit_points", None),
-                "assessment_mark": round(assess_weighted_total, 2),
+                "assessment_mark": round(assess_weighted_total, 2) if has_assessment_score else None,
                 # Show the normalized unweighted value: contribution sum divided by total assessment weight
                 "assessment_unweighted": round(
                     ((assess_unweighted_contrib_sum / assess_weight_sum) * 100.0)
@@ -462,6 +464,7 @@ def _build_semesters_section_context(
 
             assess_weight_sum = 0.0
             assess_weighted_total = 0.0
+            has_assessment_score = False
             for a in assignments:
                 if a.grade_type == GradeType.NUMERIC.value:
                     if a.mark_weight not in (None, ""):
@@ -472,6 +475,7 @@ def _build_semesters_section_context(
                     if a.weighted_mark not in (None, ""):
                         try:
                             assess_weighted_total += float(a.weighted_mark)
+                            has_assessment_score = True
                         except ValueError:
                             pass
 
@@ -482,7 +486,7 @@ def _build_semesters_section_context(
                 "code": sub.subject_code,
                 "name": sub.subject_name,
                 "semester_name": sem_name,
-                "assessment_mark": round(assess_weighted_total, 2),
+                "assessment_mark": round(assess_weighted_total, 2) if has_assessment_score else None,
                 "assessment_weight": assess_weight_sum,
                 "exam_mark": exam.exam_mark if exam else None,
                 "final_exam_mark_weight": exam_weight,

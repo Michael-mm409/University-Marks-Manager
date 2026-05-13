@@ -111,9 +111,12 @@ def build_candidate_subjects(session: Session, subject: Optional[Subject]) -> Li
     if not semester_ids:
         return candidate_subjects
 
-    # All subjects across these semesters
+    # All subjects across these semesters, ordered by year, semester name, then subject code
+    # This matches the SQL ordering: ORDER BY sem.year, sem.name, s.subject_code
     all_subjects = session.exec(
-        select(Subject).where(col(Subject.semester_id).in_(semester_ids))
+        select(Subject).join(Semester)
+        .where(col(Subject.semester_id).in_(semester_ids))
+        .order_by(col(Semester.year).asc(), col(Semester.name).asc(), col(Subject.subject_code).asc())
     ).all()
 
     prereq_manager = SubjectPrerequisiteManager(session)
