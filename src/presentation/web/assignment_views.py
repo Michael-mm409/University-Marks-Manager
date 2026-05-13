@@ -1,5 +1,6 @@
 from fastapi import Form, Request
 import logging
+import re
 from typing import Optional
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -13,12 +14,20 @@ import json
 assignment_router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
+def _derive_category(assessment: str, category: Optional[str]) -> str:
+    if category and category.strip():
+        return category.strip()
+    derived = re.sub(r"\s*[-_:]*\s*\d+\s*$", "", assessment).strip()
+    return derived or assessment
+
 @assignment_router.api_route("/assignment/create", methods=["POST"], response_class=HTMLResponse)
 def create_assignment(
     semester: str,
     code: str,
     year: str = Form(...),
     assessment: str = Form(...),
+    category: Optional[str] = Form(None),
     # Accept empty strings from form without validation errors; parse manually below
     weighted_mark: Optional[str] = Form(None),
     mark_weight: Optional[str] = Form(None),
@@ -53,6 +62,7 @@ def create_assignment(
     mark_weight_val = None
     logger.info("[DEBUG] Assignment creation requested: code=%s, semester=%s, year=%s, assessment=%s, weighted_mark=%s, mark_weight=%s, grade_type=%s, is_exam=%s", code, semester, year, assessment, weighted_mark, mark_weight, grade_type, is_exam)
     try:
+        category_value = _derive_category(assessment, category)
         if grade_type == GradeType.NUMERIC.value:
             try:
                 if weighted_mark not in (None, ""):
@@ -109,6 +119,7 @@ def create_assignment(
         new_assignment = Assignment(
             subject_id=subject_id,
             assessment=assessment,
+            category=category_value,
             # Persist numeric weighted marks as floats; S/U is tracked via grade_type.
             weighted_mark=(weighted_val if (grade_type == GradeType.NUMERIC.value and weighted_val is not None) else None),
             unweighted_mark=unweighted_val,
@@ -327,6 +338,7 @@ def edit_assignment_form(
     exam_type_val = "assignment"
     
     safe_assessment_text = html_escape(str(assignment.assessment or ""))
+    safe_category_text = html_escape(str(getattr(assignment, "category", "") or ""))
     safe_assessment_js = json.dumps(str(assessment))
     safe_code_js = json.dumps(str(code))
     safe_semester_js = json.dumps(str(semester))
@@ -343,6 +355,7 @@ def edit_assignment_form(
         </select>
     </div>
 </td>
+<td><input name='category' class='input input-xs w-24' value='{safe_category_text}' placeholder='Category' /></td>
 <td><input name='weighted_mark' type='number' step='any' min='0' class='input input-xs w-16' value='{assignment.weighted_mark if assignment.weighted_mark is not None else ''}' placeholder='Weighted mark' /></td>
 <td class='assignment-unweighted'><input name='unweighted_mark' type='text' class='input input-xs w-16 bg-gray-200 cursor-not-allowed' style='background-color:#e5e7eb;cursor:not-allowed;' value="{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % (float(assignment.unweighted_mark)*100) if assignment.unweighted_mark is not None else 'Pending')}" readonly tabindex='-1' /></td>
 <td><input name='mark_weight' type='number' step='any' min='0' class='input input-xs w-16' value='{assignment.mark_weight if assignment.mark_weight is not None else ''}' placeholder='Mark weight' /></td>
@@ -363,6 +376,7 @@ def update_assignment_ajax(
     code: str,
     semester: str,
     year: str,
+    category: Optional[str] = Form(None),
     # Accept blanks from form; parse manually
     new_assessment: Optional[str] = Form(None),
     weighted_mark: Optional[str] = Form(None),
@@ -423,6 +437,7 @@ def update_assignment_ajax(
             if existing:
                 return JSONResponse({"success": False, "error": "An assignment with this name already exists."}, status_code=400)
             assignment.assessment = new_assessment
+        assignment.category = _derive_category(new_assessment or assignment.assessment, category)
         
         # Update fields
         if grade_type == GradeType.NUMERIC.value:
@@ -532,45 +547,10 @@ def update_assignment_ajax(
                             total_mark = round((total_weighted / total_weight_percent) * 100.0, 2)
                     except ZeroDivisionError:
                         total_mark = None
-        # Return updated row HTML for table
-        exam_badge = "<span class='badge badge-xs badge-info ml-1'>Exam</span>" if getattr(assignment, "is_exam", False) else ""
-        # Use assignment.assessment (the current/new name) for URLs and data attributes
-        current_assessment = assignment.assessment
-        
-        safe_current_assessment_text = html_escape(str(current_assessment or ""))
-        encoded_current_assessment = quote(str(current_assessment or ""), safe="")
-        encoded_code = quote(str(code), safe="")
-        encoded_semester = quote(str(semester), safe="")
-        encoded_year = quote(str(year), safe="")
-        
-        safe_current_assessment_js = json.dumps(str(current_assessment))
-        safe_code_js = json.dumps(str(code))
-        safe_semester_js = json.dumps(str(semester))
-        safe_year_js = json.dumps(str(year))
-        
-        row_html = (
-            f"<td class='assignment-assessment'>{safe_current_assessment_text}{exam_badge}</td>"
-            f"<td class='assignment-weighted'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.weighted_mark) if assignment.weighted_mark is not None else '0.00')}</td>"
-            f"<td class='assignment-unweighted'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % (float(assignment.unweighted_mark)*100) if assignment.unweighted_mark is not None else 'Pending')}</td>"
-            f"<td class='assignment-mark-weight'>{'-' if assignment.grade_type in ['S','U'] else ('%.2f' % float(assignment.mark_weight) if assignment.mark_weight is not None else '0.00')}</td>"
-            f"<td class='assignment-grade-type'>{assignment.grade_type}</td>"
-            f"<td class='flex gap-1'>"
-            f"<form method='post' action='/semester/{encoded_semester}/subject/{encoded_code}/assignment/{encoded_current_assessment}/{encoded_year}/delete'>"
-            f"<input type='hidden' name='year' value='{year}' />"
-            f"<button class='btn btn-xs btn-error' type='submit'>✕</button>"
-            f"</form>"
-            f"<button class='btn btn-xs btn-outline' type='button' onclick='window.startInlineEditAssignment({safe_current_assessment_js}, {safe_code_js}, {safe_semester_js}, {safe_year_js})'>Edit</button>"
-            f"</td>"
-        )
-        # If assignment name changed, force full reload to update all references
-        # Otherwise return row HTML for inline update without reload
-        if new_assessment and new_assessment.strip() and new_assessment != assessment:
-            logger.info(f"[ASSIGNMENT_UPDATE] Name changed from '{assessment}' to '{new_assessment}' - forcing reload")
-            reload_url = f"/semester/{semester}/subject/{code}?year={year}"
-            return JSONResponse({"success": True, "reload_url": reload_url})
-        else:
-            logger.info(f"[ASSIGNMENT_UPDATE] Values updated for '{assessment}' - inline update")
-            return JSONResponse({"success": True, "row_html": row_html})
+        # The subject page renders grouped summaries server-side, so any successful
+        # update should trigger a reload to keep the table and threshold groups in sync.
+        reload_url = f"/semester/{semester}/subject/{code}?year={year}"
+        return JSONResponse({"success": True, "reload_url": reload_url})
     except Exception:
         logger.exception("update_assignment_ajax failed")
         return JSONResponse({"success": False, "error": "Internal server error"}, status_code=500)

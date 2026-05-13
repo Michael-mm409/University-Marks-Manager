@@ -31,7 +31,7 @@ from .auth_views import router as auth_router
 from .types import IndexContext
 from src.core.services.semester_manager import SemesterManager
 from src.core.services.course_manager import CourseManager
-from src.core.services.grade_calculator import GradeCalculator
+from src.core.services.grade_calculator import GradeCalculator, process_assessments
 
 async def verify_user(request: Request):
     if not request.session.get("user_id"):
@@ -955,6 +955,7 @@ def subject_detail_pretty(
         ctx["grade_goals"] = result["grade_goals"]
         ctx["total_achieved"] = result.get("total_achieved")
         ctx["remaining_weight"] = result.get("remaining_weight")
+        ctx.setdefault("assessment_summary", {"standalone_assessments": [], "grouped_assessments": {}})
         return _render(request, "subject.html", ctx)
 
 

@@ -6,7 +6,7 @@ from sqlalchemy.sql import expression
 from fastapi.templating import Jinja2Templates
 
 from src.presentation.api.deps import get_session
-from src.core.services.grade_calculator import GradeCalculator
+from src.core.services.grade_calculator import GradeCalculator, process_assessments
 from src.infrastructure.db.models import Subject, Assignment, Examination, ExamSettings, GradeType, Semester, SubjectPrerequisite, SubjectRule
 from src.presentation.web.utils.subject_helpers import (
     resolve_subject_for_context,
@@ -194,9 +194,25 @@ def build_subject_page_context(
 
     subject = ctx.get("subject")  # type: ignore[index]
     candidate_subjects: List[Subject] = build_candidate_subjects(session, subject)
+    subject_rules = session.exec(
+        select(SubjectRule).where(SubjectRule.subject_id == subject.id)
+    ).all() if isinstance(subject, Subject) and subject.id is not None else []
 
     page_ctx = dict(ctx)
     page_ctx["candidate_subjects"] = candidate_subjects
+    page_ctx["subject_rules"] = subject_rules
+    if isinstance(subject, Subject) and subject.id is not None:
+        subject_with_assignments = session.exec(
+            select(Subject)
+            .where(Subject.id == subject.id)
+            .options(selectinload(cast(Any, Subject.assignments)))
+        ).first() or subject
+        page_ctx["assessment_summary"] = process_assessments(
+            list(getattr(subject_with_assignments, "assignments", []) or []),
+            rules=subject_rules,
+        )
+    else:
+        page_ctx["assessment_summary"] = {"standalone_assessments": [], "grouped_assessments": {}}
     return page_ctx
 
 @subject_router.get(
@@ -679,8 +695,14 @@ def get_subject(
         subject_rules = session.exec(
             select(SubjectRule).where(SubjectRule.subject_id == subject_obj.id)
         ).all() if subject_obj.id is not None else []
+        ctx["assessment_summary"] = process_assessments(list(getattr(subject_obj, "assignments", []) or []), rules=subject_rules)
+        ctx["subject_rules"] = subject_rules
+        subject_rules = session.exec(
+            select(SubjectRule).where(SubjectRule.subject_id == subject_obj.id)
+        ).all() if subject_obj.id is not None else []
     else:
         subject_rules = []
+        ctx["assessment_summary"] = {"standalone_assessments": [], "grouped_assessments": {}}
 
     ctx["subject_summary"] = subject_summary
     ctx["subject_rules"] = subject_rules
@@ -697,9 +719,11 @@ async def get_subject_detail(request: Request, subject_id: int, session: Session
 
     calc = GradeCalculator(session)
     summaries = calc.calculate_subject_summary(subject)
+    assessment_summary = process_assessments(list(getattr(subject, "assignments", []) or []))
     
     return templates.TemplateResponse("subject.html", {
         "request": request,
         "subject": subject,
-        "summaries": summaries
+        "summaries": summaries,
+        "assessment_summary": assessment_summary,
     })
