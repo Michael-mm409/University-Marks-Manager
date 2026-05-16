@@ -1,12 +1,10 @@
 """SQLModel ORM models (infrastructure layer)."""
-from __future__ import annotations
 
 from enum import Enum
-from typing import ClassVar, Optional
+from typing import Any, ClassVar, Optional
 
 from sqlmodel import Field, SQLModel, Relationship
 from sqlalchemy import UniqueConstraint
-from sqlalchemy.orm import relationship
 
 class GradeType(str, Enum):
     """Supported grading modes for an assessment component."""
@@ -22,30 +20,24 @@ class GradeType(str, Enum):
 
 class User(SQLModel, table=True):
     """Represents a user of the Marks Manager system."""
-    __tablename__: ClassVar[str] = "users"  # type: ignore[assignment]
+    __tablename__: ClassVar[Any] = "users"
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(index=True, unique=True)
     email: str = Field(index=True, unique=True)
-    password_hash: str  # Store hashed password, never plain text
+    password_hash: str 
     
-    user_courses: list["UserCourse"] = Relationship(
-        sa_relationship=relationship("UserCourse", back_populates="user")
-    )
+    user_courses: list["UserCourse"] = Relationship(back_populates="user")
 
 class UserCourse(SQLModel, table=True):
     """Association table linking users to their courses."""
-    __tablename__: ClassVar[str] = "user_courses"  # type: ignore[assignment]
+    __tablename__: ClassVar[Any] = "user_courses"
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", ondelete="CASCADE")
     course_id: int = Field(foreign_key="courses.id", ondelete="CASCADE")
-    is_default: bool = Field(default=False)  # User's default/active course
+    is_default: bool = Field(default=False)
     
-    user: Optional["User"] = Relationship(
-        sa_relationship=relationship("User", back_populates="user_courses")
-    )
-    course: Optional["Course"] = Relationship(
-        sa_relationship=relationship("Course")
-    )
+    user: "User" = Relationship(back_populates="user_courses")
+    course: "Course" = Relationship(back_populates="user_links")
     
     __table_args__ = (
         UniqueConstraint("user_id", "course_id", name="uq_user_course"),
@@ -53,33 +45,26 @@ class UserCourse(SQLModel, table=True):
 
 class University(SQLModel, table=True):
     """Represents a university."""
-    __tablename__: ClassVar[str] = "university"  # type: ignore[assignment]
+    __tablename__: ClassVar[Any] = "university"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True, unique=True)
     
-    courses: list["Course"] = Relationship(
-        sa_relationship=relationship("Course", back_populates="university")
-    )
+    courses: list["Course"] = Relationship(back_populates="university")
 
 class Course(SQLModel, table=True):
     """Represents a degree or program of study."""
-    __tablename__: ClassVar[str] = "courses"  # type: ignore[assignment]
+    __tablename__: ClassVar[Any] = "courses"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     code: str = Field(index=True)
     grading_scale_id: int = Field(foreign_key="grade_scales.id")
     university_id: Optional[int] = Field(default=None, foreign_key="university.id")
     
-    university: Optional["University"] = Relationship(
-        sa_relationship=relationship("University", back_populates="courses")
-    )
-    grading_scale: Optional["GradeScale"] = Relationship(
-        sa_relationship=relationship("GradeScale")
-    )
-    # This points to Semester.course
-    semesters: list["Semester"] = Relationship(
-        sa_relationship=relationship("Semester", back_populates="course")
-    )
+    university: Optional["University"] = Relationship(back_populates="courses")
+    grading_scale: Optional["GradeScale"] = Relationship()
+    
+    semesters: list["Semester"] = Relationship(back_populates="course")
+    user_links: list["UserCourse"] = Relationship(back_populates="course")
     
     __table_args__ = (
         UniqueConstraint("code", name="uq_course_code"),
@@ -87,20 +72,14 @@ class Course(SQLModel, table=True):
 
 class Semester(SQLModel, table=True):
     """Academic semester (e.g., Autumn 2025)."""
-    __tablename__: ClassVar[str] = "semesters"  # type: ignore[assignment]
+    __tablename__: ClassVar[Any] = "semesters"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     year: int = Field(index=True)
     course_id: Optional[int] = Field(default=None, foreign_key="courses.id")
     
-    # FIXED: Added the missing relationship side for Course
-    course: Optional["Course"] = Relationship(
-        sa_relationship=relationship("Course", back_populates="semesters")
-    )
-    # FIXED: Added the missing relationship side for Subject
-    subjects: list["Subject"] = Relationship(
-        sa_relationship=relationship("Subject", back_populates="semester")
-    )
+    course: Optional["Course"] = Relationship(back_populates="semesters")
+    subjects: list["Subject"] = Relationship(back_populates="semester")
 
     __table_args__ = (
         UniqueConstraint("course_id", "name", "year", name="uq_semester_course_name_year"),
@@ -108,7 +87,7 @@ class Semester(SQLModel, table=True):
 
 class Subject(SQLModel, table=True):
     """Subject/course within a semester."""
-    __tablename__: ClassVar[str] = "subjects"  # type: ignore[assignment]
+    __tablename__: ClassVar[Any] = "subjects"
     id: Optional[int] = Field(default=None, primary_key=True)
     subject_code: str = Field(index=True)
     semester_id: int = Field(foreign_key="semesters.id", index=True)
@@ -118,74 +97,48 @@ class Subject(SQLModel, table=True):
     sync_subject: bool = False
     has_exam: bool = Field(default=True)
 
-    # Relationship to Semester
-    semester: Optional["Semester"] = Relationship(
-        sa_relationship=relationship("Semester", back_populates="subjects")
-    )
+    semester: Optional["Semester"] = Relationship(back_populates="subjects")
+    assignments: list["Assignment"] = Relationship(back_populates="subject")
+    rules: list["SubjectRule"] = Relationship(back_populates="subject")
 
-    # Relationship to Assignment
-    assignments: list["Assignment"] = Relationship(
-        sa_relationship=relationship("Assignment", back_populates="subject")
-    )
-
-    # Relationship to SubjectRule
-    rules: list["SubjectRule"] = Relationship(
-        sa_relationship=relationship("SubjectRule", back_populates="subject")
-    )
-
-    # Prerequisites: subjects this subject requires
     prerequisites: list["SubjectPrerequisite"] = Relationship(
-        sa_relationship=relationship(
-            "SubjectPrerequisite",
-            back_populates="subject",
-            primaryjoin="Subject.id==SubjectPrerequisite.subject_id",
-            cascade="all, delete-orphan"
-        )
+        back_populates="subject",
+        sa_relationship_kwargs={
+            "primaryjoin": "Subject.id==SubjectPrerequisite.subject_id",
+            "cascade": "all, delete-orphan"
+        }
     )
-    # Subjects for which this subject is a prerequisite
     required_for: list["SubjectPrerequisite"] = Relationship(
-        sa_relationship=relationship(
-            "SubjectPrerequisite",
-            back_populates="prerequisite_subject",
-            primaryjoin="Subject.id==SubjectPrerequisite.prerequisite_subject_id",
-            cascade="all, delete-orphan"
-        )
+        back_populates="prerequisite_subject",
+        sa_relationship_kwargs={
+            "primaryjoin": "Subject.id==SubjectPrerequisite.prerequisite_subject_id",
+            "cascade": "all, delete-orphan"
+        }
     )
 
     __table_args__ = (
         UniqueConstraint("subject_code", "semester_id", name="uq_subject_code_semester"),
     )
 
-
-# New model for subject prerequisites
 class SubjectPrerequisite(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "subject_prerequisite"  # type: ignore[assignment]
+    __tablename__: ClassVar[Any] = "subject_prerequisite"
     id: Optional[int] = Field(default=None, primary_key=True)
     subject_id: int = Field(foreign_key="subjects.id", index=True)
-    # Either link to another subject (prerequisite_subject_id) or store free-text in custom_text
-    prerequisite_subject_id: Optional[int] = Field(
-        default=None, foreign_key="subjects.id", index=True
-    )
+    prerequisite_subject_id: Optional[int] = Field(default=None, foreign_key="subjects.id", index=True)
     custom_text: Optional[str] = None
     is_corequisite: bool = Field(default=False, nullable=False)
 
     subject: Optional["Subject"] = Relationship(
-        sa_relationship=relationship(
-            "Subject",
-            foreign_keys="SubjectPrerequisite.subject_id",
-            back_populates="prerequisites"
-        )
+        back_populates="prerequisites",
+        sa_relationship_kwargs={"foreign_keys": "[SubjectPrerequisite.subject_id]"}
     )
     prerequisite_subject: Optional["Subject"] = Relationship(
-        sa_relationship=relationship(
-            "Subject",
-            foreign_keys="SubjectPrerequisite.prerequisite_subject_id",
-            back_populates="required_for"
-        )
+        back_populates="required_for",
+        sa_relationship_kwargs={"foreign_keys": "[SubjectPrerequisite.prerequisite_subject_id]"}
     )
 
 class Assignment(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "assignments"  # type: ignore[assignment]
+    __tablename__: ClassVar[Any] = "assignments"
     id: Optional[int] = Field(default=None, primary_key=True)
     assessment: str = Field(index=True)
     category: Optional[str] = Field(default=None, index=True)
@@ -196,31 +149,29 @@ class Assignment(SQLModel, table=True):
     grade_type: str = Field(default=GradeType.NUMERIC.value)
     is_exam: bool = Field(default=False)
     
-    subject: Optional["Subject"] = Relationship(
-        sa_relationship=relationship("Subject", back_populates="assignments")
-    )
+    subject: Optional["Subject"] = Relationship(back_populates="assignments")
     
     __table_args__ = (
         UniqueConstraint("assessment", "subject_id", name="uq_assignment_subject"),
     )
 
 class Examination(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "examinations"  # type: ignore[assignment]
+    __tablename__: ClassVar[Any] = "examinations"
     id: Optional[int] = Field(default=None, primary_key=True)
     subject_id: int = Field(foreign_key="subjects.id", index=True, unique=True)
     exam_mark: float = 0
     exam_weight: float = 100
-    exam_type: str = Field(default="main", max_length=32, description="Type of exam, e.g., 'assignment', 'main', etc.")
+    exam_type: str = Field(default="main", max_length=32)
 
 class ExamSettings(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "exam_settings"  # type: ignore[assignment]
+    __tablename__: ClassVar[Any] = "exam_settings"
     id: Optional[int] = Field(default=None, primary_key=True)
     subject_id: int = Field(foreign_key="subjects.id", index=True, unique=True)
     ps_exam: bool = False
     ps_factor: float = 40.0
 
 class GradeScale(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "grade_scales"  # type: ignore[assignment]
+    __tablename__: ClassVar[Any] = "grade_scales"
     id: Optional[int] = Field(default=None, primary_key=True)
     scale_name: str = Field(default="Standard", index=True)
     grade: str
@@ -228,13 +179,13 @@ class GradeScale(SQLModel, table=True):
     min_mark: float
     gpa_point: float
     band_type: str = Field(default="both", index=True)
+    
     __table_args__ = (
         UniqueConstraint("scale_name", "grade", "band_type", name="uq_scale_grade_type"),
     )
 
-# New model for subject prerequisites and rules
 class SubjectRule(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "subject_rules"  # type: ignore[assignment]
+    __tablename__: ClassVar[Any] = "subject_rules"
     id: Optional[int] = Field(default=None, primary_key=True)
     subject_id: int = Field(foreign_key="subjects.id", index=True)
     rule_label: str
@@ -242,11 +193,11 @@ class SubjectRule(SQLModel, table=True):
     max_count: int = 9
     weight_each: float = 2.0
     
-    subject: Optional["Subject"] = Relationship(
-        sa_relationship=relationship("Subject", back_populates="rules")
-    )
+    subject: Optional["Subject"] = Relationship(back_populates="rules")
 
-# Required for SQLModel to handle circular imports and forward references
+# Final Model Rebuilds
+User.model_rebuild()
+UserCourse.model_rebuild()
 University.model_rebuild()
 Course.model_rebuild()
 Semester.model_rebuild()
@@ -256,6 +207,8 @@ Assignment.model_rebuild()
 SubjectRule.model_rebuild()
 
 __all__ = [
+    "User",
+    "UserCourse",
     "GradeType",
     "Semester",
     "Subject",
@@ -265,4 +218,6 @@ __all__ = [
     "Course",
     "University",
     "GradeScale",
+    "SubjectRule",
+    "SubjectPrerequisite",
 ]

@@ -17,6 +17,9 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
       - PYTHONUNBUFFERED=1
       - LOG_FILTER_HEALTHCHECK=true
+      # Explicitly pass the Pepper and Session Key
+      - SECRET_PEPPER=${SECRET_PEPPER}
+      - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
     volumes:
       - ./:/app
     healthcheck:
