@@ -1,0 +1,102 @@
+/* ─────────────────────────────────────────────
+   style.css — app-level overrides
+   Loaded after Tailwind + DaisyUI in base.html
+   ───────────────────────────────────────────── */
+
+/* ── Semester grid fallback ── */
+.sem-grid { display: grid; gap: 1rem; }
+@media (min-width: 640px) { .sem-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 768px) { .sem-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.sem-card {
+  padding: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 0.5rem;
+  background: var(--b1, #fff);
+}
+
+/* ── Glass sticky navbar ── */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 70px;
+  padding: 1rem 2rem;
+  gap: 1rem;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+[data-theme="dark"] .site-header {
+  background: rgba(24, 24, 24, 0.82);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+.site-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 0 0 auto; /* pin to natural width so brand stays left */
+}
+.site-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.site-header-active-course {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  opacity: 0.85;
+  flex-wrap: wrap;
+}
+
+/* ── Breadcrumb: float to horizontal center of the navbar ── */
+.site-header [aria-label="Breadcrumb"] {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+/* On narrow screens restore to in-flow stacking under the brand */
+@media (max-width: 639px) {
+  .site-header-left { flex: 1 1 auto; }
+  .site-header [aria-label="Breadcrumb"] {
+    position: static;
+    transform: none;
+  }
+}
+
+/* ── Main content offset below sticky header ── */
+#main { padding-top: 110px; }
+
+/* ── Subject schedule: sticky thead pinned below the navbar ── */
+.sticky-schedule-head th {
+  position: sticky;
+  top: 70px;
+  z-index: 10;
+  background-color: oklch(var(--b2));
+}
+
+/* ── Subject page: target-grade responsive grid ── */
+.target-grade-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  gap: 1rem;
+}
+@media (min-width: 640px) {
+  .target-grade-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .target-grade-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
