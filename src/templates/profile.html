@@ -1,32 +1,170 @@
 {% extends 'base.html' %}
 {% block title %}Profile | Marks Manager{% endblock %}
-{% set breadcrumbs = [
-  {'label': 'Profile', 'url': None}
-] %}
+{% set breadcrumbs = [{'label': 'Profile', 'url': None}] %}
+
 {% block content %}
-<div class="flex flex-col gap-6 max-w-4xl mx-auto">
-  <h2 class="text-2xl sm:text-3xl font-bold">User Profile</h2>
+<div class="flex flex-col gap-6 max-w-4xl mx-auto pb-12">
+  <div class="flex justify-between items-center">
+    <h2 class="text-3xl font-bold">User Profile</h2>
+    <div class="badge badge-outline gap-2 p-4">
+      <span class="w-2 h-2 rounded-full bg-success"></span> Argon2id Secured
+    </div>
+  </div>
 
   {% if request.query_params.get('error') %}
-  <div class="alert alert-error">
+  <div class="alert alert-error shadow-lg">
+    <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
     <span>{{ request.query_params.get('error') }}</span>
   </div>
   {% endif %}
 
-  <!-- Account Information -->
-  <div class="card bg-base-100 shadow-xl">
-    <div class="card-body">
-      <h3 class="card-title">Account Information</h3>
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="font-semibold">Username:</label>
-          <p>{{ user.username }}</p>
-        </div>
-        <div>
-          <label class="font-semibold">Email:</label>
-          <p>{{ user.email }}</p>
+  <!-- Account & Security -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="card bg-base-100 shadow-xl border border-base-200">
+      <div class="card-body">
+        <h3 class="card-title text-primary">Account Details</h3>
+        <div class="space-y-2">
+          <p><span class="opacity-60 text-sm">Username:</span><br><strong>{{ user.username }}</strong></p>
+          <p><span class="opacity-60 text-sm">Email:</span><br><strong>{{ user.email }}</strong></p>
         </div>
       </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl border border-base-200">
+      <div class="card-body">
+        <h3 class="card-title text-secondary text-sm uppercase tracking-widest">Security Status</h3>
+        <p class="text-sm opacity-70">Your account is protected with high-memory cost hashing. You can change your password below.</p>
+        <div class="card-actions justify-end mt-2">
+          <!-- Modal toggle -->
+          <label for="change-password-modal" class="btn btn-ghost btn-xs">Change Password</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <input type="checkbox" id="change-password-modal" class="modal-toggle" />
+    <div class="modal">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg">Change Password</h3>
+        <p class="text-sm opacity-60">Enter your current password and choose a new secure password (min 8 characters).</p>
+
+        <form method="post" action="/profile/change-password" class="space-y-4 mt-4">
+          <div class="form-control">
+            <label class="label"><span class="label-text">Current Password</span></label>
+            <input type="password" name="current_password" class="input input-bordered w-full" required />
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">New Password</span></label>
+            <input type="password" name="new_password" class="input input-bordered w-full" minlength="8" required />
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Confirm New Password</span></label>
+            <input type="password" name="confirm_password" class="input input-bordered w-full" minlength="8" required />
+          </div>
+
+          <div class="modal-action">
+            <button type="submit" class="btn btn-primary">Change Password</button>
+            <label for="change-password-modal" class="btn">Cancel</label>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- My Courses Table -->
+  <div class="card bg-base-100 shadow-xl overflow-hidden border border-base-200">
+    <div class="card-body p-0">
+      <div class="p-6 pb-0 flex justify-between items-center">
+        <h3 class="card-title">Enrolled Courses</h3>
+        <span class="badge badge-neutral">{{ courses|length }} total</span>
+      </div>
+      
+      {% if courses %}
+      <div class="overflow-x-auto mt-4">
+        <table class="table w-full">
+          <thead>
+            <tr class="bg-base-200">
+              <th>Course</th>
+              <th>University</th>
+              <th class="text-center">Default</th>
+              <th class="text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in courses %}
+            <tr class="hover">
+              <td>
+                <div class="font-bold">{{ item.course.name }}</div>
+                <div class="text-xs opacity-50">{{ item.course.code }}</div>
+              </td>
+              <td>{{ item.course.university.name if item.course.university else 'Private/Independent' }}</td>
+              <td class="text-center">
+                {% if item.is_default %}
+                  <div class="badge badge-success gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-4 h-4 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    Default
+                  </div>
+                {% else %}
+                  <form method="post" action="/profile/set-default/{{ item.id }}">
+                    <button type="submit" class="btn btn-ghost btn-xs text-primary underline">Make Default</button>
+                  </form>
+                {% endif %}
+              </td>
+              <td class="text-right">
+                <form method="post" action="/profile/remove-course/{{ item.id }}" onsubmit="return confirm('Archive this course mapping? Data remains safe but won\'t appear in your dashboard.');">
+                  <button type="submit" class="btn btn-square btn-ghost btn-sm text-error">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-12 text-center">
+        <div class="text-5xl mb-4">📚</div>
+        <p class="opacity-50 italic">No courses linked to your profile yet.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+ <!-- Add / Create Course -->
+  <div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+      <h3 class="card-title">Add Course</h3>
+      {% if available_courses %}
+      <form method="post" action="/profile/add-course" class="flex flex-col gap-4">
+        <div class="form-control">
+          <label class="label">
+            <span class="label-text">Select a course to add:</span>
+          </label>
+          <select name="course_id" class="select select-bordered" required>
+            <option value="" disabled selected>Choose a course</option>
+            {% for course in available_courses %}
+            <option value="{{ course.id }}">
+              {{ course.name }} ({{ course.code }})
+              {% if course.university %} - {{ course.university.name }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+          <button type="submit" class="btn btn-primary">Join Course</button>
+      </form>
+      {% else %}
+      <p class="opacity-70">All available courses have been added to your account.</p>
+
+      <div class="mt-6 border-t border-base-300 pt-4">
+        <h4 class="font-semibold mb-3">Create New Course</h4>
+        <div class="space-y-4">
+          <a href="/courses/create" class="btn btn-secondary w-full">+ Define New Program</a>
+        </div>
+      </div>
+      {% endif %}
     </div>
   </div>
 
@@ -98,171 +236,6 @@
       }
     }
   </script>
-
-  <!-- My Courses -->
-  <div class="card bg-base-100 shadow-xl">
-    <div class="card-body">
-      <h3 class="card-title">My Courses</h3>
-      {% if courses %}
-      <div class="overflow-x-auto">
-        <table class="table table-zebra">
-          <thead>
-            <tr>
-              <th>Course Name</th>
-              <th>Code</th>
-              <th>University</th>
-              <th>Default</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for item in courses %}
-            <tr>
-              <td>{{ item.course.name }}</td>
-              <td>{{ item.course.code }}</td>
-              <td>{{ item.course.university.name if item.course.university else 'N/A' }}</td>
-              <td>
-                {% if item.is_default %}
-                  <span class="badge badge-success">Default</span>
-                {% else %}
-                  <form method="post" action="/profile/set-default/{{ item.id }}" style="display: inline;">
-                    <button type="submit" class="btn btn-xs btn-outline">Set Default</button>
-                  </form>
-                {% endif %}
-              </td>
-              <td>
-                <form method="post" action="/profile/remove-course/{{ item.id }}" onsubmit="return confirm('Remove this course from your account?');">
-                  <button type="submit" class="btn btn-xs btn-error">Remove</button>
-                </form>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <p class="opacity-70">You haven't added any courses yet. Add one below to get started.</p>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- Add / Create Course -->
-  <div class="card bg-base-100 shadow-xl">
-    <div class="card-body">
-      <h3 class="card-title">Add Course</h3>
-      {% if available_courses %}
-      <form method="post" action="/profile/add-course" class="flex flex-col gap-4">
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text">Select a course to add:</span>
-          </label>
-          <select name="course_id" class="select select-bordered" required>
-            <option value="" disabled selected>Choose a course</option>
-            {% for course in available_courses %}
-            <option value="{{ course.id }}">
-              {{ course.name }} ({{ course.code }})
-              {% if course.university %} - {{ course.university.name }}{% endif %}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
-        <button type="submit" class="btn btn-primary">Add Course</button>
-      </form>
-      {% else %}
-      <p class="opacity-70">All available courses have been added to your account.</p>
-
-      <div class="mt-6 border-t border-base-300 pt-4">
-        <h4 class="font-semibold mb-3">Create New Course</h4>
-        <form method="post" action="/profile/create-course" class="flex flex-col gap-4">
-          <div class="form-control">
-            <label class="label"><span class="label-text">Course Name</span></label>
-            <input type="text" name="name" class="input input-bordered w-full"
-              placeholder="e.g., Bachelor of Computer Science" required />
-          </div>
-
-          <div class="form-control">
-            <label class="label"><span class="label-text">Course Code</span></label>
-            <input type="text" name="code" class="input input-bordered w-full"
-              placeholder="e.g., BCS" required />
-          </div>
-
-          <div class="form-control">
-            <label class="label"><span class="label-text">Grading Scale</span></label>
-            <select name="grading_scale_id" id="profile_grading_scale_id"
-              class="select select-bordered w-full" required
-              onchange="toggleProfileCustomScale(this)">
-              <option value="" disabled selected>Select grading scale</option>
-              {% for scale in grading_scales %}
-                <option value="{{ scale.id }}">{{ scale.scale_name }}</option>
-              {% endfor %}
-              <option value="other">Other (Define Custom)</option>
-            </select>
-            <p class="mt-1 text-xs opacity-60">
-              Want to review or edit all scales? <a href="/settings" class="link link-primary">Open grading scale settings</a>.
-            </p>
-            <div id="profile_custom_scale_div" class="mt-4 p-4 border border-base-300 rounded-lg bg-base-200/50" style="display:none;">
-              <div class="form-control mb-4">
-                <label class="label"><span class="label-text font-bold">Custom Scale Name</span></label>
-                <input type="text" name="custom_grading_scale" class="input input-bordered w-full"
-                  placeholder="e.g. My University Scale" />
-              </div>
-              <label class="label"><span class="label-text font-bold">Grade Mappings</span></label>
-              <div class="overflow-x-auto">
-                <table id="profile-grading-scale-table" class="table table-sm w-full bg-base-100">
-                  <thead>
-                    <tr><th>Grade</th><th>Label</th><th>Min %</th><th>GPA</th><th></th></tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>
-                        <input type="text" name="custom_grades[]" value="HD" class="input input-xs w-16" required>
-                        <input type="hidden" name="custom_band_types[]" value="both">
-                      </td>
-                      <td><input type="text" name="custom_labels[]" value="High Distinction" class="input input-xs w-full" required></td>
-                      <td><input type="number" name="custom_min_marks[]" value="85" step="any" class="input input-xs w-16" required></td>
-                      <td><input type="number" name="custom_gpa_points[]" value="4.0" step="any" class="input input-xs w-16" required></td>
-                      <td></td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <input type="text" name="custom_grades[]" value="D" class="input input-xs w-16" required>
-                        <input type="hidden" name="custom_band_types[]" value="both">
-                      </td>
-                      <td><input type="text" name="custom_labels[]" value="Distinction" class="input input-xs w-full" required></td>
-                      <td><input type="number" name="custom_min_marks[]" value="75" step="any" class="input input-xs w-16" required></td>
-                      <td><input type="number" name="custom_gpa_points[]" value="3.0" step="any" class="input input-xs w-16" required></td>
-                      <td></td>
-                    </tr>
-                  </tbody>
-                </table>
-                <button type="button" class="btn btn-xs btn-outline mt-2" onclick="addProfileGradingScaleRow()">+ Add Grade</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="form-control">
-            <label class="label"><span class="label-text">University</span></label>
-            <select name="university_id" id="profile_university_id"
-              class="select select-bordered w-full" required
-              onchange="toggleProfileNewUniversity(this)">
-              <option value="" disabled selected>Select university</option>
-              {% for uni in universities %}
-                <option value="{{ uni.id }}">{{ uni.name }}</option>
-              {% endfor %}
-              <option value="add_new">Add new university...</option>
-            </select>
-            <input id="profile_new_university_input" name="new_university_name"
-              class="input input-bordered mt-2"
-              placeholder="Enter new university name"
-              style="display:none;" disabled />
-          </div>
-
-          <button type="submit" class="btn btn-primary">Create Course</button>
-        </form>
-      </div>
-      {% endif %}
-    </div>
-  </div>
 </div>
 
 <script>
