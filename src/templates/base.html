@@ -12,34 +12,56 @@
     <link rel="stylesheet" href="/static/css/sections/headings.css?v={{ current_year or 'v1' }}" />
     <link rel="stylesheet" href="/static/css/sections/grades.css?v={{ current_year or 'v1' }}" />
     <link rel="stylesheet" href="/static/css/sections/cards.css?v={{ current_year or 'v1' }}" />
-    <style>
-      /* Minimal fallback styles in case Tailwind utilities aren't available/cached */
-      .sem-grid { display: grid; gap: 1rem; }
-      @media (min-width: 640px) { .sem-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-      @media (min-width: 768px) { .sem-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-      .sem-card { padding: 1rem; border: 1px solid rgba(0,0,0,0.12); border-radius: .5rem; background: var(--b1, #fff); }
-    </style>
+    <link rel="stylesheet" href="/static/css/style.css?v={{ current_year or 'v1' }}" />
     <link rel="icon" href="/static/images/favicon.ico" type="image/x-icon" />
   </head>
   <body class="min-h-screen bg-base-200">
     <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 btn btn-xs">Skip to content</a>
     <div class="w-full sm:max-w-7xl mx-auto px-1 sm:px-2 md:px-3 py-1 sm:py-2 md:py-3">
-      <!-- Top Navigation Bar -->
-      <div class="flex justify-between items-start mb-1 sm:mb-2 md:mb-3">
-        <!-- Left spacer -->
-        <div class="flex-1"></div>
-        
-        <!-- User Menu (Top Right) -->
-        {% if request.session.get('username') %}
-        <div class="flex items-center gap-2">
+
+      <!-- Unified Top Header -->
+      <header class="site-header">
+
+        <!-- LEFT: Brand → Active Course → Breadcrumbs (vertical stack) -->
+        <div class="site-header-left">
+          <h1 class="site-title font-black tracking-tighter drop-shadow">University Marks Manager</h1>
+
+          {% if request.session.get('username') and not no_courses_warning %}
+          <div class="site-header-active-course">
+            <span class="opacity-60">Active Course</span>
+            {% if request.session.get('current_course_id') %}
+              <span class="font-semibold">{{ request.session.get('current_course_name') or ('#' ~ request.session.get('current_course_id')) }}</span>
+              {% if request.session.get('current_course_code') %}
+                <span class="opacity-60">{{ request.session.get('current_course_code') }}</span>
+              {% endif %}
+            {% else %}
+              <span class="opacity-40">—</span>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          {% include 'partials/breadcrumbs.html' %}
+        </div>
+
+        <!-- RIGHT: Course Selector dropdown + User profile icon -->
+        <div class="site-header-right">
+          {% block course_header %}
+          {% if not no_courses_warning %}
+            <div id="course-header-container"
+                 hx-get="/courses/_selector" hx-trigger="load" hx-swap="outerHTML">
+            </div>
+          {% endif %}
+          {% endblock %}
+
+          {% if request.session.get('username') %}
           <div class="dropdown dropdown-end">
-            <label tabindex="0" class="btn btn-ghost btn-sm gap-2 cursor-pointer">
+            <label tabindex="0" class="btn btn-ghost btn-circle cursor-pointer" aria-label="User menu">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              <span class="text-sm font-medium">{{ request.session.get('username') }}</span>
             </label>
             <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-56">
+              <li class="menu-title text-xs opacity-60 px-3 py-1">{{ request.session.get('username') }}</li>
               <li><a href="/profile" class="flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -54,17 +76,11 @@
               </a></li>
             </ul>
           </div>
+          {% endif %}
         </div>
-        {% endif %}
-      </div>
 
-      <!-- Main Header -->
-      <header class="mb-1 sm:mb-2 md:mb-3 flex flex-col items-center gap-0.5 sm:gap-1 md:gap-1.5 text-center">
-        <div>
-          <h1 class="site-title text-base leading-none sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black tracking-tighter drop-shadow">University Marks Manager</h1>
-        </div>
-              </div>
       </header>
+
       {% if flash_message %}
         <div id="flash-alert" role="status" aria-live="polite" aria-atomic="true" class="alert alert-success mb-4 flex items-start justify-between gap-4">
           <div class="flex-1">
@@ -81,28 +97,6 @@
           </div>
         </div>
       {% endif %}
-      {% block course_header %}
-      {% if not no_courses_warning %}
-      <div class="mb-3 sm:mb-6 flex justify-center px-2">
-        <div id="course-header-container" class="w-full max-w-4xl p-2 sm:p-3 md:p-4 rounded-lg sm:rounded-xl bg-base-100 border border-base-300 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 md:gap-4 shadow-sm" hx-get="/courses/_selector" hx-trigger="load" hx-swap="outerHTML">
-          <div class="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 md:gap-4 text-center sm:text-left w-full sm:w-auto">
-            <span class="text-[10px] sm:text-xs md:text-sm opacity-70">Active Course</span>
-            {% if request and request.session and request.session.get('current_course_id') %}
-              <span class="text-sm sm:text-base md:text-lg font-semibold">&nbsp;{{ request.session.get('current_course_name') or ('#' ~ request.session.get('current_course_id')) }}</span>
-              {% if request.session.get('current_course_code') %}
-                <span class="opacity-70 text-[10px] sm:text-xs md:text-sm">&nbsp;{{ request.session.get('current_course_code') }}</span>
-              {% endif %}
-            {% else %}
-              <!-- Intentionally show nothing when no active course is set -->
-              <span class="text-xs sm:text-sm opacity-70">&nbsp;</span>
-            {% endif %}
-          </div>
-          <div id="course-selector-container" class="flex-shrink-0 w-full sm:w-auto"></div>
-        </div>
-      </div>
-      {% endif %}
-      {% endblock %}
-      {% include 'partials/breadcrumbs.html' %}
       <main id="main" class="space-y-3">
         {% block content %}{% endblock %}
       </main>
