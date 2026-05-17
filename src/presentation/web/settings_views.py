@@ -1,8 +1,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlmodel import Session, col, select, delete, desc
-from sqlalchemy import or_, and_  # Import in_ for correct usage
+from sqlmodel import Session, col, select, desc
 
 from src.presentation.api.deps import get_session
 from src.infrastructure.db.models import GradeScale, Course
@@ -136,8 +135,8 @@ def update_grades(
 ):
     """Update grade scales for a specific scale name and band type (wam/gpa)."""
     # Remove existing bands for this scale_name and band_type
-    from sqlalchemy import delete as sa_delete
-    query = sa_delete(GradeScale).filter_by(scale_name=scale_name, band_type=band_type)
+    from sqlmodel import delete
+    query = delete(GradeScale).filter_by(scale_name=scale_name, band_type=band_type)
     session.execute(query)
 
     # Defensive: ensure min_marks/gpa_points are lists

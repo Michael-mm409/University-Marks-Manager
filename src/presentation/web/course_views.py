@@ -6,7 +6,7 @@ from typing import Optional, cast
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from sqlmodel import Session, select
-from sqlalchemy import Table
+from sqlmodel import Table
 
 from src.core.services.course_manager import CourseManager
 from src.core.services.semester_manager import SemesterManager

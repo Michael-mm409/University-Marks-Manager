@@ -1,15 +1,14 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlmodel import Session, select, col
+from sqlmodel.sql import expression
 from typing import Any, List, Optional, cast
-from sqlalchemy.sql import expression
 from fastapi.templating import Jinja2Templates
 
 from src.presentation.api.deps import get_session
 from src.core.services.grade_calculator import GradeCalculator, process_assessments
 from src.infrastructure.db.models import Subject, Assignment, Examination, ExamSettings, GradeType, Semester, SubjectPrerequisite, SubjectRule
 from src.presentation.web.utils.subject_helpers import (
-    resolve_subject_for_context,
     build_candidate_subjects,
 )
 from .utils.graph_helpers import build_subject_prerequisite_graph

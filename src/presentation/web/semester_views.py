@@ -1,8 +1,7 @@
 from fastapi import Depends, Form, Request, APIRouter, Response
 from typing import List, cast
 from fastapi.responses import RedirectResponse
-from sqlmodel import col, Session, col, select
-from sqlalchemy import Table, func, literal, union_all
+from sqlmodel import col, Session, col, select, Table, func, literal, union_all
 from src.presentation.api.deps import get_session
 from src.infrastructure.db.models import Semester, Subject, Assignment, Examination, ExamSettings, GradeType
 from .template_helpers import _render

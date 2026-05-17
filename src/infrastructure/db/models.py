@@ -3,8 +3,7 @@
 from enum import Enum
 from typing import Any, ClassVar, Optional
 
-from sqlmodel import Field, SQLModel, Relationship
-from sqlalchemy import UniqueConstraint
+from sqlmodel import Field, SQLModel, Relationship, UniqueConstraint
 
 class GradeType(str, Enum):
     """Supported grading modes for an assessment component."""

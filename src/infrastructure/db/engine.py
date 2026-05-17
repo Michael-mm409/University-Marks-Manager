@@ -7,8 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
-from sqlmodel import Session, create_engine
-from sqlalchemy import text
+from sqlmodel import Session, create_engine, text
 from sqlalchemy.exc import OperationalError
 from fastapi import Depends
 

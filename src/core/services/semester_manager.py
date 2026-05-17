@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 from typing import cast
-from sqlalchemy import Table
-from sqlmodel import Session, select, asc
+from sqlmodel import Session, select, asc, Table
 
 from src.infrastructure.db.models import Semester
 

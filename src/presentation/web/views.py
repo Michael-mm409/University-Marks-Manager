@@ -6,8 +6,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
-from sqlmodel import Session, select, col
-from sqlalchemy import Table
+from sqlmodel import Session, select, col, Table
 from sqlalchemy.orm import selectinload
 import re
 

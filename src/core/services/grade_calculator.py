@@ -1,7 +1,6 @@
 import re
 from typing import Sequence, Any, cast
-from sqlmodel import Session, select, func
-from sqlalchemy import case
+from sqlmodel import Session, select, func, case
 from src.infrastructure.db.models import Subject, Semester, GradeScale, Course, ExamSettings, SubjectRule, Assignment, Examination
 
 WEIGHT_THRESHOLD = 40.0
