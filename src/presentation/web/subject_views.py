@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from sqlmodel import Session, select, col
-from sqlmodel.sql import expression
+from sqlalchemy.sql import expression
 from typing import Any, List, Optional, cast
 from fastapi.templating import Jinja2Templates
 
