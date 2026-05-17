@@ -52,6 +52,7 @@ def build_subject_prerequisite_graph(session: Session, root_subject_id: int) -> 
             # Custom free-text prerequisite
             elif link.custom_text:
                 label = str(link.custom_text).strip()
+                key: tuple[Any, ...]
                 if 5 <= len(label) <= 10:
                     key = ("short", label)
                 else:

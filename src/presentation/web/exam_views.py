@@ -106,7 +106,7 @@ def save_total_mark(
 
 
     goal = None
-    if total_mark not in (None, ""):
+    if total_mark is not None and total_mark != "":
         try:
             goal = float(total_mark)
         except ValueError:
@@ -119,7 +119,7 @@ def save_total_mark(
         logger.info(f"[DEBUG] needed_weighted={needed_weighted}")
         derived_exam_raw = (needed_weighted * 100.0) / effective_exam_weight
         logger.info(f"[DEBUG] derived_exam_raw (from goal)={derived_exam_raw}")
-    elif exam_mark not in (None, ""):
+    elif exam_mark is not None and exam_mark != "":
         try:
             derived_exam_raw = float(exam_mark)
             logger.info(f"[DEBUG] derived_exam_raw (from manual input)={derived_exam_raw}")

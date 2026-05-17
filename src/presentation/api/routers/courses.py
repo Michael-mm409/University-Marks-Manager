@@ -19,6 +19,7 @@ class CourseCreate(BaseModel):
     code: str | None = None
     university_id: int | None = None
     new_university_name: str | None = None
+    grading_scale_id: int = 1
 
 
 class CourseRead(BaseModel):
@@ -62,7 +63,7 @@ def create_course(
             university_id = new_uni.id
 
     course_manager = CourseManager(session)
-    course = course_manager.create_course(name=course_data.name, code=normalized_code, university_id=university_id)
+    course = course_manager.create_course(name=course_data.name, code=normalized_code, grading_scale_id=course_data.grading_scale_id, university_id=university_id)
     return course
 
 

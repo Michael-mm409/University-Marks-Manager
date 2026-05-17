@@ -1,5 +1,5 @@
 from fastapi import Depends, Form, Request, APIRouter, Response
-from typing import List, cast
+from typing import Any, List, cast
 from fastapi.responses import RedirectResponse
 from sqlmodel import col, Session, col, select, Table, func, literal, union_all
 from src.presentation.api.deps import get_session
@@ -136,23 +136,23 @@ def delete_semester(
     subs = session.exec(select(Subject).where(Subject.semester_id == sem_id)).all() if sem_id else []
     subject_ids = [getattr(s, "id", None) for s in subs if getattr(s, "id", None) is not None]
     # Direct delete via ORM load (simpler for small dataset), prefer subject_id-based lookups
-    assignments = []
-    exams = []
-    settings = []
+    assignments: list[Assignment] = []
+    exams: list[Examination] = []
+    settings: list[ExamSettings] = []
     if subject_ids:
         for sid in subject_ids:
             assignments.extend(session.exec(select(Assignment).where(Assignment.subject_id == sid)).all())
             exams.extend(session.exec(select(Examination).where(Examination.subject_id == sid)).all())
             settings.extend(session.exec(select(ExamSettings).where(ExamSettings.subject_id == sid)).all())
     # Delete each collection explicitly (avoids type checker complaints about '+' on heterogeneous sequences)
-    for obj in assignments:
-        session.delete(obj)
-    for obj in exams:
-        session.delete(obj)
-    for obj in settings:
-        session.delete(obj)
-    for obj in subs:
-        session.delete(obj)
+    for a in assignments:
+        session.delete(a)
+    for e in exams:
+        session.delete(e)
+    for s in settings:
+        session.delete(s)
+    for sub in subs:
+        session.delete(sub)
     sem = session.exec(select(Semester).where(Semester.name == semester, Semester.year == int(year))).first()
     if sem:
         session.delete(sem)
@@ -195,7 +195,7 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
     sem = session.exec(select(Semester).where(Semester.name == semester, Semester.year == int(year))).first()
     sem_id = getattr(sem, "id", None)
     subjects_table = cast(Table, getattr(Subject, "__table__"))
-    current_subjects = []
+    current_subjects: list[Subject] = []
     if sem_id:
         other_semester_ids = session.exec(
             select(Semester.id)
@@ -224,12 +224,12 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
             ).label("row_number"),
         ).cte("ranked_subjects")
 
-        current_subjects = session.exec(
+        current_subjects = list(session.exec(
             select(Subject)
             .join(ranked_subjects, subjects_table.c.id == ranked_subjects.c.subject_id)
             .where(ranked_subjects.c.row_number == 1)
             .order_by(subjects_table.c.subject_code.asc())
-        ).all()
+        ).all())
     summaries: List[SemesterSummary] = []
     missing_exam_subjects: List[str] = []
     import logging
@@ -269,24 +269,24 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
         for a in assignments:
             # Include all assignments, including those marked as is_exam
             if a.grade_type == GradeType.NUMERIC.value:
-                if a.mark_weight not in (None, ""):
+                if a.mark_weight is not None and a.mark_weight != "":
                     try:
                         w = float(a.mark_weight)
                         assess_weight_sum += w
                         assignment_weights.append(w)
                     except ValueError:
                         pass
-                if a.weighted_mark not in (None, ""):
+                if a.weighted_mark is not None and a.weighted_mark != "":
                     try:
                         assess_weighted_total += float(a.weighted_mark)
                         has_assessment_score = True
                     except ValueError:
                         pass
-                if a.unweighted_mark not in (None, ""):
+                if a.unweighted_mark is not None and a.unweighted_mark != "":
                     try:
                         uval = float(a.unweighted_mark)
                         assess_unweighted_fraction_sum += uval
-                        if a.mark_weight not in (None, ""):
+                        if a.mark_weight is not None and a.mark_weight != "":
                             assess_unweighted_contrib_sum += uval * float(a.mark_weight)
                     except (TypeError, ValueError):
                         pass
@@ -298,8 +298,8 @@ def build_semester_context(session: Session, semester: str, year: str) -> Semest
         # Check if we have an assignment-based exam (is_exam=True)
         if exam_assignment:
             # Use the assignment-based exam data
-            exam_weight = float(exam_assignment.mark_weight) if exam_assignment.mark_weight not in (None, "") else None
-            exam_mark = float(exam_assignment.weighted_mark) if exam_assignment.weighted_mark not in (None, "") else None
+            exam_weight = float(exam_assignment.mark_weight) if exam_assignment.mark_weight is not None and exam_assignment.mark_weight != "" else None
+            exam_mark = float(exam_assignment.weighted_mark) if exam_assignment.weighted_mark is not None and exam_assignment.weighted_mark != "" else None
         else:
             # Fall back to Examination table
             exam_weight = exam.exam_weight if exam else None
@@ -428,7 +428,7 @@ def _build_semesters_section_context(
     years = sm.get_distinct_years_for_course(cid) if cid is not None else sm.get_distinct_years()
     course_filter = {"name": sess.get("current_course_name"), "code": sess.get("current_course_code")} if cid is not None else None
 
-    ctx = {
+    ctx: dict[str, Any] = {
         "semesters": semesters,
         "selected_year": y_int,
         "years": years,
@@ -437,7 +437,7 @@ def _build_semesters_section_context(
 
     if include_subject_summaries:
         # Reuse your existing summary builder logic (or extract into another helper)
-        summaries = []
+        summaries: list[dict[str, Any]] = []
         subjects_table = cast(Table, getattr(Subject, "__table__"))
         semester_ids = [sem.id for sem in semesters]
         all_subjects = session.exec(
@@ -466,12 +466,12 @@ def _build_semesters_section_context(
             has_assessment_score = False
             for a in assignments:
                 if a.grade_type == GradeType.NUMERIC.value:
-                    if a.mark_weight not in (None, ""):
+                    if a.mark_weight is not None and a.mark_weight != "":
                         try:
                             assess_weight_sum += float(a.mark_weight)
                         except ValueError:
                             pass
-                    if a.weighted_mark not in (None, ""):
+                    if a.weighted_mark is not None and a.weighted_mark != "":
                         try:
                             assess_weighted_total += float(a.weighted_mark)
                             has_assessment_score = True

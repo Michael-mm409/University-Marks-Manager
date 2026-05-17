@@ -1,7 +1,7 @@
 from fastapi import Form, Request
 import logging
 import re
-from typing import Optional
+from typing import Any, Optional
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlmodel import col, Session, select
@@ -65,9 +65,9 @@ def create_assignment(
         category_value = _derive_category(assessment, category)
         if grade_type == GradeType.NUMERIC.value:
             try:
-                if weighted_mark not in (None, ""):
+                if weighted_mark is not None and weighted_mark != "":
                     weighted_val = float(weighted_mark)
-                if mark_weight not in (None, ""):
+                if mark_weight is not None and mark_weight != "":
                     mark_weight_val = float(mark_weight)
                 # Only calculate unweighted if both are provided
                 if weighted_val is not None and mark_weight_val is not None and mark_weight_val:
@@ -161,6 +161,7 @@ def create_assignment(
         return RedirectResponse(url=f"/year/{year}/semester/{semester}/subject/{code}?error={msg}", status_code=303)
 
     # If total_mark is not provided or is empty, use the subject's stored total_mark
+    target_val: str | float | None
     if total_mark in (None, ""):
         subject = subj
         target_val = subject.total_mark if subject and subject.total_mark is not None else None
@@ -184,12 +185,12 @@ def create_assignment(
             assign_weighted_total = 0.0
             for a in assignments:
                 if a.grade_type == GradeType.NUMERIC.value:
-                    if a.mark_weight not in (None, ""):
+                    if a.mark_weight is not None and a.mark_weight != "":
                         try:
                             assign_weight_sum += float(a.mark_weight)
                         except ValueError:
                             pass
-                    if a.weighted_mark not in (None, ""):
+                    if a.weighted_mark is not None and a.weighted_mark != "":
                         try:
                             assign_weighted_total += float(a.weighted_mark)
                         except ValueError:
@@ -442,13 +443,13 @@ def update_assignment_ajax(
         # Update fields
         if grade_type == GradeType.NUMERIC.value:
             try:
-                if weighted_mark not in (None, ""):
+                if weighted_mark is not None and weighted_mark != "":
                     weighted_val = float(weighted_mark)
                     # store numeric weighted marks as floats
                     assignment.weighted_mark = weighted_val
                 else:
                     weighted_val = float(assignment.weighted_mark) if assignment.weighted_mark is not None else 0.0
-                if mark_weight not in (None, ""):
+                if mark_weight is not None and mark_weight != "":
                     mark_weight_val = float(mark_weight)
                     assignment.mark_weight = mark_weight_val
                 else:
@@ -510,39 +511,39 @@ def update_assignment_ajax(
             assess_weighted_total = 0.0
             for a in assignments:
                 if a.grade_type == GradeType.NUMERIC.value:
-                    if a.mark_weight not in (None, ""):
+                    if a.mark_weight is not None and a.mark_weight != "":
                         try:
                             assess_weight_sum += float(a.mark_weight)
                         except ValueError:
                             pass
-                    if a.weighted_mark not in (None, ""):
+                    if a.weighted_mark is not None and a.weighted_mark != "":
                         try:
                             assess_weighted_total += float(a.weighted_mark)
                         except ValueError:
                             pass
             # ...existing code...
 
-            exam_mark = None
-            exam_weight = None
+            disp_exam_mark: float | None = None
+            disp_exam_weight: float | None = None
             if exams:
                 exam = exams[0]
                 try:
-                    exam_mark = float(exam.exam_mark)
+                    disp_exam_mark = float(exam.exam_mark)
                 except (TypeError, ValueError):
-                    exam_mark = None
+                    disp_exam_mark = None
                 try:
-                    exam_weight = float(exam.exam_weight)
+                    disp_exam_weight = float(exam.exam_weight)
                 except (TypeError, ValueError):
-                    exam_weight = None
+                    disp_exam_weight = None
                 # Recalculate totals for display only — do NOT persist subject.total_mark here.
                 total_mark = None
-                if assess_weight_sum or exam_weight:
+                if assess_weight_sum or disp_exam_weight:
                     try:
                         total_weighted = assess_weighted_total
                         total_weight_percent = assess_weight_sum
-                        if exam_mark is not None and exam_weight is not None:
-                            total_weighted += (exam_mark / 100.0) * exam_weight
-                            total_weight_percent += exam_weight
+                        if disp_exam_mark is not None and disp_exam_weight is not None:
+                            total_weighted += (disp_exam_mark / 100.0) * disp_exam_weight
+                            total_weight_percent += disp_exam_weight
                         if total_weight_percent > 0:
                             total_mark = round((total_weighted / total_weight_percent) * 100.0, 2)
                     except ZeroDivisionError:

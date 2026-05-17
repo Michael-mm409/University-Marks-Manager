@@ -679,7 +679,7 @@ def get_subject(
     # Inject GradeCalculator and compute subject rule summary
     grade_calculator = GradeCalculator(session)
     subject = ctx.get("subject")
-    subject_summary = []
+    subject_summary: dict[str, Any] = {}
     if subject:
         subject_obj = cast(Subject, subject)
         if subject_obj.id is not None:

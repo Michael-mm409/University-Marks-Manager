@@ -190,7 +190,7 @@ def _render_home_body(request: Request, session: Session, parsed_year: Optional[
         if sem.id is not None:
             subjects_by_semester[sem.id] = list(sem_subjects)
 
-    ctx: IndexContext = {
+    ctx = {
         "semesters": display_semesters,
         "years": years,
         "selected_year": parsed_year,
@@ -423,11 +423,11 @@ def prerequisite_graph_all_subjects(
         # First handle subject-to-subject prerequisite relationships
         if link.prerequisite_subject_id is not None:
             try:
-                prerequisite_id = int(link.prerequisite_subject_id)
+                prerequisite_id: int | None = int(link.prerequisite_subject_id)
             except (TypeError, ValueError):
                 continue
             subject_node_ids.add(subject_id)
-            subject_node_ids.add(prerequisite_id)
+            subject_node_ids.add(cast(int, prerequisite_id))
             edges.append(
                 {
                     "from": prerequisite_id,
@@ -470,7 +470,7 @@ def prerequisite_graph_all_subjects(
                     next_custom_id -= 1
                     custom_label_to_id[label] = prerequisite_id
                     custom_nodes[prerequisite_id] = label
-            
+
             subject_node_ids.add(subject_id)
             subject_node_ids.add(prerequisite_id)
             edges.append(
@@ -487,12 +487,13 @@ def prerequisite_graph_all_subjects(
     if missing_ids:
         # FIX: cast set to list explicitly for .in_()
         extra = session.exec(select(Subject).where(col(Subject.id).in_(list(missing_ids)))).all()
-        for s in extra:
-            if s.id is not None:
-                subject_lookup[s.id] = s
+        for extra_sub in extra:
+            if extra_sub.id is not None:
+                subject_lookup[extra_sub.id] = extra_sub
 
     # Build label and initial level for every node. For synthetic
     # custom-text nodes, use the custom label directly.
+
     labels: dict[int, str] = {}
     levels: dict[int, int] = {}
     for subject_id in sorted(subject_node_ids):
@@ -697,11 +698,11 @@ def prerequisite_graph_all_years(
         # Only include subject-to-subject prerequisite relationships
         if link.prerequisite_subject_id is not None:
             try:
-                prerequisite_id = int(link.prerequisite_subject_id)
+                prerequisite_id: int | None = int(link.prerequisite_subject_id)
             except (TypeError, ValueError):
                 continue
             subject_node_ids.add(subject_id)
-            subject_node_ids.add(prerequisite_id)
+            subject_node_ids.add(cast(int, prerequisite_id))
             edges.append(
                 {
                     "from": prerequisite_id,
@@ -743,9 +744,9 @@ def prerequisite_graph_all_years(
     if missing_ids:
         # FIX: use col() and explicit list cast
         extra = session.exec(select(Subject).where(col(Subject.id).in_(list(missing_ids)))).all()
-        for s in extra:
-            if s.id is not None:
-                subject_lookup[s.id] = s
+        for extra_sub in extra:
+            if extra_sub.id is not None:
+                subject_lookup[extra_sub.id] = extra_sub
 
     # Build label and initial level for every node (using either the
     # subject_code or the synthetic custom-text label).
@@ -932,7 +933,7 @@ def subject_detail_pretty(
         subject_obj = ctx.get("subject")
 
         # Initialize result with defaults so it is never unbound
-        result = {"summaries": [], "grade_goals": []}
+        result: dict[str, Any] = {"summaries": [], "grade_goals": []}
 
         # Use 'isinstance' to narrow the type so Pylance knows 'id' exists
         if isinstance(subject_obj, Subject) and subject_obj.id is not None:

@@ -73,7 +73,7 @@ def create_assignment(data: AssignmentCreate, session: Session = Depends(get_ses
     if (
         data.grade_type == GradeType.NUMERIC.value
         and data.weighted_mark is not None
-        and data.mark_weight not in (None, 0)
+        and data.mark_weight is not None and data.mark_weight != 0
     ):
         try:
             weighted_val = float(data.weighted_mark)
@@ -234,7 +234,7 @@ def update_assignment(assignment_id: int, data: AssignmentCreate,
     if (
         assignment_record.grade_type == GradeType.NUMERIC.value
         and assignment_record.weighted_mark is not None
-        and assignment_record.mark_weight not in (None, 0)
+        and assignment_record.mark_weight is not None and assignment_record.mark_weight != 0
     ):
         try:
             weighted_val = float(assignment_record.weighted_mark)

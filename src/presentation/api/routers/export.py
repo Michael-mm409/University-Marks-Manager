@@ -41,7 +41,7 @@ def export_user_data(user_id: int, session: Session = Depends(get_session)) -> A
 
     if not course_ids:
         # User has no courses, return early with empty lists
-        data = {
+        data: dict[str, Any] = {
             "semesters": [],
             "subjects": [],
             "assignments": [],

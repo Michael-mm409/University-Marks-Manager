@@ -314,7 +314,7 @@ class GradeCalculator:
         all_assignments = list(getattr(subject, "assignments", []) or [])
         exam_record = self.session.exec(select(Examination).where(Examination.subject_id == subject.id)).first()
 
-        summary = []
+        summary: list[dict[str, Any]] = []
         used_assignment_ids: set[int] = set()
         rule_patterns = []
 
@@ -370,6 +370,7 @@ class GradeCalculator:
         has_exam_flag = getattr(subject, "has_exam", False)
         exam_assignment = next((a for a in all_assignments if a.is_exam), None)
 
+        score: float | None = None
         if exam_record or exam_assignment or has_exam_flag:
             if exam_record:
                 e_mark = exam_record.exam_mark

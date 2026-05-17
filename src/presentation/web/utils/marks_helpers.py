@@ -68,17 +68,17 @@ def compute_subject_marks_summary(
             count_f += 1
 
         if a.grade_type == GradeType.NUMERIC.value:
-            if a.mark_weight not in (None, ""):
+            if a.mark_weight is not None and a.mark_weight != "":
                 try:
                     assignment_weight_percent += float(a.mark_weight)
                 except (TypeError, ValueError):
                     pass
-            if a.weighted_mark not in (None, ""):
+            if a.weighted_mark is not None and a.weighted_mark != "":
                 try:
                     assignment_weighted_sum += float(a.weighted_mark)
                 except (TypeError, ValueError):
                     pass
-            if a.unweighted_mark not in (None, ""):
+            if a.unweighted_mark is not None and a.unweighted_mark != "":
                 try:
                     assignment_unweighted_sum += float(a.unweighted_mark)
                 except (TypeError, ValueError):
@@ -96,18 +96,18 @@ def compute_subject_marks_summary(
 
     if exam_assignment is not None:
         has_assignment_exam = True
-        if exam_assignment.mark_weight not in (None, ""):
+        if exam_assignment.mark_weight is not None and exam_assignment.mark_weight != "":
             try:
                 exam_weight_value = float(exam_assignment.mark_weight)
             except (TypeError, ValueError):
                 exam_weight_value = 0.0
-        if exam_assignment.weighted_mark not in (None, ""):
+        if exam_assignment.weighted_mark is not None and exam_assignment.weighted_mark != "":
             try:
                 exam_weighted_sum = float(exam_assignment.weighted_mark)
             except (TypeError, ValueError):
                 exam_weighted_sum = None
         # Prefer explicit unweighted_mark for raw percent if available
-        if exam_assignment.unweighted_mark not in (None, ""):
+        if exam_assignment.unweighted_mark is not None and exam_assignment.unweighted_mark != "":
             try:
                 raw_exam_percent = float(exam_assignment.unweighted_mark)
             except (TypeError, ValueError):

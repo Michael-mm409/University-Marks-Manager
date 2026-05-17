@@ -1,7 +1,7 @@
 """Service layer for managing courses."""
 from __future__ import annotations
 
-from typing import Optional, Iterable
+from typing import Any, Optional, Iterable, cast
 
 from sqlmodel import Session, select, func
 
@@ -42,8 +42,8 @@ class CourseManager:
         """Retrieve all courses from the database, with related university and grading_scale."""
         from sqlalchemy.orm import selectinload
         statement = select(Course).options(
-            selectinload(Course.university),
-            selectinload(Course.grading_scale)
+            selectinload(cast(Any, Course.university)),
+            selectinload(cast(Any, Course.grading_scale))
         )
         results = self.session.exec(statement).all()
         return list(results)
