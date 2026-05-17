@@ -114,7 +114,7 @@ def update_course_scale(
             if course:
                 # Find the GradeScale by scale_name, then set grading_scale_id to its id
                 scale = session.exec(select(GradeScale).where(GradeScale.scale_name == scale_name)).first()
-                if scale:
+                if scale and scale.id is not None:
                     course.grading_scale_id = scale.id
                     session.add(course)
                     session.commit()
