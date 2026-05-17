@@ -11,7 +11,7 @@
 body .site-title {
   /* Responsive clamp: min 2rem (~text-3xl), scale with viewport, max 4rem (~text-6xl) */
   /* Dialed down: min ~1.75rem, softer slope, max ~3rem */
-  font-size: clamp(1.6rem, 2.6vw, 2.75rem) !important;
+  font-size: clamp(1rem, 3.5vw, 2.75rem) !important;
 }
 /* Subject page main title (code and name) */
 /* Responsive: min ~1.1rem, scales with viewport, max ~1.7rem */

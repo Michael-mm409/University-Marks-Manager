@@ -19,9 +19,11 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  display: flex;
+  /* 3-column grid: minmax(0,1fr) forces both sides to actually shrink,
+     keeping the breadcrumb truly page-centred without expanding past its column */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   width: 100%;
   min-height: 70px;
   padding: 1rem 2rem;
@@ -40,14 +42,25 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  min-width: 0;
-  flex: 0 0 auto; /* pin to natural width so brand stays left */
+  min-width: 0; /* allows title to wrap rather than overflow */
 }
 .site-header-right {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.5rem;
-  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+/* Course selector grows to fill the right column; select fills it so
+   clientWidth is the actual constrained width the JS can measure against */
+#course-header-container {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+#course-header-container .select {
+  width: 100%;
 }
 .site-header-active-course {
   display: flex;
@@ -58,26 +71,59 @@
   flex-wrap: wrap;
 }
 
-/* ── Breadcrumb: float to horizontal center of the navbar ── */
+/* ── Breadcrumb: centered flex child between left and right sections ── */
 .site-header [aria-label="Breadcrumb"] {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1;
+  flex: 1 1 0;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
-/* On narrow screens restore to in-flow stacking under the brand */
-@media (max-width: 639px) {
-  .site-header-left { flex: 1 1 auto; }
+/* ── Narrow screens: switch to flex-wrap, three rows ── */
+/* Row 1: title                                                   */
+/* Row 2: course selector (full width) + user icon               */
+/* Row 3: breadcrumbs (full width)                               */
+@media (max-width: 767px) {
+  .site-header {
+    display: flex;
+    flex-wrap: wrap;
+    padding: 0.5rem 0.75rem;
+    min-height: auto;
+    gap: 0.35rem 0.5rem;
+    align-items: flex-start;
+  }
+  .site-header-left {
+    flex: 1 1 100%;
+    order: 1;
+  }
+  .site-header-active-course {
+    display: none;
+  }
+  /* Row 2: course selector grows to fill, user icon at end */
+  .site-header-right {
+    flex: 1 1 100%;
+    order: 2;
+    justify-content: flex-start;
+  }
+  #course-header-container {
+    flex: 1 1 auto;
+  }
+  #course-header-container .select {
+    width: 100%;
+    max-width: 100%;
+  }
+  /* Row 3: breadcrumbs full width */
   .site-header [aria-label="Breadcrumb"] {
-    position: static;
-    transform: none;
+    flex: 1 1 100%;
+    order: 3;
+    justify-content: flex-start;
   }
 }
 
 /* ── Main content offset below sticky header ── */
 #main { padding-top: 110px; }
+@media (max-width: 767px) { #main { padding-top: 140px; } }
 
 /* ── Subject schedule: sticky thead pinned below the navbar ── */
 .sticky-schedule-head th {

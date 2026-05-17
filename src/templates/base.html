@@ -22,7 +22,7 @@
       <!-- Unified Top Header -->
       <header class="site-header">
 
-        <!-- LEFT: Brand → Active Course → Breadcrumbs (vertical stack) -->
+        <!-- LEFT: Brand + Active Course -->
         <div class="site-header-left">
           <h1 class="site-title font-black tracking-tighter drop-shadow">University Marks Manager</h1>
 
@@ -39,11 +39,12 @@
             {% endif %}
           </div>
           {% endif %}
-
-          {% include 'partials/breadcrumbs.html' %}
         </div>
 
-        <!-- RIGHT: Course Selector dropdown + User profile icon -->
+        <!-- CENTER: Breadcrumbs — grid column 2, equal 1fr sides keep it page-centred -->
+        {% include 'partials/breadcrumbs.html' %}
+
+        <!-- RIGHT: Course Selector + User icon — grid column 3 -->
         <div class="site-header-right">
           {% block course_header %}
           {% if not no_courses_warning %}
@@ -123,6 +124,75 @@
           htmx.ajax('GET', '/courses/_selector', {target: '#course-header-container', swap: 'outerHTML'});
         }
       });
+
+      // Course selector: show full name when there is room, fall back to the course code when cramped.
+      // Only the closed-button text (selected option) is compacted — the open dropdown always shows full names.
+      (function () {
+        var ro = new ResizeObserver(applyCourseSelectorMode);
+
+        function applyCourseSelectorMode() {
+          var sel = document.querySelector('#course-header-container select');
+          if (!sel) return;
+
+          var selectedOpt = sel.selectedOptions[0];
+          // data-full holds the original full text; fall back to current textContent on first run.
+          var fullText = ((selectedOpt && (selectedOpt.dataset.full || selectedOpt.textContent)) || '').trim();
+          if (!fullText) return;
+
+          // Measure how wide the full text would render at the select's current font.
+          var ruler = document.createElement('span');
+          var cs = window.getComputedStyle(sel);
+          ruler.style.cssText = 'position:fixed;top:-9999px;visibility:hidden;white-space:nowrap;';
+          ruler.style.fontSize   = cs.fontSize;
+          ruler.style.fontFamily = cs.fontFamily;
+          ruler.style.fontWeight = cs.fontWeight;
+          ruler.textContent = fullText;
+          document.body.appendChild(ruler);
+          var textWidth = ruler.offsetWidth;
+          document.body.removeChild(ruler);
+
+          var needed = textWidth + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 28;
+          var cramped = sel.clientWidth < needed;
+
+          sel.querySelectorAll('option[data-compact]').forEach(function (opt) {
+            // Store full text on first encounter (before we ever overwrite textContent).
+            if (!opt.dataset.full) opt.dataset.full = opt.textContent.trim();
+            if (cramped && opt.selected) {
+              // Only compact the selected option — the closed button shows the code.
+              opt.textContent = opt.dataset.compact;
+            } else {
+              // Every other option (and all options when not cramped) keeps its full name.
+              opt.textContent = opt.dataset.full;
+            }
+          });
+        }
+
+        function restoreFullNames(sel) {
+          sel.querySelectorAll('option[data-compact]').forEach(function (opt) {
+            if (opt.dataset.full) opt.textContent = opt.dataset.full;
+          });
+        }
+
+        function observeContainer() {
+          var el = document.getElementById('course-header-container');
+          if (!el) return;
+          ro.observe(el);
+
+          var sel = el.querySelector('select');
+          if (sel && !sel._compactWired) {
+            sel._compactWired = true;
+            // When the dropdown opens (focus), show full names in the list.
+            sel.addEventListener('focus',  function () { restoreFullNames(sel); });
+            // When it closes, reapply compact to the button.
+            sel.addEventListener('blur',   applyCourseSelectorMode);
+            sel.addEventListener('change', applyCourseSelectorMode);
+          }
+          applyCourseSelectorMode();
+        }
+
+        document.addEventListener('DOMContentLoaded', observeContainer);
+        document.body.addEventListener('htmx:afterSettle', observeContainer);
+      })();
       // Auto-close and manual close for one-time flash alert shown after actions
       (function () {
         const KEY = 'uom.flash.autoclose';
