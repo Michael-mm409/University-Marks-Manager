@@ -398,6 +398,42 @@ Stored per subject (ExamSettings): reduces effective exam contribution while lea
 
 Add tests under `tests/` (not yet populated). Suggested:
 
+## 🤝 Contributing & Templates
+
+I've added a few small helpers to make contributing and triage quick:
+
+- `CONTRIBUTING.md` — quick steps for PRs, tests, and running locally.
+- `my-service/CLAUDE.md` and related `my-service/*/CLAUDE.md` — short, informal conventions per area (api, internal, cmd).
+- GitHub templates for PRs and Issues live under `.github/`:
+   - `PULL_REQUEST_TEMPLATE.md` — short PR body to copy into new PRs.
+   - `.github/ISSUE_TEMPLATE/` — templates for bug reports, feature requests, and chores.
+   - `.github/ISSUE_TEMPLATE/config.yml` — presents choices when opening new issues.
+
+If you open issues or PRs, follow the short templates — they make reviews faster and keep things tidy.
+
+   Labels
+   - I added a small set of labels to help triage: `bug`, `enhancement`, `chore`, `docs`, `test`, `perf`, `refactor`, `ci`, `help wanted`, `good first issue`, and `discussion`.
+   - Use them when creating issues or PRs to speed up sorting; you can also apply them later during triage.
+
+   Import labels into your GitHub repo
+   - If you want to import the `labels.yml` set into the repo (create/update labels), run:
+
+   ```bash
+   python3 scripts/import_labels.py
+   ```
+
+   Make sure the `gh` CLI is installed and authenticated (`gh auth login`) and you're running the command from the repo root.
+
+   If `gh` is not available or doesn't support label subcommands in your environment, use the alternative script which uses a GitHub token:
+
+   ```bash
+   export GITHUB_TOKEN=ghp_...
+   python3 scripts/import_labels_api.py
+   ```
+
+   Set `GITHUB_TOKEN` (or `GH_TOKEN`) with repo scope before running.
+
+
 - Assignment numeric parsing
 - Exam target solver edge cases (0, impossible, negative required)
 - S/U path does not retain numeric data

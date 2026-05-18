@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+issue_template:
+  - name: "Bug report"
+    about: "Report a bug or unexpected behavior"
+    title: "bug: "
+    labels: ["bug"]
+  - name: "Feature request"
+    about: "Suggest an idea or improvement"
+    title: "feat: "
+    labels: ["enhancement"]
+  - name: "Chore"
+    about: "Small maintenance task or housekeeping"
+    title: "chore: "
+    labels: ["chore"]
