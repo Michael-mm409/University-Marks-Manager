@@ -9,14 +9,10 @@
   <div class="flex items-center justify-between gap-3 flex-wrap">
     <h3 class="text-lg sm:text-xl font-bold">Subject Schedule</h3>
     {% if ns.has_subjects %}
-    <div class="join" id="schedule-toggle">
-      <button onclick="setScheduleView('table')" id="sched-btn-table" class="join-item btn btn-xs btn-active" title="Table view">
-        ☰ Table
-      </button>
-      <button onclick="setScheduleView('grid')" id="sched-btn-grid" class="join-item btn btn-xs" title="Grid view">
-        ⊞ Grid
-      </button>
-    </div>
+      <div class="btn-group">
+        <button id="sched-btn-table" class="btn btn-sm btn-outline btn-active" onclick="setScheduleView('table')">Table View</button>
+        <button id="sched-btn-grid" class="btn btn-sm btn-outline" onclick="setScheduleView('grid')">Grid View</button>
+      </div>
     {% endif %}
   </div>
 
@@ -24,7 +20,7 @@
     <!-- TABLE VIEW -->
     <div id="schedule-table" class="overflow-x-auto rounded-xl bg-base-100 shadow" style="scroll-margin-top: 82px;">
       <table class="table table-zebra table-sm sm:table-md w-full">
-        <thead class="sticky-schedule-head">
+        <thead>
           <tr>
             <th>Subject Code</th>
             <th>Subject Name</th>
@@ -100,19 +96,18 @@
         var btnT    = document.getElementById('sched-btn-table');
         var btnG    = document.getElementById('sched-btn-grid');
         if (view === 'table') {
-          tableEl.style.display = '';
-          gridEl.style.display = 'none';
-          btnT.classList.add('btn-active');
-          btnG.classList.remove('btn-active');
+          if (tableEl) tableEl.style.display = '';
+          if (gridEl)  gridEl.style.display = 'none';
+          if (btnT) btnT.classList.add('btn-active');
+          if (btnG) btnG.classList.remove('btn-active');
         } else {
-          tableEl.style.display = 'none';
-          gridEl.style.display = 'flex';
-          btnG.classList.add('btn-active');
-          btnT.classList.remove('btn-active');
+          if (tableEl) tableEl.style.display = 'none';
+          if (gridEl)  gridEl.style.display = 'flex';
+          if (btnG) btnG.classList.add('btn-active');
+          if (btnT) btnT.classList.remove('btn-active');
         }
         localStorage.setItem('scheduleView', view);
       }
-      // Restore last chosen view on load
       document.addEventListener('DOMContentLoaded', function() {
         var saved = localStorage.getItem('scheduleView');
         if (saved === 'grid') setScheduleView('grid');

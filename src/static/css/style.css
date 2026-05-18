@@ -125,13 +125,6 @@
 #main { padding-top: 110px; }
 @media (max-width: 767px) { #main { padding-top: 140px; } }
 
-/* ── Subject schedule: sticky thead pinned below the navbar ── */
-.sticky-schedule-head th {
-  position: sticky;
-  top: 70px;
-  z-index: 10;
-  background-color: oklch(var(--b2));
-}
 
 /* ── Subject page: target-grade responsive grid ── */
 .target-grade-grid {
