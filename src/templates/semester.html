@@ -91,10 +91,10 @@
     <thead class="text-sm opacity-70">
       <tr class="border-b border-base-300">
         <th class="text-left p-4">Code</th>
-        <th class="text-left p-4" style="white-space:normal;word-break:break-word;">Name</th>
+        <th class="text-left p-4" style="white-space:normal;word-break:break-word;min-width:10rem;">Name</th>
         <th class="text-right p-4">Mark</th>
-        <th class="text-right p-4">Unweighted (%)</th>
-        <th class="text-right p-4">Weight</th>
+        <th class="text-right p-4 hidden md:table-cell">Unweighted (%)</th>
+        <th class="text-right p-4 hidden md:table-cell">Weight</th>
         <th class="text-right p-4 font-bold">Total</th>
         <th class="text-right p-4"></th>
       </tr>
@@ -104,9 +104,9 @@
       {% for row in subject_summaries %}
       <tr class="hover:bg-base-200/50 border-b border-base-300/50">
         <td class="p-4 font-mono">{{ row.code }}</td>
-        <td class="p-4" style="white-space:normal;word-break:break-word;">{{ row.name }}</td>
+        <td class="p-4" style="white-space:normal;word-break:break-word;min-width:10rem;">{{ row.name }}</td>
         <td class="p-4 text-right">{{ '%.2f' % row.assessment_mark if row.assessment_mark is not none else '-' }}</td>
-        <td class="p-4 text-right">
+        <td class="p-4 text-right hidden md:table-cell">
           {% if row.assessment_weight is defined and row.assessment_weight is not none and row.assessment_weight != 0
                 and row.assessment_unweighted_contribution is defined and row.assessment_unweighted_contribution is not none %}
             {{ '%.2f' % ((row.assessment_unweighted_contribution / row.assessment_weight) * 100) }}%
@@ -114,7 +114,7 @@
             -
           {% endif %}
         </td>
-        <td class="p-4 text-right">{{ '%.0f' % row.assessment_weight if row.assessment_weight is not none else '-' }}%</td>
+        <td class="p-4 text-right hidden md:table-cell">{{ '%.0f' % row.assessment_weight if row.assessment_weight is not none else '-' }}%</td>
         <td class="p-4 text-right font-bold">{{ '%.0f' % row.total_mark if row.total_mark is not none else '-' }}</td>
         <td class="p-4 text-right">
           <a href="/year/{{year}}/semester/{{semester}}/subject/{{row.code}}" class="btn btn-xs btn-outline">Open</a>
