@@ -381,7 +381,7 @@ class GradeCalculator:
             if exam_record:
                 e_mark = exam_record.exam_mark
                 e_weight = exam_record.exam_weight
-                weight = float(e_weight) if e_weight is not None else 50.0 
+                weight = float(e_weight) if e_weight is not None else 50.0
                 score = float(e_mark) if e_mark is not None else None
                 unweighted = (score / weight) if (score is not None and weight > 0) else None
             elif exam_assignment:
@@ -389,20 +389,21 @@ class GradeCalculator:
                 score = float(exam_assignment.weighted_mark) if exam_assignment.weighted_mark is not None else None
                 unweighted = (float(exam_assignment.unweighted_mark) / 100) if exam_assignment.unweighted_mark else None
             else:
-                weight = 50.0 
+                weight = 50.0
                 unweighted, score = None, None
 
-            summary.append({
-                "type": "exam",
-                "label": "Final Examination",
-                "count": 1,
-                "unweighted_avg": unweighted,
-                "total_weight": weight,
-                "weighted_score": round(score, 2) if score is not None else 0.0,
-                "bonus_count": 0,  # Fixed: Prevents Jinja2 UndefinedError
-                "has_scored_items": score is not None,
-                "core_items": [exam_record] if exam_record else ([exam_assignment] if exam_assignment else []),
-            })
+            if weight > 0:
+                summary.append({
+                    "type": "exam",
+                    "label": "Final Examination",
+                    "count": 1,
+                    "unweighted_avg": unweighted,
+                    "total_weight": weight,
+                    "weighted_score": round(score, 2) if score is not None else 0.0,
+                    "bonus_count": 0,
+                    "has_scored_items": score is not None,
+                    "core_items": [exam_record] if exam_record else ([exam_assignment] if exam_assignment else []),
+                })
 
         # 4. Process General Assignments
         remaining = [a for a in all_assignments if a.id not in used_assignment_ids 
