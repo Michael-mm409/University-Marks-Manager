@@ -69,6 +69,37 @@ async def lifespan(fastapi_app: FastAPI):
     # For development: drop and recreate tables on each startup
     # SQLModel.metadata.drop_all(engine)
     SQLModel.metadata.create_all(engine)
+
+    # Column migration: add gpa_scale to courses table for existing databases.
+    # create_all is idempotent but does not add columns to existing tables.
+    from sqlalchemy import inspect as _sa_inspect, text as _text
+    from sqlmodel import Session as _Session, select as _select
+    from src.infrastructure.db.models import GradeScale as _GradeScale
+
+    _inspector = _sa_inspect(engine)
+    _course_cols = {c["name"] for c in _inspector.get_columns("courses")}
+    if "gpa_scale" not in _course_cols:
+        with _Session(engine) as _s:
+            _s.exec(_text("ALTER TABLE courses ADD COLUMN gpa_scale INTEGER DEFAULT 4"))
+            _s.commit()
+
+    # Seed 7-Point Australian GradeScale rows once if they don't exist yet.
+    with _Session(engine) as _s:
+        _exists = _s.exec(
+            _select(_GradeScale).where(_GradeScale.scale_name == "7-Point Australian")
+        ).first()
+        if not _exists:
+            _seven_pt = [
+                _GradeScale(scale_name="7-Point Australian", grade="HD", label="High Distinction", min_mark=85.0, gpa_point=7.0, band_type="both"),
+                _GradeScale(scale_name="7-Point Australian", grade="D",  label="Distinction",       min_mark=75.0, gpa_point=6.0, band_type="both"),
+                _GradeScale(scale_name="7-Point Australian", grade="C",  label="Credit",            min_mark=65.0, gpa_point=5.0, band_type="both"),
+                _GradeScale(scale_name="7-Point Australian", grade="P",  label="Pass",              min_mark=50.01, gpa_point=4.0, band_type="both"),
+                _GradeScale(scale_name="7-Point Australian", grade="PS", label="Pass Supplementary", min_mark=50.0, gpa_point=4.0, band_type="both"),
+                _GradeScale(scale_name="7-Point Australian", grade="F",  label="Fail",              min_mark=0.0,  gpa_point=0.0, band_type="both"),
+            ]
+            for _r in _seven_pt:
+                _s.add(_r)
+            _s.commit()
     # Enable template auto-reload in development so Jinja picks up template changes without restarts
     fastapi_app.state.jinja_env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),

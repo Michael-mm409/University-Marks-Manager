@@ -123,6 +123,66 @@ def update_course_scale(
             pass
     return RedirectResponse(url="/settings", status_code=303)
 
+@router.post("/settings/grade-scales/add")
+def add_grade_scale_band(
+    request: Request,
+    scale_name: str = Form(...),
+    grade: str = Form(...),
+    label: str = Form(...),
+    min_mark: float = Form(...),
+    gpa_point: float = Form(...),
+    band_type: str = Form("both"),
+    session: Session = Depends(get_session),
+):
+    """Add or update a single grade band within a named GPA scale.
+
+    Matches on the unique constraint (scale_name, grade, band_type): if a row
+    already exists it is updated in-place; otherwise a new row is inserted.
+    This allows callers to build up a complete scale one band at a time, or to
+    correct an existing band without touching the rest of the scale.
+    """
+    scale_name = scale_name.strip()
+    grade = grade.strip().upper()
+    label = label.strip()
+    if not scale_name or not grade or not label:
+        request.session["flash_message"] = "Scale name, grade, and label are all required."
+        return RedirectResponse(url="/profile", status_code=303)
+    if band_type not in ("both", "wam", "gpa"):
+        band_type = "both"
+
+    existing = session.exec(
+        select(GradeScale).where(
+            GradeScale.scale_name == scale_name,
+            GradeScale.grade == grade,
+            GradeScale.band_type == band_type,
+        )
+    ).first()
+
+    if existing:
+        existing.label = label
+        existing.min_mark = min_mark
+        existing.gpa_point = gpa_point
+        session.add(existing)
+        session.commit()
+        request.session["flash_message"] = f"Updated '{grade}' band in scale '{scale_name}'."
+    else:
+        row = GradeScale(
+            scale_name=scale_name,
+            grade=grade,
+            label=label,
+            min_mark=min_mark,
+            gpa_point=gpa_point,
+            band_type=band_type,
+        )
+        session.add(row)
+        session.commit()
+        request.session["flash_message"] = f"Added '{grade}' to scale '{scale_name}'."
+
+    return RedirectResponse(url="/profile", status_code=303)
+
+
+# NOTE: update_grades() below is a dead function — it has no route decorator and
+# is never registered.  It is preserved here for reference but should not be called.
 def update_grades(
     request: Request,
     scale_name: str = Form(...),

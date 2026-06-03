@@ -44,7 +44,7 @@
         <h3 class="card-title text-lg">Grade Point Average</h3>
         <div class="flex items-center justify-between">
           <div class="text-4xl font-bold text-secondary">{{ "%.2f"|format(gpa) }}</div>
-          <div class="text-sm opacity-70">out of 4.0</div>
+          <div class="text-sm opacity-70">out of {{ gpa_max|default(4) }}.0</div>
         </div>
         <div class="mt-2 text-xs opacity-60">
           GPA = Sum(Grade Points × Credit Points) ÷ Sum(Credit Points)
@@ -122,6 +122,23 @@
               <button class="btn btn-sm btn-secondary w-full mt-2" type="submit">Save Changes</button>
             </form>
             
+            <div class="divider my-1"></div>
+
+            <form method="post" action="/courses/{{ course.code or course.id }}/settings/update" class="flex flex-col gap-3">
+              <h3 class="font-bold text-base border-b pb-2 mb-1">GPA Scale</h3>
+              <label class="form-control">
+                <span class="label-text text-xs font-semibold uppercase opacity-60">Scale</span>
+                <select name="gpa_scale" class="select select-bordered select-sm mt-1">
+                  <option value="4" {% if (gpa_max|default(4)) == 4 %}selected{% endif %}>4-Point (Standard)</option>
+                  <option value="7" {% if (gpa_max|default(4)) == 7 %}selected{% endif %}>7-Point (Australian)</option>
+                </select>
+              </label>
+              <p class="text-[11px] opacity-50 -mt-1">
+                4-Point: HD=4, D=3, C=2, P=1, F=0 &nbsp;|&nbsp; 7-Point: HD=7, D=6, C=5, P=4, F=0
+              </p>
+              <button class="btn btn-sm btn-accent w-full" type="submit">Save GPA Scale</button>
+            </form>
+
             <div class="divider my-1"></div>
 
             <form method="post" action="/courses/{{ course.code or course.id }}/delete" onsubmit="return confirm('Delete this course? Semesters will be unassigned.');">

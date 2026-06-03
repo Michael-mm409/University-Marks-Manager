@@ -2,7 +2,7 @@
 from typing import Any, Optional, List, cast
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlmodel import Session, select, col
+from sqlmodel import Session, select, col, func
 from sqlalchemy.orm import selectinload
 from src.infrastructure.db.models import User, UserCourse, Course, GradeScale, University
 import bcrypt
@@ -259,12 +259,44 @@ def profile_page(request: Request, session: Session = Depends(get_session)):
 
     universities = session.exec(select(University)).all()
 
+    # Build a list of (max_gpa_int, scale_name) pairs for every scale that has
+    # at least one band_type="both" row — used by the profile GPA scale selector
+    # and the Add Grade Band form.  Sorted ascending so 4-pt comes before 7-pt.
+    gpa_scale_rows = session.exec(
+        select(GradeScale.scale_name, func.max(GradeScale.gpa_point))
+        .where(GradeScale.band_type == "both")
+        .group_by(GradeScale.scale_name)
+        .order_by(func.max(GradeScale.gpa_point))
+    ).all()
+    gpa_scale_options = [
+        (int(row[1]), row[0])
+        for row in gpa_scale_rows
+        if row[1] is not None
+    ]
+
+    # Richer per-scale data for the "Registered Scales" profile card.
+    # Fetches every band (grade letter + gpa_point) for each scale and groups
+    # them so the template can render one card per scale with its bands listed.
+    _band_rows = session.exec(
+        select(GradeScale.scale_name, GradeScale.grade, GradeScale.gpa_point)
+        .where(GradeScale.band_type == "both")
+        .order_by(GradeScale.scale_name, GradeScale.gpa_point.desc())
+    ).all()
+    _scale_map: dict[str, dict] = {}
+    for _sname, _grade, _gpa in _band_rows:
+        if _sname not in _scale_map:
+            _scale_map[_sname] = {"scale_name": _sname, "max_gpa": int(_gpa), "bands": []}
+        _scale_map[_sname]["bands"].append(_grade)
+    gpa_scale_cards = sorted(_scale_map.values(), key=lambda x: x["max_gpa"])
+
     return _render(request, "profile.html", {
         "user": user,
-        "courses": user.user_courses, # This returns the list of UserCourse objects
+        "courses": user.user_courses,
         "available_courses": available_courses,
         "grading_scales": grading_scales,
         "universities": universities,
+        "gpa_scale_options": gpa_scale_options,
+        "gpa_scale_cards": gpa_scale_cards,
     })
 
 

@@ -58,6 +58,7 @@ class Course(SQLModel, table=True):
     code: str = Field(index=True)
     grading_scale_id: int = Field(foreign_key="grade_scales.id")
     university_id: Optional[int] = Field(default=None, foreign_key="university.id")
+    gpa_scale: Optional[int] = Field(default=4)  # Max GPA points: 4 (Standard) or 7 (Australian)
     
     university: Optional["University"] = Relationship(back_populates="courses")
     grading_scale: Optional["GradeScale"] = Relationship()

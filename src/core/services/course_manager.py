@@ -225,6 +225,47 @@ class CourseManager:
         self.session.refresh(course)
         return course
 
+    def update_gpa_scale(self, course_id: int, gpa_scale: int) -> Optional[Course]:
+        """Set gpa_scale on a course and sync grading_scale_id to the matching GradeScale rows.
+
+        The scale whose max gpa_point equals gpa_scale is resolved dynamically from
+        the database, so any scale added via /settings/grade-scales/add is picked up
+        automatically without code changes.
+        """
+        from src.infrastructure.db.models import GradeScale
+        course = self.get_course_by_id(course_id)
+        if not course:
+            return None
+
+        # Find which scale_name has max(gpa_point) == gpa_scale among band_type="both" rows
+        all_scale_maxes = self.session.exec(
+            select(GradeScale.scale_name, func.max(GradeScale.gpa_point))
+            .where(GradeScale.band_type == "both")
+            .group_by(GradeScale.scale_name)
+        ).all()
+        scale_name: str | None = None
+        for row in all_scale_maxes:
+            row_name, row_max = row[0], row[1]
+            if row_max is not None and int(row_max) == gpa_scale:
+                scale_name = str(row_name)
+                break
+
+        if scale_name:
+            ref = self.session.exec(
+                select(GradeScale).where(
+                    GradeScale.scale_name == scale_name,
+                    GradeScale.band_type == "both",
+                )
+            ).first()
+            if ref is not None and ref.id is not None:
+                course.grading_scale_id = ref.id
+
+        course.gpa_scale = gpa_scale
+        self.session.add(course)
+        self.session.commit()
+        self.session.refresh(course)
+        return course
+
     def delete_course(self, course_id: int) -> bool:
         """Delete a course and all associated semesters, subjects, assignments, and exams.
 

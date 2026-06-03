@@ -5,7 +5,7 @@ from typing import Optional, cast
 
 from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from sqlmodel import Table
 
 from src.core.services.course_manager import CourseManager
@@ -421,6 +421,9 @@ def get_course_detail_page(
     gpa = grade_calculator.calculate_gpa(course.id) if course.id else None
     grade_counts = grade_calculator.calculate_grade_counts(course.id) if course.id else {}
 
+    # Resolve the GPA max from the stored gpa_scale (default 4 for Standard scale)
+    gpa_max = int(getattr(course, "gpa_scale", None) or 4)
+
     # Get all universities for the dropdown
     from src.infrastructure.db.models import University
     universities = session.exec(select(University)).all()
@@ -435,6 +438,7 @@ def get_course_detail_page(
         universities=universities,
         wam=wam,
         gpa=gpa,
+        gpa_max=gpa_max,
         grade_counts=grade_counts,
     )
 
@@ -699,6 +703,45 @@ def update_course_view(
         sess["current_course_code"] = getattr(updated, "code", None)
         sess["flash_message"] = "Course details updated."
     target = f"/courses/{(getattr(updated, 'code', None) or getattr(updated, 'id', ''))}"
+    if request.headers.get("HX-Request"):
+        resp = HTMLResponse()
+        resp.headers["HX-Redirect"] = target
+        return resp
+    return RedirectResponse(url=target, status_code=303)
+
+
+@router.post("/courses/{course_code}/settings/update", response_class=HTMLResponse)
+def update_course_settings_view(
+    request: Request,
+    course_code: str,
+    gpa_scale: int = Form(...),
+    return_to: Optional[str] = Form(None),
+    session: Session = Depends(get_session),
+):
+    """Update per-course GPA scale and sync the linked grading scale rows."""
+    cm = CourseManager(session)
+    course = _resolve_course(cm, course_code)
+    if not course or course.id is None:
+        return HTMLResponse("Course not found", status_code=404)
+    # Validate dynamically: accepted values are the integer max GPA points of
+    # any scale present in the grade_scales table, so newly added scales are
+    # accepted without any code changes.
+    scale_rows = session.exec(
+        select(func.max(GradeScale.gpa_point))
+        .where(GradeScale.band_type == "both")
+        .group_by(GradeScale.scale_name)
+    ).all()
+    valid_gpa_scales = {int(v) for v in scale_rows if v is not None}
+    if gpa_scale not in valid_gpa_scales:
+        return HTMLResponse(
+            f"gpa_scale {gpa_scale} is not a recognised scale maximum "
+            f"(valid: {sorted(valid_gpa_scales)})",
+            status_code=422,
+        )
+    cm.update_gpa_scale(course.id, gpa_scale)
+    # Honour an explicit return_to path supplied by the caller (e.g. "/profile");
+    # fall back to the course detail page.
+    target = return_to if (return_to and return_to.startswith("/")) else f"/courses/{course_code}"
     if request.headers.get("HX-Request"):
         resp = HTMLResponse()
         resp.headers["HX-Redirect"] = target

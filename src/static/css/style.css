@@ -50,7 +50,10 @@
   justify-content: flex-end;
   gap: 0.5rem;
   min-width: 0;
-  overflow: hidden;
+  /* overflow must be visible so the absolutely-positioned dropdown-content
+     is not clipped by this container; the course selector's own
+     #course-header-container keeps overflow:hidden for text truncation */
+  overflow: visible;
 }
 /* Course selector grows to fill the right column; select fills it so
    clientWidth is the actual constrained width the JS can measure against */
