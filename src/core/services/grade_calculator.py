@@ -9,6 +9,12 @@ def academic_round(val: float) -> int:
     """Round using strict half-up rules (e.g. 84.5 → 85, not banker's rounding)."""
     return math.floor(val + 0.5)
 
+
+def _round2dp(val: float) -> float:
+    """Half-up round to 2 decimal places. Avoids Python's banker's rounding (round())
+    so that e.g. 19.125 → 19.13 instead of 19.12."""
+    return math.floor(val * 100 + 0.5) / 100
+
 WEIGHT_THRESHOLD = 40.0
 
 
@@ -365,7 +371,7 @@ class GradeCalculator:
                 "count": len(core_items),
                 "unweighted_avg": (weighted_score / scored_core_weight) if scored_core_weight > 0 else None,
                 "total_weight": sum((a.mark_weight or 0) for a in core_items),
-                "weighted_score": round(weighted_score, 2),
+                "weighted_score": _round2dp(weighted_score),
                 "bonus_count": max(0, len(matches) - rule.max_count),  # Required by template
                 "display_status": "Grouped",
                 "has_scored_items": bool(scored_core_items),
@@ -399,7 +405,7 @@ class GradeCalculator:
                     "count": 1,
                     "unweighted_avg": unweighted,
                     "total_weight": weight,
-                    "weighted_score": round(score, 2) if score is not None else 0.0,
+                    "weighted_score": _round2dp(score) if score is not None else 0.0,
                     "bonus_count": 0,
                     "has_scored_items": score is not None,
                     "core_items": [exam_record] if exam_record else ([exam_assignment] if exam_assignment else []),
@@ -420,7 +426,7 @@ class GradeCalculator:
                     "count": 1,
                     "unweighted_avg": round(a_score, 4) if a_score is not None else None,
                     "total_weight": round(a_weight, 2),
-                    "weighted_score": round(_item_weighted_score(a), 2),
+                    "weighted_score": _round2dp(_item_weighted_score(a)),
                     "bonus_count": 0,  # Required by template
                     "display_status": "Standalone",
                     "has_scored_items": a_score is not None,
@@ -443,7 +449,7 @@ class GradeCalculator:
                 "count": len(items),
                 "unweighted_avg": round(unweighted_avg, 4) if unweighted_avg is not None else None,
                 "total_weight": total_weight,
-                "weighted_score": round(weighted_score, 2),
+                "weighted_score": _round2dp(weighted_score),
                 "bonus_count": 0,  # Required by template
                 "display_status": "Grouped",
                 "has_scored_items": bool(scored_items),
@@ -480,7 +486,7 @@ class GradeCalculator:
                             remaining_weight_value += _item_weight(item)
 
         remaining_weight = round(remaining_weight_value, 2)
-        total_achieved = round(total_achieved, 2)
+        total_achieved = _round2dp(total_achieved)
 
         # Apply university half-up rounding before threshold checks so that
         # e.g. 84.61 rounds to 85 and correctly satisfies an HD (85) threshold.
