@@ -1,3 +1,4 @@
+import math
 from typing import Optional
 from fastapi import Request
 from fastapi import APIRouter, Depends, Form
@@ -196,10 +197,11 @@ def save_total_mark(
         )
     ).first()
     if subject:
-        # Only update total_mark from the form, do not let exam_mark affect it
+        # Only update total_mark from the form, do not let exam_mark affect it.
+        # Apply university half-up rounding so e.g. 84.61 is stored as 85.0.
         if total_mark:
             try:
-                subject.total_mark = float(total_mark)
+                subject.total_mark = float(math.floor(float(total_mark) + 0.5))
             except ValueError:
                 subject.total_mark = None
         else:

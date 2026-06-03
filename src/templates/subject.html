@@ -361,7 +361,7 @@
                 {% if row.has_scored_items is defined and not row.has_scored_items %}
                   Pending
                 {% else %}
-                  {{ "%.2f"|format(row.unweighted_avg * 100) }}%
+                  {{ "%.2f"|format((row.unweighted_avg | default(0, true)) * 100) }}%
                 {% endif %}
               </td>
               <td class="px-4 py-2 text-right text-gray-600">

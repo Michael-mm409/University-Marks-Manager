@@ -1,7 +1,13 @@
+import math
 import re
 from typing import Sequence, Any, cast
 from sqlmodel import Session, select, func, case
 from src.infrastructure.db.models import Subject, Semester, GradeScale, Course, ExamSettings, SubjectRule, Assignment, Examination
+
+
+def academic_round(val: float) -> int:
+    """Round using strict half-up rules (e.g. 84.5 → 85, not banker's rounding)."""
+    return math.floor(val + 0.5)
 
 WEIGHT_THRESHOLD = 40.0
 
@@ -475,21 +481,22 @@ class GradeCalculator:
         remaining_weight = round(remaining_weight_value, 2)
         total_achieved = round(total_achieved, 2)
 
+        # Apply university half-up rounding before threshold checks so that
+        # e.g. 84.61 rounds to 85 and correctly satisfies an HD (85) threshold.
+        rounded_total = academic_round(total_achieved)
+
         grade_goals = []
         for label, target in [("Pass", 50), ("Credit", 65), ("Distinction", 75), ("High Distinction", 85)]:
-            if total_achieved >= target:
+            if rounded_total >= target:
                 status = "Achieved"
                 req_p = 0.0
             elif remaining_weight <= 0:
-                # This is where your "Impossible" was triggered
                 status = "Impossible"
                 req_p = 0.0
             else:
-                # Logic: (Target - Current) / Remaining Weight
-                # Example: (50 - 44.10) / 50.0 = 5.9 / 50.0 = 0.118 (11.8%)
                 needed_from_remaining = (target - total_achieved)
                 req_p = (needed_from_remaining / remaining_weight) * 100
-                
+
                 if req_p > 100:
                     status = "Impossible"
                 else:
@@ -497,6 +504,7 @@ class GradeCalculator:
 
             grade_goals.append({
                 "label": label,
+                "target": target,
                 "status": status,
                 "required_percent": round(req_p, 2)
             })
