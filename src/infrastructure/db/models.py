@@ -96,6 +96,7 @@ class Subject(SQLModel, table=True):
     credit_points: int = Field(default=6)
     sync_subject: bool = False
     has_exam: bool = Field(default=True)
+    is_finalized: bool = Field(default=False)
 
     semester: Optional["Semester"] = Relationship(back_populates="subjects")
     assignments: list["Assignment"] = Relationship(back_populates="subject")

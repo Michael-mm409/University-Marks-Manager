@@ -83,6 +83,12 @@ async def lifespan(fastapi_app: FastAPI):
             _s.exec(_text("ALTER TABLE courses ADD COLUMN gpa_scale INTEGER DEFAULT 4"))
             _s.commit()
 
+    _subject_cols = {c["name"] for c in _inspector.get_columns("subjects")}
+    if "is_finalized" not in _subject_cols:
+        with _Session(engine) as _s:
+            _s.exec(_text("ALTER TABLE subjects ADD COLUMN is_finalized BOOLEAN NOT NULL DEFAULT FALSE"))
+            _s.commit()
+
     # Seed 7-Point Australian GradeScale rows once if they don't exist yet.
     with _Session(engine) as _s:
         _exists = _s.exec(

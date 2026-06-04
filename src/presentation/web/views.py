@@ -30,7 +30,7 @@ from .auth_views import router as auth_router
 from .types import IndexContext
 from src.core.services.semester_manager import SemesterManager
 from src.core.services.course_manager import CourseManager
-from src.core.services.grade_calculator import GradeCalculator, process_assessments
+from src.core.services.grade_calculator import GradeCalculator, process_assessments, _round2dp
 
 async def verify_user(request: Request):
     if not request.session.get("user_id"):
@@ -953,8 +953,11 @@ def subject_detail_pretty(
 
         ctx["summaries"] = result["summaries"]
         ctx["grade_goals"] = result["grade_goals"]
-        ctx["total_achieved"] = result.get("total_achieved")
+        ctx["total_achieved"] = _round2dp(
+            sum(float(row.get("weighted_score") or 0) for row in result["summaries"])
+        )
         ctx["remaining_weight"] = result.get("remaining_weight")
+        ctx["is_fully_graded"] = result.get("is_fully_graded", False)
         ctx.setdefault("assessment_summary", {"standalone_assessments": [], "grouped_assessments": {}})
         return _render(request, "subject.html", ctx)
 

@@ -172,8 +172,28 @@
     <div class="flex-1">
       <button class="btn btn-sm btn-primary" id="show-add-assignment-form" type="button" onclick="toggleSection('add-assignment-form', false)">Add Assignment</button>
     </div>
-    <div class="flex-1 flex justify-end">
-      <button class="btn btn-sm btn-accent ml-auto" id="show-total-mark-form" type="button" onclick="toggleSection('add-total-mark-form')">Add Total Mark</button>
+    <div class="flex-1 flex items-center justify-end gap-3">
+      {# Finalized toggle — submits immediately on change #}
+      <form method="post" action="/semester/{{ semester }}/subject/{{ subject.subject_code }}/finalize" id="finalize-form">
+        <input type="hidden" name="year" value="{{ year }}" />
+        <input type="hidden" name="is_finalized" value="false" />
+        <label class="flex items-center gap-1.5 cursor-pointer select-none text-xs font-semibold opacity-60 hover:opacity-100 transition-opacity" title="Mark this course as fully graded. Hides the target grade calculator.">
+          <input type="checkbox" name="is_finalized" value="true" class="checkbox checkbox-xs"
+            {% if subject.is_finalized %}checked{% endif %}
+            onchange="this.form.submit()" />
+          Finalized
+        </label>
+      </form>
+      {% if subject.is_finalized %}
+      <span class="text-xs font-semibold opacity-60 flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+        </svg>
+        Course Complete
+      </span>
+      {% else %}
+      <button class="btn btn-sm btn-accent" id="show-total-mark-form" type="button" onclick="toggleSection('add-total-mark-form')">Add Total Mark</button>
+      {% endif %}
     </div>
   </div>
 

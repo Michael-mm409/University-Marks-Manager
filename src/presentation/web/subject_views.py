@@ -608,6 +608,32 @@ async def update_subject_rules(
     return RedirectResponse(url=f"/year/{year}/semester/{semester}/subject/{code}", status_code=303)
 
 
+@subject_router.post("/semester/{semester}/subject/{code}/finalize", response_class=RedirectResponse)
+def toggle_subject_finalized(
+    semester: str,
+    code: str,
+    year: str = Form(...),
+    is_finalized: bool = Form(False),
+    session: Session = Depends(get_session),
+) -> RedirectResponse:
+    """Set or clear the is_finalized flag on a subject."""
+    subj = session.exec(
+        select(Subject)
+        .join(Semester)
+        .where(
+            Subject.subject_code == code,
+            Semester.name == semester,
+            Semester.year == int(year),
+        )
+    ).first()
+    if not subj:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    subj.is_finalized = is_finalized
+    session.add(subj)
+    session.commit()
+    return RedirectResponse(f"/semester/{semester}/subject/{code}?year={year}", status_code=303)
+
+
 @subject_router.api_route("/semester/{semester}/subject/{code}/delete", methods=["POST"], response_class=RedirectResponse)
 def delete_subject(
     semester: str,

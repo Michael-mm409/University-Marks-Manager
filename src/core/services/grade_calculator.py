@@ -456,7 +456,33 @@ class GradeCalculator:
                 "core_items": items,
             })
 
-        # 5. Final Calculations & Grade Goals
+        # 5. Determine whether every weighted item has a real (non-zero) mark.
+        # Used by the template to decide whether to show the target-grade calculator
+        # or a static "Course Complete" badge.
+        def _is_graded(item: Any) -> bool:
+            if isinstance(item, Examination):
+                if float(item.exam_weight or 0) <= 0:
+                    return True
+                mark = item.exam_mark
+                return mark is not None and float(mark) != 0.0
+            weight = float(getattr(item, "mark_weight", 0) or 0)
+            if weight <= 0:
+                return True
+            # S/U items have no numeric mark by design
+            if getattr(item, "grade_type", "numeric") in ("S", "U"):
+                return True
+            wm = getattr(item, "weighted_mark", None)
+            return wm is not None and float(wm) != 0.0
+
+        gradeable: list[Any] = [
+            a for a in all_assignments if float(getattr(a, "mark_weight", 0) or 0) > 0
+        ]
+        if exam_record and float(exam_record.exam_weight or 0) > 0:
+            gradeable.append(exam_record)
+
+        is_fully_graded: bool = bool(gradeable) and all(_is_graded(item) for item in gradeable)
+
+        # 6. Final Calculations & Grade Goals
         type_order = {"rule": 0, "general": 1, "exam": 2}
         summary.sort(key=lambda x: (type_order.get(x["type"], 99), x["label"]))
 
@@ -517,8 +543,9 @@ class GradeCalculator:
             })
 
         return {
-            "summaries": summary, 
-            "grade_goals": grade_goals, 
-            "total_achieved": total_achieved, 
-            "remaining_weight": remaining_weight
+            "summaries": summary,
+            "grade_goals": grade_goals,
+            "total_achieved": total_achieved,
+            "remaining_weight": remaining_weight,
+            "is_fully_graded": is_fully_graded,
         }
