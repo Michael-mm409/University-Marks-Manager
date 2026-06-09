@@ -95,6 +95,11 @@ def create_assignment(
         if subj is None:
             logger.error("[DEBUG] Subject not found for code=%s, semester=%s, year=%s", code, semester, year)
             return HTMLResponse("Subject not found for the given code, semester, and year. Cannot create assignment.", status_code=400)
+        if getattr(subj, "is_finalized", False):
+            return RedirectResponse(
+                f"/semester/{semester}/subject/{code}?year={year}&error=Subject+is+finalized.+Uncheck+Finalized+to+modify+assignments.",
+                status_code=303,
+            )
         subject_id = getattr(subj, "id", None)
         logger.info("[DEBUG] subject_id resolved: %s", subject_id)
         if subject_id is None:
@@ -271,6 +276,11 @@ def delete_assignment(
             Semester.year == int(year),
         )
     ).first()
+    if getattr(subj, "is_finalized", False):
+        return RedirectResponse(
+            f"/semester/{semester}/subject/{code}?year={year}&error=Subject+is+finalized.+Uncheck+Finalized+to+modify+assignments.",
+            status_code=303,
+        )
     sid = getattr(subj, "id", None)
     existing = session.exec(
         select(Assignment).where(
@@ -417,6 +427,11 @@ def update_assignment_ajax(
         sid = getattr(subj, "id", None)
         if sid is None:
             return JSONResponse({"success": False, "error": "Subject not found."}, status_code=404)
+        if getattr(subj, "is_finalized", False):
+            return JSONResponse(
+                {"success": False, "error": "Subject is finalized. Uncheck Finalized to modify assignments."},
+                status_code=403,
+            )
         assignment = session.exec(
             select(Assignment).where(
                 Assignment.subject_id == sid,

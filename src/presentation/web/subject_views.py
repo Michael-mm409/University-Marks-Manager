@@ -629,6 +629,16 @@ def toggle_subject_finalized(
     if not subj:
         raise HTTPException(status_code=404, detail="Subject not found")
     subj.is_finalized = is_finalized
+    if is_finalized:
+        # Snapshot the current computed total so it stays frozen
+        calc = GradeCalculator(session)
+        result = calc.calculate_subject_summary(subj)
+        computed = result.get("total_achieved")
+        if computed is not None and float(computed) > 0:
+            subj.total_mark = float(computed)
+    else:
+        # Clear stored total so the page recalculates live from assignments
+        subj.total_mark = None
     session.add(subj)
     session.commit()
     return RedirectResponse(f"/semester/{semester}/subject/{code}?year={year}", status_code=303)

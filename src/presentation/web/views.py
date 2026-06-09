@@ -953,9 +953,12 @@ def subject_detail_pretty(
 
         ctx["summaries"] = result["summaries"]
         ctx["grade_goals"] = result["grade_goals"]
-        ctx["total_achieved"] = _round2dp(
-            sum(float(row.get("weighted_score") or 0) for row in result["summaries"])
-        )
+        if result.get("total_achieved") is not None:
+            ctx["total_achieved"] = result["total_achieved"]
+        else:
+            ctx["total_achieved"] = _round2dp(
+                sum(float(row.get("weighted_score") or 0) for row in result["summaries"])
+            )
         ctx["remaining_weight"] = result.get("remaining_weight")
         ctx["is_fully_graded"] = result.get("is_fully_graded", False)
         ctx.setdefault("assessment_summary", {"standalone_assessments": [], "grouped_assessments": {}})
