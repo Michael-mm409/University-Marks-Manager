@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from typing import Any, Optional, Iterable, cast
 
-from sqlmodel import Session, select, func
+from sqlalchemy.orm import Session
+from sqlalchemy import select, func, Column
+from sqlmodel import col
 
 from src.infrastructure.db.models import Course, Subject, Semester
 
@@ -21,9 +23,8 @@ class CourseManager:
         code = code.strip()
         if university_id is None and new_university_name:
             from src.infrastructure.db.models import University
-            from sqlmodel import select
             uni_name = new_university_name.strip()
-            existing = self.session.exec(select(University).where(University.name == uni_name)).first()
+            existing = self.session.execute(select(University).where(col(University.name) == uni_name)).scalars().first()
             if existing:
                 university_id = existing.id
             else:
@@ -45,13 +46,13 @@ class CourseManager:
             selectinload(cast(Any, Course.university)),
             selectinload(cast(Any, Course.grading_scale))
         )
-        results = self.session.exec(statement).all()
+        results = self.session.execute(statement).scalars().all()
         return list(results)
 
     def get_course_by_id(self, course_id: int) -> Optional[Course]:
         """Get a course by its ID, loading related subjects and semester."""
-        statement = select(Course).where(Course.id == course_id)
-        course = self.session.exec(statement).first()
+        statement = select(Course).where(col(Course.id) == course_id)
+        course = self.session.execute(statement).scalars().first()
         return course
 
     def get_course_by_code(self, course_code: str) -> Optional[Course]:
@@ -65,7 +66,7 @@ class CourseManager:
         # Case-insensitive compare and trim DB value as well
         db_code_normalized = func.trim(func.lower(Course.code))
         statement = select(Course).where(db_code_normalized == func.lower(normalized))
-        return self.session.exec(statement).first()
+        return self.session.execute(statement).scalars().first()
 
     # Legacy subject-link helper retained for compatibility but unused now
     def get_unlinked_subjects(self, course_id: int) -> list[Subject]:
@@ -127,7 +128,7 @@ class CourseManager:
         if not course:
             return None
 
-        semesters = self.session.exec(select(Semester).where(Semester.year == year)).all()
+        semesters = self.session.execute(select(Semester).where(col(Semester.year) == year)).scalars().all()
         for sem in semesters:
             self._link_semester_and_subjects(course, sem)
         return self.get_course_by_id(course_id)
@@ -137,7 +138,7 @@ class CourseManager:
         course = self.get_course_by_id(course_id)
         if not course:
             return None
-        semesters = self.session.exec(select(Semester)).all()
+        semesters = self.session.execute(select(Semester)).scalars().all()
         for sem in semesters:
             self._link_semester_and_subjects(course, sem)
         return self.get_course_by_id(course_id)
@@ -178,22 +179,22 @@ class CourseManager:
         course = self.get_course_by_id(course_id)
         if not course:
             return None
-        semesters = self.session.exec(
-            select(Semester).where(Semester.year == year, Semester.course_id == course_id)
-        ).all()
+        semesters = self.session.execute(
+            select(Semester).where(col(Semester.year) == year, col(Semester.course_id) == course_id)
+        ).scalars().all()
         for sem in semesters:
             self.unassign_semester_from_course(course_id, sem.id)  # type: ignore[arg-type]
         return self.get_course_by_id(course_id)
 
     def get_unassigned_semesters(self) -> list[Semester]:
         """Return semesters that are not assigned to any course."""
-        return list(self.session.exec(select(Semester).where(Semester.course_id == None)).all())
+        return list(self.session.execute(select(Semester).where(col(Semester.course_id).is_(None))).scalars().all())
 
     def get_unassigned_years(self) -> list[int]:
         """Return years that have at least one unassigned semester (descending)."""
-        years = self.session.exec(
-            select(Semester.year).where(Semester.course_id == None).distinct()
-        ).all()
+        years = self.session.execute(
+            select(col(Semester.year)).where(col(Semester.course_id).is_(None)).distinct()
+        ).scalars().all()
         return sorted([int(y) for y in years], reverse=True)
 
     # New: update and delete
@@ -207,9 +208,8 @@ class CourseManager:
         # University logic
         if new_university_name and (university_id is None or university_id == "add_new"):
             from src.infrastructure.db.models import University
-            from sqlmodel import select
             uni_name = new_university_name.strip()
-            existing = self.session.exec(select(University).where(University.name == uni_name)).first()
+            existing = self.session.execute(select(University).where(col(University.name) == uni_name)).scalars().first()
             if existing:
                 course.university_id = existing.id
             else:
@@ -238,10 +238,10 @@ class CourseManager:
             return None
 
         # Find which scale_name has max(gpa_point) == gpa_scale among band_type="both" rows
-        all_scale_maxes = self.session.exec(
-            select(GradeScale.scale_name, func.max(GradeScale.gpa_point))
-            .where(GradeScale.band_type == "both")
-            .group_by(GradeScale.scale_name)
+        all_scale_maxes = self.session.execute(
+            select(col(GradeScale.scale_name), func.max(col(GradeScale.gpa_point)))
+            .where(col(GradeScale.band_type) == "both")
+            .group_by(col(GradeScale.scale_name))
         ).all()
         scale_name: str | None = None
         for row in all_scale_maxes:
@@ -251,12 +251,12 @@ class CourseManager:
                 break
 
         if scale_name:
-            ref = self.session.exec(
+            ref = self.session.execute(
                 select(GradeScale).where(
-                    GradeScale.scale_name == scale_name,
-                    GradeScale.band_type == "both",
+                    col(GradeScale.scale_name) == scale_name,
+                    col(GradeScale.band_type) == "both",
                 )
-            ).first()
+            ).scalars().first()
             if ref is not None and ref.id is not None:
                 course.grading_scale_id = ref.id
 
@@ -291,9 +291,9 @@ class CourseManager:
         """
         # Now filter by Semester.year via join
         return list(
-            self.session.exec(
+            self.session.execute(
                 select(Subject)
                 .join(Semester)
-                .where(Semester.year == int(year))
-            ).all()
+                .where(col(Semester.year) == int(year))
+            ).scalars().all()
         )

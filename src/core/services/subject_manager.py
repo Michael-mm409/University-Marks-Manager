@@ -1,7 +1,8 @@
 """Service layer for managing subjects."""
 from __future__ import annotations
 
-from sqlmodel import Session, select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from src.infrastructure.db.models import Subject
 
@@ -20,5 +21,5 @@ class SubjectManager:
             A list of all Subject objects.
         """
         statement = select(Subject)
-        results = self.session.exec(statement).all()
+        results = self.session.execute(statement).scalars().all()
         return list(results)

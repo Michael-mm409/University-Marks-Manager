@@ -7,8 +7,9 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
-from sqlmodel import Session, create_engine, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
+from sqlmodel import Session
 from fastapi import Depends
 
 # Read the database URL from the environment variable.

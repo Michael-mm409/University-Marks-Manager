@@ -1,7 +1,9 @@
 import math
 import re
-from typing import Sequence, Any, cast
-from sqlmodel import Session, select, func, case
+from typing import Sequence, Any
+from sqlalchemy.sql import select, func, case
+from sqlalchemy.orm import Session
+from sqlmodel import col
 from src.infrastructure.db.models import Subject, Semester, GradeScale, Course, ExamSettings, SubjectRule, Assignment, Examination
 
 
@@ -118,12 +120,11 @@ class GradeCalculator:
         
         # Filter by course if provided
         if course_id is not None:
-            query = query.where(Semester.course_id == course_id)
-        
-        # Use comma-separated conditions in .where() to avoid Pylance Optional Operand error
+            query = query.where(col(Semester.course_id) == course_id)
+
         query = query.where(
-            Subject.total_mark != None,
-            cast(Any, Subject.total_mark) > 0
+            col(Subject.total_mark).is_not(None),
+            col(Subject.total_mark) > 0
         )
         
         self._print_sql(query, f"Base Query (course_id={course_id})")
@@ -149,19 +150,19 @@ class GradeCalculator:
         # Step 2: Query for ALL scales with the determined scale_name (or Standard as fallback)
         if scale_name:
             query = select(GradeScale).where(
-                GradeScale.scale_name == scale_name,
-                GradeScale.band_type == "both"
+                col(GradeScale.scale_name) == scale_name,
+                col(GradeScale.band_type) == "both"
             )
             self._print_sql(query, f"Grade Scales Query (scale_name={scale_name})")
-            scales = self.session.exec(query).all()
+            scales = self.session.execute(query).scalars().all()
         else:
             print(f"[GRADE_CALCULATOR] No specific scale_name, querying Standard scale")
             query = select(GradeScale).where(
-                GradeScale.scale_name == "Standard",
-                GradeScale.band_type == "both"
+                col(GradeScale.scale_name) == "Standard",
+                col(GradeScale.band_type) == "both"
             )
             self._print_sql(query, "Grade Scales Query (Standard scale)")
-            scales = self.session.exec(query).all()
+            scales = self.session.execute(query).scalars().all()
 
         print(f"[GRADE_CALCULATOR] Found {len(scales)} grade scales from query")
         for s in scales:
@@ -210,7 +211,7 @@ class GradeCalculator:
         
         self._print_sql(wam_query, f"WAM Query (course_id={course_id})")
         
-        result = self.session.exec(wam_query).first()
+        result = self.session.execute(wam_query).first()
         
         print(f"[GRADE_CALCULATOR] WAM calculation for course_id={course_id}: result={result}")
         
@@ -239,15 +240,15 @@ class GradeCalculator:
 
         # Fetch all valid subjects (already filtered by total_mark > 0)
         base_query = self._build_base_query(course_id)
-        subjects = self.session.exec(base_query).all()
+        subjects = self.session.execute(base_query).scalars().all()
 
         # Pre-fetch all exam_settings for efficiency
         subject_ids: list[int] = [subj.id for subj in subjects if subj.id is not None]
         exam_settings_map = {}
         if subject_ids:
-            exam_settings = self.session.exec(
-                select(ExamSettings).where(ExamSettings.subject_id.in_(subject_ids))  # type: ignore[attr-defined]
-            ).all()
+            exam_settings = self.session.execute(
+                select(ExamSettings).where(col(ExamSettings.subject_id).in_(subject_ids))
+            ).scalars().all()
             exam_settings_map = {es.subject_id: es for es in exam_settings}
 
         for subject in subjects:
@@ -294,11 +295,11 @@ class GradeCalculator:
         
         self._print_sql(gpa_query, f"GPA Query (course_id={course_id})")
         
-        result = self.session.exec(gpa_query).first()
-        
+        result = self.session.execute(gpa_query).first()
+
         # Debug: Print each subject's mark, credit points, and assigned GPA point
         print("[GRADE_CALCULATOR] GPA subject breakdown (course_id={}):".format(course_id))
-        subjects = self.session.exec(base_query).all()
+        subjects = self.session.execute(base_query).scalars().all()
         for subj in subjects:
             mark = subj.total_mark
             cp = subj.credit_points
@@ -322,9 +323,9 @@ class GradeCalculator:
             return {"summaries": [], "grade_goals": []}
 
         # 1. Setup Data
-        rules = self.session.exec(select(SubjectRule).where(SubjectRule.subject_id == subject.id)).all()
+        rules = self.session.execute(select(SubjectRule).where(col(SubjectRule.subject_id) == subject.id)).scalars().all()
         all_assignments = list(getattr(subject, "assignments", []) or [])
-        exam_record = self.session.exec(select(Examination).where(Examination.subject_id == subject.id)).first()
+        exam_record = self.session.execute(select(Examination).where(col(Examination.subject_id) == subject.id)).scalars().first()
 
         summary: list[dict[str, Any]] = []
         used_assignment_ids: set[int] = set()
