@@ -1,7 +1,7 @@
 <div class="mt-6 w-full max-w-4xl mx-auto">
   <h3 class="font-semibold mb-2">Prerequisite Graph (All Subjects)</h3>
   
-  <div style="position: relative; border: 1px solid #ccc; border-radius: 8px; overflow: hidden; resize: vertical; min-height: 400px; height: 500px;">
+  <div style="position: relative; border: 1px solid #ccc; border-radius: 8px; overflow: hidden; resize: vertical; min-height: 400px; height: 650px;">
     
     <div id="prereq-graph-index" style="width: 100%; height: 100%; background: #fff;"></div>
     
@@ -25,7 +25,7 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+ <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const graphUrl = "{% if selected_year %}/year/{{ selected_year }}/prerequisite_graph/json{% else %}/all/prerequisite_graph/json{% endif %}";
@@ -36,25 +36,22 @@
           if (!container || !data.nodes) return;
 
           const nodes = new vis.DataSet(data.nodes.map(n => {
-            // 1. Array tracking your completed subject codes directly
             const completedCodes = ["CSC5020", "STA6200"];
 
-            // 2. Fallback to standard blue configurations
-            let baseColor = '#90caf9'; // Remaining
+            let baseColor = '#90caf9'; 
             let borderCol = '#1565c0';
             let fontCol = '#222';
 
-            // 3. Match by code string to catch both the real and virtual placeholder nodes
             if (completedCodes.includes(n.label)) {
-              baseColor = '#a5d6a7';   // Completed (Soft Green)
-              borderCol = '#2e7d32';   // Dark Green border
+              baseColor = '#a5d6a7';   
+              borderCol = '#2e7d32';   
               fontCol = '#1b5e20';
             } else if (n.main) {
-              baseColor = '#1976d2';   // Focus Target
+              baseColor = '#1976d2';   
               borderCol = '#0d47a1';
               fontCol = '#fff';
             } else if (n.corequisite) {
-              baseColor = '#ffeb3b';   // Corequisite
+              baseColor = '#ffeb3b';   
               borderCol = '#f57f17';
             }
 
@@ -63,10 +60,11 @@
               label: n.label,
               color: { background: baseColor, border: borderCol, highlight: { background: baseColor, border: borderCol } },
               font: { color: fontCol, size: n.main ? 22 : 16, bold: n.main },
+              // Use the coordinates computed by the backend matrix generator
               x: n.x,
               y: n.y,
-              physics: n.physics || false,
-              fixed: { x: true, y: true },
+              physics: false,
+              fixed: { x: true, y: true }
             };
           }));
 
@@ -80,20 +78,19 @@
           })));
 
           const network = new vis.Network(container, { nodes, edges }, {
-            layout: { randomSeed: 42 },
+            layout: { randomSeed: 42 }, // Disabled hierarchical layout since coordinates are absolute
             nodes: { shape: 'box', borderWidth: 2 },
             edges: {
               smooth: {
                 enabled: true,
                 type: 'cubicBezier',
-                forceDirection: 'vertical',
+                forceDirection: 'vertical', // Outward curve paths go sideways
                 roundness: 0.4,
               }
             },
             physics: { enabled: false },
           });
 
-          // Trigger vis-network redrawing logic whenever container resizing occurs
           const resizeObserver = new ResizeObserver(() => {
             network.redraw();
             network.fit();

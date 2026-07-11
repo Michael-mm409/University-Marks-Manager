@@ -92,16 +92,17 @@ def build_subject_prerequisite_graph(session: Session, root_subject_id: int) -> 
         if subject_node_ids
         else []
     )
+    
     by_id = {}
     for s in subjects:
-        # Using explicit dot notation lets Pylance know s.id is definitely an int inside this block
         if s.id is not None:
-            sid = s.id  # No need for int() call since s.id is already narrowed to an int
+            sid = s.id 
             by_id[sid] = {
                 "object": s,
                 "is_finalized": bool(getattr(s, "is_finalized", False))
             }
 
+    # Cleaned Loop: Processes the local tracking variables safely
     nodes: List[dict] = []
     for sid in sorted(subject_node_ids):
         s_data = by_id.get(sid)
@@ -111,14 +112,11 @@ def build_subject_prerequisite_graph(session: Session, root_subject_id: int) -> 
         code = str(getattr(s, "subject_code", ""))
         level = infer_level_from_text(code)
         
-        is_completed = s_data["is_finalized"]
-        
         node: dict = {
             "id": sid,
             "label": code,
             "main": sid == root_id,
             "corequisite": False,
-            "is_completed": is_completed,
         }
         if level is not None:
             node["level"] = level
