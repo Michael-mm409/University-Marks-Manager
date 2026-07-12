@@ -102,7 +102,6 @@ def build_subject_prerequisite_graph(session: Session, root_subject_id: int) -> 
                 "is_finalized": bool(getattr(s, "is_finalized", False))
             }
 
-    # Cleaned Loop: Processes the local tracking variables safely
     nodes: List[dict] = []
     for sid in sorted(subject_node_ids):
         s_data = by_id.get(sid)
@@ -112,11 +111,36 @@ def build_subject_prerequisite_graph(session: Session, root_subject_id: int) -> 
         code = str(getattr(s, "subject_code", ""))
         level = infer_level_from_text(code)
         
+        is_completed = bool(getattr(s, "is_finalized", False))
+        is_in_progress = False
+
+        if not is_completed and hasattr(s, "id") and s.id is not None:
+            from src.infrastructure.db.models import Assignment, Examination
+            
+            # Check if any mark exists
+            has_assignment_marks = session.exec(
+                select(Assignment).where(Assignment.subject_id == s.id, col(Assignment.weighted_mark) > 0)
+            ).first() is not None
+
+            has_exam_marks = session.exec(
+                select(Examination).where(Examination.subject_id == s.id, col(Examination.exam_mark) > 0)
+            ).first() is not None
+
+            if has_assignment_marks or has_exam_marks:
+                is_in_progress = True
+
+        # Determine if this specific item acts as an active corequisite link to the root view
+        # Checks if this edge is flagged as corequisite in our links array
+        is_link_coreq = any(e for e in edges if e["from"] == sid and e["type"] == "corequisite")
+
         node: dict = {
             "id": sid,
             "label": code,
             "main": sid == root_id,
-            "corequisite": False,
+            "corequisite": is_link_coreq,
+            "is_completed": is_completed,
+            "is_in_progress": is_in_progress,
+            "is_corequisite_active": is_link_coreq and not is_completed
         }
         if level is not None:
             node["level"] = level

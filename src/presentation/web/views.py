@@ -551,6 +551,7 @@ def prerequisite_graph_all_subjects(
 
     nodes_orientation_vertical = num_levels <= max_vertical_levels
 
+    nodes = []
     for visual_level, node_ids in sorted(nodes_by_visual.items()):
         num_nodes = len(node_ids)
         for index, subject_id in enumerate(node_ids):
@@ -560,6 +561,31 @@ def prerequisite_graph_all_subjects(
             else:
                 x = visual_level * level_separation
                 y = (index - (num_nodes - 1) / 2) * node_spacing
+
+            s = subject_lookup.get(subject_id)
+            is_completed = bool(getattr(s, "is_finalized", False)) if s else False
+            is_in_progress = False
+
+            if s and not is_completed:
+                # EXPLICIT LOOKUP: Bypasses lazy loading by checking the tables directly via SQL
+                # Imports inside the loop safely to avoid circular dependencies if any exist
+                from src.infrastructure.db.models import Assignment, Examination
+                
+                # Check if any assignment marks exist for this subject id
+                has_assignment_marks = session.exec(
+                    select(Assignment)
+                    .where(Assignment.subject_id == s.id, col(Assignment.weighted_mark) > 0)
+                ).first() is not None
+
+                # Check if any exam marks exist for this subject id
+                has_exam_marks = session.exec(
+                    select(Examination)
+                    .where(Examination.subject_id == s.id, col(Examination.exam_mark) > 0)
+                ).first() is not None
+
+                if has_assignment_marks or has_exam_marks:
+                    is_in_progress = True
+
             node: dict = {
                 "id": subject_id,
                 "label": labels[subject_id],
@@ -569,6 +595,8 @@ def prerequisite_graph_all_subjects(
                 "x": x,
                 "y": y,
                 "physics": False,
+                "is_completed": is_completed,
+                "is_in_progress": is_in_progress
             }
             nodes.append(node)
 
@@ -815,6 +843,31 @@ def prerequisite_graph_all_years(
             else:
                 x = visual_level * level_separation
                 y = (index - (num_nodes - 1) / 2) * node_spacing
+
+            s = subject_lookup.get(subject_id)
+            is_completed = bool(getattr(s, "is_finalized", False)) if s else False
+            is_in_progress = False
+
+            if s and not is_completed:
+                # EXPLICIT LOOKUP: Bypasses lazy loading by checking the tables directly via SQL
+                # Imports inside the loop safely to avoid circular dependencies if any exist
+                from src.infrastructure.db.models import Assignment, Examination
+                
+                # Check if any assignment marks exist for this subject id
+                has_assignment_marks = session.exec(
+                    select(Assignment)
+                    .where(Assignment.subject_id == s.id, col(Assignment.weighted_mark) > 0)
+                ).first() is not None
+
+                # Check if any exam marks exist for this subject id
+                has_exam_marks = session.exec(
+                    select(Examination)
+                    .where(Examination.subject_id == s.id, col(Examination.exam_mark) > 0)
+                ).first() is not None
+
+                if has_assignment_marks or has_exam_marks:
+                    is_in_progress = True
+
             node: dict = {
                 "id": subject_id,
                 "label": labels[subject_id],
@@ -824,6 +877,8 @@ def prerequisite_graph_all_years(
                 "x": x,
                 "y": y,
                 "physics": False,
+                "is_completed": is_completed,
+                "is_in_progress": is_in_progress
             }
             nodes.append(node)
 
@@ -962,8 +1017,93 @@ def subject_detail_pretty(
         ctx["remaining_weight"] = result.get("remaining_weight")
         ctx["is_fully_graded"] = result.get("is_fully_graded", False)
         ctx.setdefault("assessment_summary", {"standalone_assessments": [], "grouped_assessments": {}})
-        return _render(request, "subject.html", ctx)
 
+        # --- AUTOMATED SINGLE-SUBJECT PREREQUISITE GRAPH GENERATOR ---
+        graph_nodes = []
+        graph_edges = []
+
+        if isinstance(subject_obj, Subject) and subject_obj.id is not None:
+            # 1. Collect the main subject and its immediate prerequisites links
+            links = session.exec(
+                select(SubjectPrerequisite).where(SubjectPrerequisite.subject_id == subject_obj.id)
+            ).all()
+
+            subject_node_ids = {subject_obj.id}
+            custom_nodes: dict[int, str] = {}
+            next_custom_id = -1
+
+            for link in links:
+                if link.subject_id is None:
+                    continue
+                
+                if link.prerequisite_subject_id is not None:
+                    prereq_id = int(link.prerequisite_subject_id)
+                    subject_node_ids.add(prereq_id)
+                    graph_edges.append({
+                        "from": prereq_id,
+                        "to": subject_obj.id,
+                        "type": "corequisite" if link.is_corequisite else "prerequisite"
+                    })
+                elif link.custom_text:
+                    requirement_text = link.custom_text.strip()
+                    code_match = re.search(r"\b[A-Za-z]{3,5}\d{3,4}\b", requirement_text)
+                    if code_match:
+                        label = code_match.group(0)
+                        matching_subject = session.exec(select(Subject).where(Subject.subject_code == label)).first()
+                        
+                        if matching_subject and matching_subject.id is not None:
+                            prereq_id = int(matching_subject.id)
+                        else:
+                            prereq_id = next_custom_id
+                            next_custom_id -= 1
+                            custom_nodes[prereq_id] = label
+                        
+                        subject_node_ids.add(prereq_id)
+                        graph_edges.append({
+                            "from": prereq_id,
+                            "to": subject_obj.id,
+                            "type": "corequisite" if link.is_corequisite else "prerequisite"
+                        })
+
+            # 2. Evaluate labels and color statuses automatically for each gathered node
+            for node_id in sorted(subject_node_ids):
+                is_completed = False
+                is_in_progress = False
+                label = "Unknown"
+
+                if node_id in custom_nodes:
+                    label = custom_nodes[node_id]
+                else:
+                    s = session.get(Subject, node_id)
+                    if s:
+                        label = str(getattr(s, "subject_code", ""))
+                        is_completed = bool(getattr(s, "is_finalized", False))
+                        
+                        if not is_completed:
+                            from src.infrastructure.db.models import Assignment, Examination
+                            has_assignment_marks = session.exec(
+                                select(Assignment).where(Assignment.subject_id == s.id, col(Assignment.weighted_mark) > 0)
+                            ).first() is not None
+                            has_exam_marks = session.exec(
+                                select(Examination).where(Examination.subject_id == s.id, col(Examination.exam_mark) > 0)
+                            ).first() is not None
+                            
+                            if has_assignment_marks or has_exam_marks:
+                                is_in_progress = True
+
+                graph_nodes.append({
+                    "id": node_id,
+                    "label": label,
+                    "main": node_id == subject_obj.id,
+                    "corequisite": False,
+                    "is_completed": is_completed,
+                    "is_in_progress": is_in_progress
+                })
+
+        ctx["prereq_graph_data"] = {"nodes": graph_nodes, "edges": graph_edges}
+        # --- END OF GRAPH GENERATOR ---
+
+        return _render(request, "subject.html", ctx)
 
 @views.get("/year/{year}/semester/{semester}/subject/{code}/settings", response_class=HTMLResponse)
 def subject_settings_page(
