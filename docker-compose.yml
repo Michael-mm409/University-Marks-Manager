@@ -24,7 +24,6 @@ services:
     env_file:
       - .env
     environment:
-          - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
           - PYTHONUNBUFFERED=1
           - LOG_FILTER_HEALTHCHECK=true
           - SECRET_PEPPER=${SECRET_PEPPER}
