@@ -125,7 +125,11 @@
                     hx-swap="none">
                     {% for max_gpa, scale_name in (gpa_scale_options if gpa_scale_options is defined else []) %}
                     <option value="{{ max_gpa }}" {% if (item.course.gpa_scale or 4) == max_gpa %}selected{% endif %}>
-                      {{ max_gpa }}-pt {{ scale_name }}
+                      {% if "Point" in scale_name or "pt" in scale_name %}
+                        {{ scale_name }}
+                      {% else %}
+                        {{ scale_name }} ({{ max_gpa }}-Point)
+                      {% endif %}
                     </option>
                     {% endfor %}
                   </select>

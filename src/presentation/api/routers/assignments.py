@@ -9,6 +9,7 @@ from sqlmodel import col, Session, select
 from src.infrastructure.db.models import Assignment, GradeType, Subject, Semester
 from src.presentation.api.schemas import AssignmentCreate, AssignmentRead
 from src.presentation.api.deps import get_session
+from src.core.services.grade_calculator import GradeCalculator
 
 router = APIRouter()
 
@@ -130,6 +131,8 @@ def create_assignment(data: AssignmentCreate, session: Session = Depends(get_ses
     session.add(assignment)
     session.commit()
     session.refresh(assignment)
+    if assignment.subject_id is not None:
+        GradeCalculator(session).sync_subject_total(assignment.subject_id)
     return assignment
 
 
@@ -246,6 +249,8 @@ def update_assignment(assignment_id: int, data: AssignmentCreate,
     session.add(assignment_record)
     session.commit()
     session.refresh(assignment_record)
+    if assignment_record.subject_id is not None:
+        GradeCalculator(session).sync_subject_total(assignment_record.subject_id)
     return assignment_record
 
 
@@ -264,8 +269,11 @@ def delete_assignment(assignment_id: int, session: Session = Depends(get_session
     a = session.get(Assignment, assignment_id)
     if not a:
         raise HTTPException(status_code=404, detail="Not found")
+    subject_id = a.subject_id
     session.delete(a)
     session.commit()
+    if subject_id is not None:
+        GradeCalculator(session).sync_subject_total(subject_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 __all__ = ["router"]

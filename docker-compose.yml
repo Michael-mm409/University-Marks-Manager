@@ -20,6 +20,7 @@ services:
       - "8001:8001"
     networks:
       - proxy-tier
+      - databases_bigdata-net
     env_file:
       - .env
     environment:
@@ -30,7 +31,7 @@ services:
           - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
           - FORWARDED_ALLOW_IPS=*
     volumes:
-      - ./:/app
+      - ./:/app:Z
     healthcheck:
       test: [ "CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/healthz').getcode()==200 else 1)\"" ]
       interval: 30s
@@ -40,4 +41,6 @@ services:
 
 networks:
   proxy-tier:
+    external: true
+  databases_bigdata-net:
     external: true

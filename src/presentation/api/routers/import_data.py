@@ -13,6 +13,7 @@ from src.infrastructure.db.models import (
     User,
 )
 from src.presentation.api.deps import get_session
+from src.core.services.grade_calculator import GradeCalculator
 
 router = APIRouter()
 
@@ -115,6 +116,24 @@ async def import_user_data(
 
         session.flush()
         session.commit()
+
+        # Collect distinct subject_ids from imported records and sync totals
+        distinct_subject_ids = {
+            assign_data["subject_id"]
+            for assign_data in payload.get("assignments", [])
+            if assign_data.get("subject_id") is not None
+        } | {
+            exam_data["subject_id"]
+            for exam_data in payload.get("examinations", [])
+            if exam_data.get("subject_id") is not None
+        } | {
+            subj_data["id"]
+            for subj_data in payload.get("subjects", [])
+            if subj_data.get("id") is not None
+        }
+
+        for sid in distinct_subject_ids:
+            GradeCalculator(session).sync_subject_total(sid)
 
         return {
             "success": True,

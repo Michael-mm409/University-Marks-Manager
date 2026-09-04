@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlmodel import col, Session, select
 from src.infrastructure.db.models import Assignment, ExamSettings, Examination, GradeType, Semester, Subject
 from src.presentation.api.deps import get_session
+from src.core.services.grade_calculator import GradeCalculator
 from urllib.parse import quote_plus, quote
 from html import escape as html_escape
 import json
@@ -238,6 +239,9 @@ def create_assignment(
                         )
                     )
                 session.commit()
+    if subject_id is not None:
+        GradeCalculator(session).sync_subject_total(subject_id)
+
     url = f"/semester/{semester}/subject/{code}?year={year}&total_mark={target_val or ''}"
     if return_to:
         url += f"&return_to={return_to}"
@@ -291,6 +295,8 @@ def delete_assignment(
     if existing:
         session.delete(existing)
         session.commit()
+        if sid is not None:
+            GradeCalculator(session).sync_subject_total(sid)
     # Always include total_mark in redirect to ensure summary recalculates
     total_mark = getattr(subj, "total_mark", None)
     url = f"/semester/{semester}/subject/{code}?year={year}"
@@ -380,6 +386,7 @@ def edit_assignment_form(
     <button type='button' class='btn btn-xs' onclick='window.cancelInlineEditAssignment()'>Cancel</button>
 </td>
 """)
+
 # AJAX endpoint: update assignment and return JSON result
 @assignment_router.api_route("/assignment/{assessment}/{year}/update", methods=["POST"], response_class=JSONResponse)
 def update_assignment_ajax(
@@ -398,20 +405,24 @@ def update_assignment_ajax(
     session: Session = Depends(get_session),
 ):
     """
-    Short description.
+    Update an existing assignment via AJAX and synchronize subject totals.
 
     Args:
-        assessment: Description.
-        code: Description.
-        semester: Description.
-        year: Description.
-        weighted_mark: Description.
-        mark_weight: Description.
-        grade_type: Description.
-        session: Description.
+        assessment: Original assessment name.
+        code: Subject code.
+        semester: Semester name.
+        year: Semester year.
+        category: Optional category override.
+        new_assessment: Optional updated assessment name.
+        weighted_mark: Numeric weighted mark string.
+        mark_weight: Mark weight string.
+        grade_type: Grade type ("numeric", "S", "U").
+        is_exam: Whether the assignment represents the final exam.
+        exam_type: Exam type ("assignment" or "main").
+        session: Database session dependency.
 
-    Raises:
-        Description.
+    Returns:
+        JSONResponse: Success status and URL to reload the page.
     """
     try:
         # Resolve subject to use normalized ID-based lookups
@@ -443,7 +454,6 @@ def update_assignment_ajax(
         
         # Update assignment name if changed
         if new_assessment and new_assessment != assessment:
-            # Check for duplicate name
             existing = session.exec(
                 select(Assignment).where(
                     Assignment.subject_id == sid,
@@ -455,42 +465,42 @@ def update_assignment_ajax(
             assignment.assessment = new_assessment
         assignment.category = _derive_category(new_assessment or assignment.assessment, category)
         
-        # Update fields
+        # Update marks and weights
         if grade_type == GradeType.NUMERIC.value:
             try:
-                if weighted_mark is not None and weighted_mark != "":
-                    weighted_val = float(weighted_mark)
-                    # store numeric weighted marks as floats
-                    assignment.weighted_mark = weighted_val
-                else:
-                    weighted_val = float(assignment.weighted_mark) if assignment.weighted_mark is not None else 0.0
-                if mark_weight is not None and mark_weight != "":
+                if mark_weight is not None and mark_weight.strip() != "":
                     mark_weight_val = float(mark_weight)
                     assignment.mark_weight = mark_weight_val
                 else:
                     mark_weight_val = float(assignment.mark_weight) if assignment.mark_weight is not None else 0.0
-                assignment.unweighted_mark = round(weighted_val / mark_weight_val, 4) if mark_weight_val else None
+
+                if weighted_mark is not None and weighted_mark.strip() != "":
+                    weighted_val = float(weighted_mark)
+                    assignment.weighted_mark = weighted_val
+                    assignment.unweighted_mark = round(weighted_val / mark_weight_val, 4) if mark_weight_val else None
+                else:
+                    assignment.weighted_mark = None
+                    assignment.unweighted_mark = None
             except ValueError:
                 return JSONResponse({"success": False, "error": "Invalid numeric values."}, status_code=400)
         elif grade_type in (GradeType.SATISFACTORY.value, GradeType.UNSATISFACTORY.value):
             assignment.weighted_mark = None
             assignment.mark_weight = None
             assignment.unweighted_mark = None
+
         assignment.grade_type = grade_type
         assignment.is_exam = is_exam
         session.commit()
 
         # --- Sync Examination table if assignment is (un)marked as exam ---
-        # Only one exam per subject is supported (by design)
         exam = session.exec(
             select(Examination).where(
                 (Examination.subject_id == sid) & (Examination.exam_type == exam_type)
             )
         ).first()
         if is_exam:
-            # Use assignment's weighted_mark for the exam (Final Exam Mark)
-            exam_mark = assignment.weighted_mark if assignment.weighted_mark is not None else 0.0
-            exam_weight = assignment.mark_weight if assignment.mark_weight is not None else 0.0
+            exam_mark = float(assignment.weighted_mark) if assignment.weighted_mark is not None else None
+            exam_weight = float(assignment.mark_weight) if assignment.mark_weight is not None else 0.0
             if exam:
                 exam.exam_mark = exam_mark
                 exam.exam_weight = exam_weight
@@ -505,68 +515,18 @@ def update_assignment_ajax(
                 )
             session.commit()
         else:
-            # If unmarking as exam, remove the Examination record if it matches this assignment
             if exam:
                 session.delete(exam)
                 session.commit()
-        # Recalculate and update subject total_mark after assignment edit (display only)
-        subject = subj
-        if subject:
-            assignments = session.exec(
-                select(Assignment).where(
-                    Assignment.subject_id == sid,
-                ).order_by(col(Assignment.id))
-            ).all()
-            exams = session.exec(
-                select(Examination).where(
-                    Examination.subject_id == sid,
-                )
-            ).all()
-            assess_weight_sum = 0.0
-            assess_weighted_total = 0.0
-            for a in assignments:
-                if a.grade_type == GradeType.NUMERIC.value:
-                    if a.mark_weight is not None and a.mark_weight != "":
-                        try:
-                            assess_weight_sum += float(a.mark_weight)
-                        except ValueError:
-                            pass
-                    if a.weighted_mark is not None and a.weighted_mark != "":
-                        try:
-                            assess_weighted_total += float(a.weighted_mark)
-                        except ValueError:
-                            pass
-            # ...existing code...
 
-            disp_exam_mark: float | None = None
-            disp_exam_weight: float | None = None
-            if exams:
-                exam = exams[0]
-                try:
-                    disp_exam_mark = float(exam.exam_mark)
-                except (TypeError, ValueError):
-                    disp_exam_mark = None
-                try:
-                    disp_exam_weight = float(exam.exam_weight)
-                except (TypeError, ValueError):
-                    disp_exam_weight = None
-                # Recalculate totals for display only — do NOT persist subject.total_mark here.
-                total_mark = None
-                if assess_weight_sum or disp_exam_weight:
-                    try:
-                        total_weighted = assess_weighted_total
-                        total_weight_percent = assess_weight_sum
-                        if disp_exam_mark is not None and disp_exam_weight is not None:
-                            total_weighted += (disp_exam_mark / 100.0) * disp_exam_weight
-                            total_weight_percent += disp_exam_weight
-                        if total_weight_percent > 0:
-                            total_mark = round((total_weighted / total_weight_percent) * 100.0, 2)
-                    except ZeroDivisionError:
-                        total_mark = None
-        # The subject page renders grouped summaries server-side, so any successful
-        # update should trigger a reload to keep the table and threshold groups in sync.
+        # Recalculate and persist subject total_mark and is_finalized status
+        if sid is not None:
+            GradeCalculator(session).sync_subject_total(sid)
+
+        # Reload the page to reflect recalculated summaries and grouping
         reload_url = f"/semester/{semester}/subject/{code}?year={year}"
         return JSONResponse({"success": True, "reload_url": reload_url})
     except Exception:
         logger.exception("update_assignment_ajax failed")
         return JSONResponse({"success": False, "error": "Internal server error"}, status_code=500)
+        

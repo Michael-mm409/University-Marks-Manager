@@ -54,7 +54,8 @@ except Exception:
 
 app_name = os.getenv("APP_NAME", "Marks Manager")
 app_version = os.getenv("APP_VERSION", "dev")
-api_version = os.getenv("API_VERSION", "v1").strip().strip("/")
+raw_api_version = os.getenv("API_VERSION", "v1").strip().strip("/")
+api_version = f"v{raw_api_version}" if raw_api_version.isdigit() else raw_api_version
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
@@ -131,6 +132,8 @@ APPLICATION = FastAPI(title="University Marks Manager API", lifespan=lifespan)
 # Use API_VERSION for API prefix
 API_PREFIX = f"/api/{api_version}" if api_version else "/api"
 APPLICATION.include_router(api, prefix=API_PREFIX)
+if raw_api_version and raw_api_version != api_version:
+    APPLICATION.include_router(api, prefix=f"/api/{raw_api_version}")
 APPLICATION.include_router(views)
 
 # Enable server-side sessions for lightweight state (e.g., selected course)

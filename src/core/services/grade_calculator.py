@@ -1,4 +1,5 @@
 import math
+from decimal import Decimal, ROUND_HALF_UP
 import re
 from typing import Sequence, Any
 from sqlalchemy.sql import select, func, case
@@ -9,7 +10,7 @@ from src.infrastructure.db.models import Subject, Semester, GradeScale, Course, 
 
 def academic_round(val: float) -> int:
     """Round using strict half-up rules (e.g. 84.5 → 85, not banker's rounding)."""
-    return math.floor(val + 0.5)
+    return int(Decimal(str(val)).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
 
 
 def _round2dp(val: float) -> float:
@@ -82,8 +83,12 @@ def process_assessments(assessments: Sequence[Any], rules: Sequence[SubjectRule]
     for category, group in grouped_assessments.items():
         scored_weight = group.pop("scored_weight")
         score_total = group.pop("score_total")
-        group["score"] = round((score_total / group["weight"]) * 100.0, 2) if group["weight"] else None
-        group["rows"] = sorted(group["rows"], key=lambda row: row["name"].lower())
+
+        group["score"] = (
+            round((score_total / scored_weight) * 100.0, 2)
+            if scored_weight > 0
+            else None
+)
 
     standalone_assessments.sort(key=lambda row: row["name"].lower())
 
@@ -124,7 +129,8 @@ class GradeCalculator:
 
         query = query.where(
             col(Subject.total_mark).is_not(None),
-            col(Subject.total_mark) > 0
+            col(Subject.total_mark) > 0,
+            col(Subject.is_finalized).is_(True)
         )
         
         self._print_sql(query, f"Base Query (course_id={course_id})")
@@ -252,18 +258,17 @@ class GradeCalculator:
             exam_settings_map = {es.subject_id: es for es in exam_settings}
 
         for subject in subjects:
-            mark = subject.total_mark
+            mark = academic_round(subject.total_mark) if subject.total_mark is not None else None
             subj_exam = exam_settings_map.get(subject.id) if subject.id is not None else None
             is_ps = subj_exam.ps_exam if subj_exam else False
             
             if is_ps:
-                # Count as PS regardless of mark
                 counts['PS'] += 1
                 continue
-            # Otherwise, assign by mark, but skip PS band
+
             for scale in scales:
                 if scale.grade == 'PS':
-                    continue  # skip PS for non-ps_exam subjects
+                    continue
                 if mark is not None and mark >= scale.min_mark:
                     counts[scale.grade] += 1
                     break
@@ -284,7 +289,11 @@ class GradeCalculator:
         grade_subquery = base_query.subquery()
         # Build CASE expression for GPA points based on grade scales
         # Use SQLAlchemy's case() for proper typing
-        whens = [(grade_subquery.c.total_mark >= scale.min_mark, scale.gpa_point) for scale in scales]
+        # In SQL, ROUND(total_mark) performs half-up rounding to the nearest integer:
+        whens = [
+            (func.round(grade_subquery.c.total_mark) >= scale.min_mark, scale.gpa_point)
+            for scale in scales
+        ]
         gpa_point_expr = case(*whens, else_=0.0)
         
         # Calculate weighted GPA
@@ -379,7 +388,7 @@ class GradeCalculator:
                 "core_items": core_items,
             })
 
-        # 3. Process Exam
+       # 3. Process Exam
         has_exam_flag = getattr(subject, "has_exam", False)
         exam_assignment = next((a for a in all_assignments if a.is_exam), None)
 
@@ -394,7 +403,16 @@ class GradeCalculator:
             elif exam_assignment:
                 weight = float(exam_assignment.mark_weight or 50.0)
                 score = float(exam_assignment.weighted_mark) if exam_assignment.weighted_mark is not None else None
-                unweighted = (float(exam_assignment.unweighted_mark) / 100) if exam_assignment.unweighted_mark else None
+                
+                # Robust ratio conversion: handles both 0.94 and 94.0
+                raw_unweighted = getattr(exam_assignment, "unweighted_mark", None)
+                if raw_unweighted is not None:
+                    raw_float = float(raw_unweighted)
+                    unweighted = raw_float / 100.0 if raw_float > 1.0 else raw_float
+                elif score is not None and weight > 0:
+                    unweighted = score / weight
+                else:
+                    unweighted = None
             else:
                 weight = 50.0
                 unweighted, score = None, None
@@ -404,10 +422,11 @@ class GradeCalculator:
                     "type": "exam",
                     "label": "Final Examination",
                     "count": 1,
-                    "unweighted_avg": unweighted,
+                    "unweighted_avg": round(unweighted, 4) if unweighted is not None else None,
                     "total_weight": weight,
                     "weighted_score": _round2dp(score) if score is not None else 0.0,
                     "bonus_count": 0,
+                    "display_status": "Standalone",
                     "has_scored_items": score is not None,
                     "core_items": [exam_record] if exam_record else ([exam_assignment] if exam_assignment else []),
                 })
@@ -420,12 +439,19 @@ class GradeCalculator:
         for a in remaining:
             a_weight = _item_weight(a)
             a_score = _item_score(a)
+            
+            # Normalize standalone score if legacy data has raw percentages > 1.0
+            if a_score is not None and a_score > 1.0:
+                a_score_ratio = a_score / 100.0
+            else:
+                a_score_ratio = a_score
+
             if a_weight >= WEIGHT_THRESHOLD:
                 summary.append({
                     "type": "general",
                     "label": a.assessment or "Assessment",
                     "count": 1,
-                    "unweighted_avg": round(a_score, 4) if a_score is not None else None,
+                    "unweighted_avg": round(a_score_ratio, 4) if a_score_ratio is not None else None,
                     "total_weight": round(a_weight, 2),
                     "weighted_score": _round2dp(_item_weighted_score(a)),
                     "bonus_count": 0,  # Required by template
@@ -464,16 +490,17 @@ class GradeCalculator:
             if isinstance(item, Examination):
                 if float(item.exam_weight or 0) <= 0:
                     return True
-                mark = item.exam_mark
-                return mark is not None and float(mark) != 0.0
+                return item.exam_mark is not None
+
             weight = float(getattr(item, "mark_weight", 0) or 0)
+
             if weight <= 0:
                 return True
-            # S/U items have no numeric mark by design
+
             if getattr(item, "grade_type", "numeric") in ("S", "U"):
                 return True
-            wm = getattr(item, "weighted_mark", None)
-            return wm is not None and float(wm) != 0.0
+
+            return getattr(item, "weighted_mark", None) is not None
 
         gradeable: list[Any] = [
             a for a in all_assignments if float(getattr(a, "mark_weight", 0) or 0) > 0
@@ -487,32 +514,25 @@ class GradeCalculator:
         type_order = {"rule": 0, "general": 1, "exam": 2}
         summary.sort(key=lambda x: (type_order.get(x["type"], 99), x["label"]))
 
-        # Check for Total Mark override (e.g., if a final grade is already uploaded)
-        raw_total = getattr(subject, "total_mark", 0.0)
-        db_total_mark = float(raw_total) if raw_total is not None else 0.0
-        
+        # Check for Total Mark override (e.g., if a final grade is already uploaded without individual assignments)
+        raw_total = getattr(subject, "total_mark", None)
+        db_total_mark = float(raw_total) if raw_total is not None else None
+
         total_achieved = 0.0
         remaining_weight_value = 0.0
 
-        if db_total_mark > 0:
-            total_achieved = round(db_total_mark, 2)
-            remaining_weight_value = 0.0
-        else:
-            # Calculate from summary items
-            for row in summary:
-                total_achieved += row["weighted_score"]
-                
-                # Logic: If the whole row has no scores, add its full weight to remaining
-                if not row["has_scored_items"]:
-                    remaining_weight_value += float(row["total_weight"] or 0.0)
-                else:
-                    # If it's a group, check for individual unscored items
-                    # We use the 'core_items' list to find assignments without a mark
-                    for item in row["core_items"]:
-                        if _item_score(item) is None:
-                            remaining_weight_value += _item_weight(item)
+        for row in summary:
+            total_achieved += float(row["weighted_score"] or 0.0)
 
-        remaining_weight = round(remaining_weight_value, 2)
+            for item in row["core_items"]:
+                if _item_score(item) is None:
+                    remaining_weight_value += _item_weight(item)
+
+        if not summary and db_total_mark is not None and db_total_mark > 0 and getattr(subject, "is_finalized", False) and not all_assignments:
+            total_achieved = _round2dp(db_total_mark)
+            remaining_weight_value = 0.0
+
+        remaining_weight = _round2dp(remaining_weight_value)
         total_achieved = _round2dp(total_achieved)
 
         # Apply university half-up rounding before threshold checks so that
@@ -550,3 +570,30 @@ class GradeCalculator:
             "remaining_weight": remaining_weight,
             "is_fully_graded": is_fully_graded,
         }
+
+    def sync_subject_total(self, subject_id: int) -> float | None:
+        """Recalculates subject summary and persists total_mark and is_finalized."""
+        subject = self.session.get(Subject, subject_id)
+        if not subject:
+            return None
+
+        # Re-use existing comprehensive calculation logic
+        summary_result = self.calculate_subject_summary(subject)
+        all_assignments = list(getattr(subject, "assignments", []) or [])
+        exam_record = self.session.execute(select(Examination).where(col(Examination.subject_id) == subject.id)).scalars().first()
+        has_exam = getattr(subject, "has_exam", False)
+
+        if not all_assignments and not exam_record and not has_exam:
+            total_achieved = 0.0
+            is_fully_graded = False
+        else:
+            total_achieved = summary_result.get("total_achieved", 0.0)
+            is_fully_graded = summary_result.get("is_fully_graded", False)
+
+        # Update subject fields
+        subject.total_mark = total_achieved
+        subject.is_finalized = is_fully_graded
+
+        self.session.add(subject)
+        self.session.commit()
+        return total_achieved
