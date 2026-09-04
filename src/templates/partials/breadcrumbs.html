@@ -1,0 +1,21 @@
+<nav aria-label="Breadcrumb">
+  <ol class="flex items-center gap-2 text-sm breadcrumb px-2 py-2 bg-base-100 rounded-lg shadow-sm justify-center overflow-hidden whitespace-nowrap">
+    <!-- Home -->
+    <li>
+      <a href="/all" class="link link-hover text-primary font-medium">Home</a>
+    </li>
+    
+    {% if breadcrumbs %}
+      {% for crumb in breadcrumbs %}
+      <li class="text-base-content/50 font-medium">&gt;</li>
+      <li>
+        {% if crumb.url %}
+          <a href="{{ crumb.url }}" class="link link-hover text-primary font-medium">{{ crumb.label }}</a>
+        {% else %}
+          <span class="text-base-content font-semibold">{{ crumb.label }}</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    {% endif %}
+  </ol>
+</nav>

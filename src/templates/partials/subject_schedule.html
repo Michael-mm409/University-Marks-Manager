@@ -1,0 +1,119 @@
+{% set ns = namespace(has_subjects=false) %}
+{% for sem in semesters %}
+  {% if subjects_by_semester.get(sem.id) %}
+    {% set ns.has_subjects = true %}
+  {% endif %}
+{% endfor %}
+
+<section class="max-w-4xl mx-auto px-2 w-full flex flex-col gap-3">
+  <div class="flex items-center justify-between gap-3 flex-wrap">
+    <h3 class="text-lg sm:text-xl font-bold">Subject Schedule</h3>
+    {% if ns.has_subjects %}
+      <div class="btn-group">
+        <button id="sched-btn-table" class="btn btn-sm btn-outline btn-active" onclick="setScheduleView('table')">Table View</button>
+        <button id="sched-btn-grid" class="btn btn-sm btn-outline" onclick="setScheduleView('grid')">Grid View</button>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if ns.has_subjects %}
+    <!-- TABLE VIEW -->
+    <div id="schedule-table" class="overflow-x-auto rounded-xl bg-base-100 shadow" style="scroll-margin-top: 82px;">
+      <table class="table table-zebra table-sm sm:table-md w-full">
+        <thead>
+          <tr>
+            <th>Subject Code</th>
+            <th>Subject Name</th>
+            <th>Semester</th>
+            <th>Year</th>
+            <th class="text-right">Credit Points</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sem in semesters | sort(attribute='year') %}
+            {% set subs = subjects_by_semester.get(sem.id) %}
+            {% if subs %}
+              {% for s in subs %}
+                <tr class="hover">
+                  <td class="font-mono text-xs sm:text-sm">
+                    <a class="link link-primary" href="/year/{{ sem.year }}/semester/{{ sem.name }}/subject/{{ s.subject_code }}">
+                      {{ s.subject_code }}
+                    </a>
+                  </td>
+                  <td class="text-sm">{{ s.subject_name }}</td>
+                  <td><span class="badge badge-ghost badge-sm">{{ sem.name }}</span></td>
+                  <td class="tabular-nums text-sm">{{ sem.year }}</td>
+                  <td class="text-right tabular-nums text-sm">{{ s.credit_points }}</td>
+                </tr>
+              {% endfor %}
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- GRID VIEW (grouped by year, semesters side-by-side) -->
+    <div id="schedule-grid" style="display:none" class="flex flex-col gap-6">
+      {% set years_seen = [] %}
+      {% for sem in semesters | sort(attribute='year') %}
+        {% if sem.year not in years_seen %}
+          {% set _ = years_seen.append(sem.year) %}
+          <div>
+            <div class="text-base font-bold mb-2 border-b border-base-300 pb-1">{{ sem.year }}</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {% for inner_sem in semesters | sort(attribute='name') %}
+                {% if inner_sem.year == sem.year %}
+                  {% set subs = subjects_by_semester.get(inner_sem.id) %}
+                  {% if subs %}
+                    <div class="p-3 rounded-lg bg-base-100 shadow border border-base-200 flex flex-col gap-2">
+                      <div class="font-semibold text-sm text-primary">{{ inner_sem.name }}</div>
+                      <ul class="flex flex-col gap-1">
+                        {% for s in subs %}
+                          <li class="flex items-baseline gap-1 text-xs sm:text-sm">
+                            <a class="link link-hover font-mono text-primary shrink-0" href="/year/{{ inner_sem.year }}/semester/{{ inner_sem.name }}/subject/{{ s.subject_code }}">
+                              {{ s.subject_code }}
+                            </a>
+                            <span class="opacity-40 shrink-0">—</span>
+                            <span class="opacity-70 truncate" title="{{ s.subject_name }}">{{ s.subject_name }}</span>
+                          </li>
+                        {% endfor %}
+                      </ul>
+                      <div class="text-xs opacity-50 text-right">{{ subs | map(attribute='credit_points') | sum }} CP</div>
+                    </div>
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <script>
+      function setScheduleView(view) {
+        var tableEl = document.getElementById('schedule-table');
+        var gridEl  = document.getElementById('schedule-grid');
+        var btnT    = document.getElementById('sched-btn-table');
+        var btnG    = document.getElementById('sched-btn-grid');
+        if (view === 'table') {
+          if (tableEl) tableEl.style.display = '';
+          if (gridEl)  gridEl.style.display = 'none';
+          if (btnT) btnT.classList.add('btn-active');
+          if (btnG) btnG.classList.remove('btn-active');
+        } else {
+          if (tableEl) tableEl.style.display = 'none';
+          if (gridEl)  gridEl.style.display = 'flex';
+          if (btnG) btnG.classList.add('btn-active');
+          if (btnT) btnT.classList.remove('btn-active');
+        }
+        localStorage.setItem('scheduleView', view);
+      }
+      document.addEventListener('DOMContentLoaded', function() {
+        var saved = localStorage.getItem('scheduleView');
+        if (saved === 'grid') setScheduleView('grid');
+      });
+    </script>
+  {% else %}
+    <p class="text-sm opacity-60 italic">No subjects found for the selected period.</p>
+  {% endif %}
+</section>

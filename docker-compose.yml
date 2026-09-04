@@ -1,51 +1,46 @@
 services:
-  nginx:
-    container_name: marks-manager-nginx
-    image: nginx:latest
-    ports:
-      - "18000:80"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      web:
-        condition: service_healthy
-    restart: unless-stopped
-
   web:
     container_name: marks-manager-web
     build:
       context: .
       dockerfile: Dockerfile
-    image: university-marks-manager:fastapi
-    command: uvicorn src.app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --workers 2
+    command: >
+      uvicorn src.app.main:app
+      --host 0.0.0.0
+      --port 8001
+      --proxy-headers
+      --forwarded-allow-ips="*"
+      --reload
+      --reload-dir /app/src
+      --reload-dir /app/src/templates
+      --log-level info
+      --access-log
     restart: unless-stopped
+    ports:
+      - "8001:8001"
+    networks:
+      - proxy-tier
+      - databases_bigdata-net
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}
-      - ENABLE_DEBUG_ROUTES=${ENABLE_DEBUG_ROUTES}
-    # Mark the web app healthy only when /healthz responds OK; helps avoid transient 502s on restart
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz').getcode()==200 else 1)\""]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
-    depends_on:
-      - db
-
-  db:
-    container_name: marks-manager-db
-    image: postgres:13
-    restart: unless-stopped
+          - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT}/${POSTGRES_DB}
+          - PYTHONUNBUFFERED=1
+          - LOG_FILTER_HEALTHCHECK=true
+          - SECRET_PEPPER=${SECRET_PEPPER}
+          - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
+          - FORWARDED_ALLOW_IPS=*
     volumes:
-      - postgres_data_nas:/var/lib/postgresql/data/
-    env_file:
-      - .env
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      - ./:/app:Z
+    healthcheck:
+      test: [ "CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/healthz').getcode()==200 else 1)\"" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
 
-volumes:
-  postgres_data_nas:
+networks:
+  proxy-tier:
+    external: true
+  databases_bigdata-net:
+    external: true

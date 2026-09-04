@@ -17,3 +17,15 @@ __pycache__/
 .coverage
 .env
 .env.local
+
+# Scripts
+db/data/
+db/build/
+assets/@eaDir/
+/CommandsThumbs.db
+**/Thumbs.db
+Commands/
+query_db.py
+debug_db.py
+check.py
+.venv/

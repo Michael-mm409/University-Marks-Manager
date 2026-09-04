@@ -68,6 +68,9 @@ conda create -n umm python=3.11 -y
 conda activate umm
 pip install -r requirements.txt
 
+# Optional: dev tools (linting, tests, migrations)
+pip install -r requirements-dev.txt
+
 # Optional: set for this session; StartMarkManager.bat will default to 'umm' if not set
 $env:CONDA_ENV = "umm"
 
@@ -395,6 +398,42 @@ Stored per subject (ExamSettings): reduces effective exam contribution while lea
 
 Add tests under `tests/` (not yet populated). Suggested:
 
+## 🤝 Contributing & Templates
+
+I've added a few small helpers to make contributing and triage quick:
+
+- `CONTRIBUTING.md` — quick steps for PRs, tests, and running locally.
+- `my-service/CLAUDE.md` and related `my-service/*/CLAUDE.md` — short, informal conventions per area (api, internal, cmd).
+- GitHub templates for PRs and Issues live under `.github/`:
+   - `PULL_REQUEST_TEMPLATE.md` — short PR body to copy into new PRs.
+   - `.github/ISSUE_TEMPLATE/` — templates for bug reports, feature requests, and chores.
+   - `.github/ISSUE_TEMPLATE/config.yml` — presents choices when opening new issues.
+
+If you open issues or PRs, follow the short templates — they make reviews faster and keep things tidy.
+
+   Labels
+   - I added a small set of labels to help triage: `bug`, `enhancement`, `chore`, `docs`, `test`, `perf`, `refactor`, `ci`, `help wanted`, `good first issue`, and `discussion`.
+   - Use them when creating issues or PRs to speed up sorting; you can also apply them later during triage.
+
+   Import labels into your GitHub repo
+   - If you want to import the `labels.yml` set into the repo (create/update labels), run:
+
+   ```bash
+   python3 scripts/import_labels.py
+   ```
+
+   Make sure the `gh` CLI is installed and authenticated (`gh auth login`) and you're running the command from the repo root.
+
+   If `gh` is not available or doesn't support label subcommands in your environment, use the alternative script which uses a GitHub token:
+
+   ```bash
+   export GITHUB_TOKEN=ghp_...
+   python3 scripts/import_labels_api.py
+   ```
+
+   Set `GITHUB_TOKEN` (or `GH_TOKEN`) with repo scope before running.
+
+
 - Assignment numeric parsing
 - Exam target solver edge cases (0, impossible, negative required)
 - S/U path does not retain numeric data
@@ -405,13 +444,14 @@ See `docs/configuration.md` for environment suggestions & feature flags.
 
 ## 📘 Additional Documentation
 
-| Doc                            | Purpose                           |
-| ------------------------------ | --------------------------------- |
-| `docs/api-reference.md`        | Endpoints & form fields           |
-| `docs/configuration.md`        | Settings, calculations, structure |
-| `docs/troubleshooting.md`      | Common issues & fixes             |
-| `docs/tailwind-cli-install.md` | Local Tailwind build steps        |
-| `docs/architecture.md`         | High-level design                 |
+| Doc                                                     | Purpose                           |
+| ------------------------------------------------------- | --------------------------------- |
+| [api-reference.md](docs/api-reference.md)               | Endpoints & form fields           |
+| [configuration.md](docs/configuration.md)               | Settings, calculations, structure |
+| [troubleshooting.md](docs/troubleshooting.md)           |Common issues & fixes              |
+| [tailwind-cli-install.md](docs/tailwind-cli-install.md) | Local Tailwind build steps        |
+| [architecture.md](docs/architecture.md)                 | High-level design                 |
+| [MULTI_USER_SETUP.md](docs/MULTI_USER_SETUP.md)         | Multi User setup file             |
 
 ## 🤝 Contributing
 
@@ -431,11 +471,3 @@ MIT – see `LICENSE`.
 ## 📣 Support
 
 Open an issue with reproduction steps and environment details.
-
----
-
-Generated README reflects current FastAPI-based implementation (replacing legacy Streamlit description).
-
-```
-
-```

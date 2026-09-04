@@ -1,0 +1,116 @@
+<div class="mt-6 w-full max-w-4xl mx-auto">
+  <h3 class="font-semibold mb-2">Prerequisite Graph (All Subjects)</h3>
+  
+  <div style="position: relative; border: 1px solid #ccc; border-radius: 8px; overflow: hidden; resize: vertical; min-height: 400px; height: 650px;">
+    
+    <div id="prereq-graph-index" style="width: 100%; height: 100%; background: #fff;"></div>
+    
+    <div style="position: absolute; right: 8px; bottom: 8px; background: rgba(255,255,255,0.95); border: 1px solid #ddd; border-radius: 6px; padding: 6px 8px; font-size: 0.75rem; color: #333; box-shadow: 0 1px 2px rgba(0,0,0,0.08); pointer-events: none; z-index: 10;">
+      <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+        <span style="display:inline-block; width:14px; height:14px; background:#a5d6a7; border:1px solid #2e7d32; border-radius:3px;"></span>
+        <span>Completed</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+        <span style="display:inline-block; width:14px; height:14px; background:#ffe082; border:1px solid #ffb300; border-radius:3px;"></span>
+        <span>In Progress</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+        <span style="display:inline-block; width:14px; height:14px; background:#90caf9; border:1px solid #1565c0; border-radius:3px;"></span>
+        <span>Planned</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+        <span style="display:inline-block; width:16px; height:0; border-top:2px solid #1976d2;"></span>
+        <span>Prerequisite</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <span style="display:inline-block; width:16px; height:0; border-top:2px dashed #ff9800;"></span>
+        <span>Corequisite</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const graphUrl = "{% if selected_year %}/year/{{ selected_year }}/prerequisite_graph/json{% else %}/all/prerequisite_graph/json{% endif %}";
+      fetch(graphUrl)
+        .then(r => r.json())
+        .then(data => {
+          const container = document.getElementById('prereq-graph-index');
+          if (!container || !data.nodes) return;
+
+          // 1. Build Vis DataSet from backend properties
+          const nodes = new vis.DataSet(data.nodes.map(n => {
+            let baseColor = '#90caf9'; // Planned (Soft Blue)
+            let borderCol = '#1565c0';
+            let fontCol = '#222';
+
+            if (n.is_completed) {
+              baseColor = '#a5d6a7';   // Completed (Soft Green)
+              borderCol = '#2e7d32';   
+              fontCol = '#1b5e20';
+            } else if (n.is_in_progress) {
+              baseColor = '#ffe082';   // In Progress (Soft Amber)
+              borderCol = '#ffb300';   
+              fontCol = '#b78103';
+            } else if (n.main) {
+              baseColor = '#1976d2';   
+              borderCol = '#0d47a1';
+              fontCol = '#fff';
+            }
+
+            return {
+              id: n.id,
+              label: n.label,
+              color: { background: baseColor, border: borderCol, highlight: { background: baseColor, border: borderCol } },
+              font: { color: fontCol, size: n.main ? 22 : 16, bold: n.main },
+              x: n.x,
+              y: n.y,
+              physics: false,
+              fixed: { x: true, y: true }
+            };
+          }));
+
+          const edges = new vis.DataSet(data.edges.map(e => ({
+            from: e.from,
+            to: e.to,
+            arrows: 'to',
+            color: e.type === 'corequisite' ? { color: '#ff9800' } : { color: '#1976d2' },
+            dashes: e.type === 'corequisite',
+            title: e.type.charAt(0).toUpperCase() + e.type.slice(1),
+          })));
+
+          /// Options Configuration Block
+          const options = {
+            layout: { 
+              randomSeed: 42,
+              improvedLayout: true
+            },
+            nodes: { 
+              shape: 'box', 
+              borderWidth: 2,
+              margin: 12
+            },
+            edges: {
+              smooth: {
+                enabled: true,
+                type: 'cubicBezier',
+                forceDirection: 'vertical',
+                roundness: 0.5,
+              }
+            },
+            physics: { enabled: false }, // Direct node coordinate positioning enforcement
+          };
+
+          // Single Initialization Call
+          const network = new vis.Network(container, { nodes, edges }, options);
+
+          const resizeObserver = new ResizeObserver(() => {
+            network.redraw();
+            network.fit();
+          });
+          resizeObserver.observe(container);
+        });
+    });
+  </script>
+</div>

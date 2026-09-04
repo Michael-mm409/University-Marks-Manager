@@ -1,3 +1,3 @@
 #!/bin/sh
 
-uvicorn src.app.main:app --reload
+uvicorn src.app.main:app --reload --port 8001

@@ -1,11 +1,26 @@
-# /u:/UOW/Bachelor of Computer Science/Assignment Marks/University-Marks-Manager/requirements.txt
-# FastAPI stack — use upper bounds to avoid unexpected major upgrades
+# Core FastAPI stack — use upper bounds to avoid unexpected major upgrades
 fastapi>=0.111.0,<1.0.0
 uvicorn[standard]>=0.30.0,<1.0.0
+# Let sqlmodel choose a compatible SQLAlchemy (>=2.0 on modern versions)
 sqlmodel>=0.0.16,<1.0.0
 jinja2>=3.1.6,<4.0.0
 python-multipart>=0.0.18,<1.0.0
 itsdangerous>=2.2,<3.0.0
 
-# For production use the system-built psycopg2 package
-psycopg2>=2.9.9,<3.0.0
+# Typing helpers used by the web layer
+typing_extensions>=4.0,<5.0
+
+# Load environment variables from .env during local/dev runs
+python-dotenv>=1.0.1,<2.0.0
+
+# Using psycopg2-binary for simpler Docker builds to avoid C-dependencies
+psycopg2-binary>=2.9.9,<3.0.0
+
+# Password hashing for authentication
+bcrypt>=4.0.0,<5.0.0
+argon2-cffi>=21.3.0,<23.0.0
+
+
+
+pandas>=2.0.0
+openpyxl>=3.0.0

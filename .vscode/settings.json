@@ -1,8 +1,15 @@
 {
-  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.typeCheckingMode": "standard",
   "python.analysis.diagnosticSeverityOverrides": {
     "reportAttributeAccessIssue": "information"
   },
   "python.analysis.extraPaths": ["./"],
-  "python.analysis.stubPath": "./stubs"
+  "python.analysis.stubPath": "./stubs",
+  "remote.portsAttributes": {
+    "8001": {
+      "onAutoForward": "ignore"
+    }
+  },
+  "python-envs.defaultEnvManager": "ms-python.python:conda",
+  "python-envs.defaultPackageManager": "ms-python.python:conda"
 }

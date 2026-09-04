@@ -1,3 +1,26 @@
+<!--
+Simple PR template for this personal repo. Keep it short and helpful.
+Start the PR title with the commit type and scope, e.g. `feat(app): add CSV import`.
+-->
+
+Title: type(scope): short summary
+
+Summary
+- One-line summary of what changed.
+
+Why
+- Short sentence about the motivation / why this matters.
+
+How I tested
+- Automated tests run: yes/no, and any manual steps.
+
+Checklist (optional)
+- [ ] Tests added/updated
+- [ ] Manual steps documented
+- [ ] No secrets committed
+
+Notes
+- Any follow-ups or migration steps.
 # Pull Request
 
 ## Title

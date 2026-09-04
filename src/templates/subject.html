@@ -1,360 +1,731 @@
 {% extends 'base.html' %}
+{% block title %}{{semester}} - {{subject.subject_code}}{% endblock %}
+{% set breadcrumbs = [
+  {'label': year, 'url': '/year/' ~ year},
+  {'label': semester, 'url': '/year/' ~ year ~ '/semester/' ~ semester},
+] %}
+
 {% block content %}
-<style>
-  /* Small helper to show a tidy chevron for collapsibles */
-  .chev { width: 16px; height: 16px; opacity: 0.7; transition: transform 0.2s ease; }
-  .collapse > input[type="checkbox"]:checked + .collapse-title .chev { transform: rotate(180deg); }
-
-  /* Desktop layout */
-  .form-panels { display: grid; gap: 1.5rem; }
-  @media (min-width: 768px) {
-    .form-panels { grid-template-columns: 1fr 1fr; }
-  }
-
-  /* Center title and position chevron */
-  .collapse-title {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center; /* Center the title text */
-  }
-  .custom-chevron {
-    position: absolute;
-    right: 1rem; /* Position chevron to the right */
-  }
-
-  /* Hide the checkbox toggle visually but keep it functional */
-  .collapse > input[type="checkbox"].sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
-</style>
-<div class="flex items-start justify-between flex-wrap gap-4 mb-4">
-  <div>
-    <h2 class="text-2xl font-semibold flex items-center gap-3">
-      <span id="subject-code-display">{{subject.subject_code}}</span>
-      <span class="text-base font-normal opacity-70" id="subject-name-display">{{subject.subject_name}}</span>
-      <button id="edit-subject-btn" class="btn btn-xs btn-circle btn-ghost" type="button" onclick="showSubjectEditForm()" title="Edit subject">&#9881;</button>
-    </h2>
-    <form id="subject-edit-form" method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/update" class="flex gap-2 mt-2 hidden" onsubmit="return submitSubjectEditForm(event)">
-      <input type="hidden" name="year" value="{{year}}" />
-      <input name="subject_code" class="input input-xs w-24" value="{{subject.subject_code}}" required />
-      <input name="subject_name" class="input input-xs w-48" value="{{subject.subject_name}}" required />
-      <button type="submit" class="btn btn-xs btn-primary">Save</button>
-      <button type="button" class="btn btn-xs" onclick="hideSubjectEditForm()">Cancel</button>
-    </form>
-    <p class="mt-1 text-xs opacity-70 uppercase tracking-wide">Semester {{semester}} — {{year}}</p>
-  </div>
-  <div class="flex gap-2">
-    {% if return_to %}
-      {% set ret = return_to.split('-') %}
-  <a href="/year/{{ret[1]}}/semester/{{ret[0]}}" class="btn btn-xs btn-outline">Back to Semester</a>
-    {% else %}
-  <a href="/year/{{year}}/semester/{{semester}}" class="btn btn-xs btn-outline">Back to Semester</a>
-    {% endif %}
-    <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/delete" onsubmit="return confirm('Delete this subject and all related assignments/exams?');">
-      <input type="hidden" name="year" value="{{year}}" />
-      <button class="btn btn-xs btn-error" type="submit">Delete Subject</button>
-    </form>
-  </div>
+{% if request.query_params.get('error') %}
+<div class="alert alert-error shadow-md mb-6 max-w-4xl mx-auto">
+  <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4v2m0 0v2m0-6v-2m0 6v2m0 0H9m3 0h3m0 0h3m-3 0h-3m0 0H9m6 0H9m3 0h3m-3 0h3"></path></svg>
+  <span>{{ request.query_params.get('error') }}</span>
 </div>
+{% endif %}
 
-<div class="form-panels mb-6">
-  <!-- Add Assignment (collapsible) -->
-  <div class="collapse bg-base-100 rounded-xl shadow card-glow">
-    <input id="toggle-add" type="checkbox" class="sr-only" />
-    <label for="toggle-add" class="collapse-title font-semibold cursor-pointer">
-      <span class="flex items-center gap-2">
-        Add Assignment <span class="badge badge-outline badge-sm">{{ assignments|length }} existing</span>
-      </span>
-      <svg class="custom-chevron chev" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.5a1 1 0 0 1-.71-.29l-7-7a1 1 0 1 1 1.42-1.42L12 13.09l6.29-6.3a1 1 0 1 1 1.42 1.42l-7 7a1 1 0 0 1-.71.29z"/></svg>
-    </label>
-    <div class="collapse-content">
-      {% if error_messages and error_messages|length %}
-        <div class="alert alert-error mb-4 text-sm relative" id="error-alert">
-          <button type="button" class="btn btn-xs btn-circle absolute right-2 top-2" onclick="document.getElementById('error-alert').style.display='none'">✕</button>
-          <ul class="list-disc ml-4">
-            {% for err in error_messages %}<li>{{ err }}</li>{% endfor %}
-          </ul>
-        </div>
-      {% endif %}
-      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/create" class="grid grid-cols-1 md:grid-cols-12 gap-3 text-sm">
-        <input type="hidden" name="year" value="{{year}}" />
-        {% if final_total is not none %}<input type="hidden" name="total_mark" value="{{ final_total }}" />{% endif %}
-        {% if effective_exam_weight %}<input type="hidden" name="exam_weight" value="{{ effective_exam_weight }}" />{% endif %}
-        {% if ps_exam %}<input type="hidden" name="ps_exam" value="true" />{% endif %}
-        {% if ps_exam and ps_factor %}<input type="hidden" name="ps_factor" value="{{ ps_factor }}" />{% endif %}
-        <input name="assessment" placeholder="Assignment" class="input input-bordered input-xs col-span-1 md:col-span-4" required />
-        <input id="weighted_mark_input" name="weighted_mark" type="number" step="any" min="0" placeholder="Weighted mark" class="input input-bordered input-xs col-span-1 md:col-span-2" />
-        <input id="mark_weight_input" name="mark_weight" type="number" step="any" min="0" placeholder="Mark weight" class="input input-bordered input-xs col-span-1 md:col-span-2" />
-        <select id="grade_type_select" name="grade_type" class="select select-bordered select-xs col-span-1 md:col-span-2">
-          <option value="numeric">Numeric</option>
-          <option value="S">S</option>
-          <option value="U">U</option>
-        </select>
-        <button class="btn btn-xs btn-primary col-span-1 md:col-span-2" type="submit">Add</button>
-      </form>
+<div class="flex flex-col gap-6">
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h2 class="subject-title flex flex-wrap items-center gap-3">
+        <span id="subject-code-display">{{ subject.subject_code }}</span>
+        <span id="subject-name-display">{{ subject.subject_name }}</span>
+      </h2>
+      <p class="semester-title mt-1"><span>{{ semester }}</span> <span class="semester-year">{{ year }}</span></p>
+    </div>
+    <a id="edit-subject-btn" class="btn btn-xs btn-circle btn-ghost" href="/year/{{ year }}/semester/{{ semester }}/subject/{{ subject.subject_code }}/settings" title="Open subject settings">&#9881;</a>
+  </div>
+
+  <div class="rounded-2xl border border-base-300 bg-base-100 shadow-sm p-4 md:p-5">
+    <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h3 class="font-semibold text-lg">Subject Overview</h3>
+        <p class="text-sm opacity-70">Use the settings cog to edit subject details and rules on a separate page.</p>
+      </div>
+
     </div>
   </div>
 
-  <!-- Total Mark (collapsible) -->
-  <div class="collapse bg-base-100 rounded-xl shadow card-glow">
-    <input id="toggle-total" type="checkbox" class="sr-only" />
-    <label for="toggle-total" class="collapse-title font-semibold cursor-pointer">
-      <span class="flex items-center gap-2">
-        Total Mark
-        {% if subject.total_mark is not none and subject.total_mark != 0 %}
-          <span class="badge badge-outline badge-sm">Saved</span>
+  <div class="grid gap-6 lg:grid-cols-2">
+    <div class="prerequisite-section w-full">
+      <h3 class="font-semibold mb-2">Prerequisites</h3>
+      <ul class="list-disc list-inside mb-2">
+        {% if prerequisites and prerequisites|length > 0 %}
+          {% for prereq in prerequisites %}
+            <li>
+                {% if prereq.prerequisite_subject %}
+                  {{ prereq.prerequisite_subject.subject_code }} - {{ prereq.prerequisite_subject.subject_name }}
+                {% elif prereq.custom_text %}
+                  {{ prereq.custom_text }}
+                {% else %}
+                  Unknown prerequisite
+                {% endif %}
+              {% if prereq.is_corequisite %}<span class="badge badge-info ml-2">Co-requisite</span>{% endif %}
+                <form method="post" action="/year/{{year}}/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite/remove" style="display:inline">
+                  <input type="hidden" name="year" value="{{year}}" />
+                  <input type="hidden" name="prerequisite_id" value="{{ prereq.id }}" />
+                  <input type="hidden" name="is_corequisite" value="{{ prereq.is_corequisite|int }}" />
+                <button type="submit" class="btn btn-xs btn-error ml-2">Remove</button>
+              </form>
+            </li>
+          {% endfor %}
         {% else %}
-          <span class="badge badge-outline badge-sm">Not Saved Yet</span>
+          <li class="text-gray-500">No prerequisites set.</li>
         {% endif %}
-      </span>
-      <svg class="custom-chevron chev" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.5a1 1 0 0 1-.71-.29l-7-7a1 1 0 1 1 1.42-1.42L12 13.09l6.29-6.3a1 1 0 1 1 1.42 1.42l-7 7a1 1 0 0 1-.71.29z"/></svg>
-    </label>
-    <div class="collapse-content">
-      {% if show_total_mark_saved and subject.total_mark is not none and subject.total_mark != 0 %}
-        <div class="alert alert-success mb-2 relative" id="success-alert">
-          <button type="button" class="btn btn-xs btn-circle absolute right-2 top-2" onclick="document.getElementById('success-alert').style.display='none'">✕</button>
-          Total mark saved successfully.
-        </div>
-      {% endif %}
-      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/totalMark/save" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-4 text-sm">
-        <input type="hidden" name="year" value="{{year}}" />
-        <div class="col-span-1 sm:col-span-2 md:col-span-4">
-          <label class="form-control">
-            <span class="label-text text-xs">Desired Final Total Mark</span>
-            <input name="total_mark" value="{{ final_total if final_total is not none else '' }}" placeholder="e.g. 75" class="input input-bordered input-xs" />
-          </label>
-        </div>
-        <div class="col-span-1 sm:col-span-2 md:col-span-4">
-          <label class="form-control">
-            <span class="label-text text-xs">Exam Weight (%)</span>
-            <input disabled value="{{ effective_exam_weight if effective_exam_weight else 0 }}" class="input input-bordered input-xs" />
-          </label>
-        </div>
-        <div class="col-span-1 sm:col-span-1 md:col-span-2 flex items-end">
-          <label class="form-control w-full">
-            <span class="label-text text-xs">PS Factor %</span>
-            <input name="ps_factor" value="{{ ps_factor if ps_factor is not none else '40' }}" class="input input-bordered input-xs" {% if not ps_exam %}disabled{% endif %} />
-          </label>
-        </div>
-        <div class="col-span-1 sm:col-span-1 md:col-span-2 flex items-end">
-          <label class="label cursor-pointer flex gap-2 items-center text-xs">
-            <span>PS Exam?</span>
-            <input type="checkbox" name="ps_exam" value="true" class="toggle toggle-xs" {% if ps_exam %}checked{% endif %} id="ps-exam-toggle" />
-          </label>
-        </div>
-        <div class="col-span-1 sm:col-span-2 md:col-span-4 flex items-end">
-          <div class="flex gap-2 w-full">
-            <button class="btn btn-xs btn-secondary w-full" type="submit">Save Target</button>
-            <button id="confirm-reset-btn" class="btn btn-xs btn-ghost" type="button">Confirm Reset</button>
+      </ul>
+      <button class="btn btn-sm btn-primary mb-2" id="show-add-prerequisite-form" type="button" onclick="toggleSection('add-prerequisite-form', false)">Add Prerequisite</button>
+      <div id="add-prerequisite-form-section" class="hidden">
+        <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite/add" class="flex flex-col md:flex-row gap-2 items-center">
+          <input type="hidden" name="year" value="{{year}}" />
+          <div class="flex gap-2 items-center w-full">
+              <select name="prerequisite_subject_id" class="input input-xs w-48">
+                <option value="">Select subject...</option>
+                {% for subj in candidate_subjects %}
+                  <option value="{{ subj.id }}">{{ subj.subject_code }} - {{ subj.subject_name }}</option>
+                {% endfor %}
+              </select>
+              <span class="text-xs">or</span>
+            <input name="custom_prerequisite" class="input input-xs flex-1" placeholder="Or enter a custom prerequisite (free text)" />
+            <label class="flex items-center gap-1 ml-2">
+              <input type="checkbox" name="is_corequisite" value="1" class="checkbox checkbox-xs" />
+              <span class="text-xs">Co-requisite</span>
+            </label>
+            <button type="submit" class="btn btn-xs btn-success">Add</button>
+            <button type="button" class="btn btn-xs" onclick="toggleSection('add-prerequisite-form', true)">Cancel</button>
           </div>
-        </div>
-      </form>
-      <p class="mt-2 text-xs opacity-70">Provide a desired overall final %; the system derives and stores the required raw exam mark. Exam weight is automatically set to the remaining percentage after assignments (or retained if already created).{% if ps_exam %} PS mode: only {{ effective_scoring_exam_weight }}% (factor {{ ps_factor if ps_factor is not none else 40 }}%) of this weight counts toward the average.{% endif %}</p>
+          <div class="text-xs text-gray-600 mt-1">Select a subject from the dropdown, or type any prerequisite code/name/description. (Selecting from the dropdown links to a real subject; custom text is saved as-is.) Use the checkbox to mark as co-requisite.</div>
+        </form>
+      </div>
     </div>
-  </div>
-</div>
 
-<div class="mt-8">
-  <div class="tabs tabs-boxed w-full mb-4">
-    <a class="tab tab-sm tab-active" id="tab-assignments" onclick="showTab('assignments')">Assignments</a>
-    <a class="tab tab-sm" id="tab-summary" onclick="showTab('summary')">Summary</a>
-  </div>
-  <div id="panel-assignments">
-    <h4 class="font-semibold mb-2 flex items-center gap-2">Assignments</h4>
-    <div class="overflow-x-auto mb-6">
-      <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
-        <thead>
-          <tr>
-            <th>Assessment</th>
-            <th>Weighted</th>
-            <th>Unweighted</th>
-            <th>Weight</th>
-            <th>Type</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-  {% for assignment in assignments %}
-  <tr data-assessment="{{ assignment.assessment }}" data-code="{{ assignment.subject_code }}" data-semester="{{ assignment.semester_name }}" data-year="{{ assignment.year }}" class="assignment-row">
-    <td class="assignment-assessment">{{assignment.assessment}}</td>
-    <td class="assignment-weighted">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.weighted_mark|float) if assignment.weighted_mark is not none else '0.00' }}{% endif %}</td>
-    <td class="assignment-unweighted">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.unweighted_mark|float) if assignment.unweighted_mark is not none else '0.00' }}{% endif %}</td>
-    <td class="assignment-mark-weight">{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % (assignment.mark_weight|float) if assignment.mark_weight is not none else '0.00' }}{% endif %}</td>
-    <td class="assignment-grade-type">{{assignment.grade_type}}</td>
-    <td class="flex gap-1">
-      <form method="post" action="/semester/{{semester}}/subject/{{subject.subject_code}}/assignment/{{assignment.assessment}}/{{assignment.subject_code}}/{{assignment.semester_name}}/{{assignment.year}}/delete" onsubmit="return confirm('Delete assignment?');">
-        <input type="hidden" name="year" value="{{year}}" />
-        <button class="btn btn-xs btn-error" type="submit">✕</button>
-      </form>
-      <button class="btn btn-xs btn-outline" type="button" onclick="startInlineEditAssignment('{{ assignment.assessment }}','{{ assignment.subject_code }}','{{ assignment.semester_name }}','{{ assignment.year }}')">Edit</button>
-    </td>
-  </tr>
-  {% endfor %}
+    <div class="mt-6 lg:mt-0 w-full max-w-xl mx-auto mb-4 lg:mb-0">
+      <h3 class="font-semibold mb-2">Prerequisite Graph</h3>
+      <div id="prereq-graph" class="h-[320px] border border-base-300 bg-base-100 rounded-xl"></div>
+      <div class="mt-2 flex flex-wrap gap-2 text-[0.75rem]">
+        <span style="display:inline-flex;align-items:center;gap:.5rem;border:1px solid rgba(0,0,0,.12);background:#fff;border-radius:9999px;padding:.35rem .75rem;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.08);">
+          <span style="display:inline-block;width:.875rem;height:.875rem;border-radius:.2rem;background:#1976d2;border:1px solid #0d47a1;"></span>
+          <span>Main subject</span>
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:.5rem;border:1px solid rgba(0,0,0,.12);background:#fff;border-radius:9999px;padding:.35rem .75rem;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.08);">
+          <span style="display:inline-block;width:.875rem;height:.875rem;border-radius:.2rem;background:#90caf9;border:1px solid #64b5f6;"></span>
+          <span>Subject</span>
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:.5rem;border:1px solid rgba(0,0,0,.12);background:#fff;border-radius:9999px;padding:.35rem .75rem;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.08);">
+          <span style="display:inline-block;width:1.1rem;height:0;border-top:2px solid #1976d2;"></span>
+          <span>Prerequisite</span>
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:.5rem;border:1px solid rgba(0,0,0,.12);background:#fff;border-radius:9999px;padding:.35rem .75rem;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.08);">
+          <span style="display:inline-block;width:1.1rem;height:0;border-top:2px dashed #ff9800;"></span>
+          <span>Corequisite</span>
+        </span>
+      </div>
+      <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+      <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        fetch(`/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite_graph/json?year={{year}}`)
+          .then(r => r.json())
+          .then(data => {
+            const container = document.getElementById('prereq-graph');
+            if (!container || !data.nodes) return;
 
-  <!-- end assignment loop -->
-  {% if assignments|length == 0 %}
-  <tr><td colspan="6" class="opacity-70">No assignments.</td></tr>
-  {% endif %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  <div id="panel-summary" class="hidden">
-    <h4 class="font-semibold mb-3 flex items-center gap-2">Summary</h4>
-    <div class="overflow-x-auto p-2">
-  <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
-        <thead>
-          <tr>
-            <th>Subject Title</th>
-            <th>Assignment Mark</th>
-            <th>Assessment Weight</th>
-            <th>Final Exam Mark</th>
-            <th>Final Exam Mark Weight</th>
-            <th>Total Mark</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>{{ subject.subject_name }}</td>
-            <td>{{ '%.2f' % assignment_weighted_sum }}</td>
-            <td>{{ '%.0f' % assignment_weight_percent }}%</td>
-            <td>{{ '%.2f' % exam_mark if exam_mark is not none else '-' }}</td>
-            <td>{{ '%.0f' % effective_exam_weight if effective_exam_weight else 0 }}%</td>
-            <td>{{ '%.0f' % subject.total_mark if subject.total_mark is not none else '-' }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-<script>
-  window.subjectBasePath = '/semester/{{semester}}/subject/{{subject.subject_code}}';
-  window.subjectYear = '{{year}}';
-  console.log('subject.total_mark:', "{{ subject.total_mark }}");
-</script>
-<script src="/static/js/subject_page.js"></script>
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    var saveForm = document.querySelector('form[action*="totalMark/save"]');
-    var psExamToggle = document.getElementById('ps-exam-toggle');
-    var psFactorInput = saveForm ? saveForm.querySelector('input[name="ps_factor"]') : null;
-    if (psExamToggle && psFactorInput) {
-      function updatePsFactorState() {
-        psFactorInput.disabled = !psExamToggle.checked;
-      }
-      psExamToggle.addEventListener('change', updatePsFactorState);
-      updatePsFactorState();
-    }
-    if (saveForm) {
-      saveForm.addEventListener('submit', function(event) {
-        event.preventDefault();
-        var formData = new FormData(saveForm);
-        fetch(saveForm.action, {
-          method: 'POST',
-          body: formData,
-          headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        })
-        .then(r => r.json())
-        .then(data => {
-          if (data.success) {
-            window.location.reload(); // Automatically refresh page
-          }
-        });
-      });
-      var resetBtn = document.getElementById('reset-total-btn');
-        var confirmResetBtn = document.getElementById('confirm-reset-btn');
-        if (confirmResetBtn) {
-          confirmResetBtn.addEventListener('click', function() {
-            if (!confirm('Are you sure you want to reset the saved total mark for this subject? This will clear the stored total.')) return;
-            // POST to dedicated reset endpoint
-            var formData = new FormData();
-            formData.append('year', window.subjectYear);
-            fetch(window.subjectBasePath + '/totalMark/reset', {
-              method: 'POST',
-              body: formData,
-              headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(r => r.json())
-            .then(data => {
-              if (data.success) window.location.reload();
+            const nodes = new vis.DataSet(data.nodes.map(n => ({
+              id: n.id,
+              label: n.label,
+              color: n.main ? '#1976d2' : (n.corequisite ? '#ffeb3b' : '#90caf9'),
+              font: { color: n.main ? '#fff' : '#222', size: n.main ? 22 : 16, bold: n.main },
+              x: n.x,
+              y: n.y,
+              physics: n.physics || false,
+              fixed: { x: true, y: true },
+            })));
+            const edges = new vis.DataSet(data.edges.map(e => ({
+              from: e.from,
+              to: e.to,
+              arrows: 'to',
+              color: e.type === 'corequisite' ? { color: '#ff9800' } : { color: '#1976d2' },
+              dashes: e.type === 'corequisite',
+              title: e.type.charAt(0).toUpperCase() + e.type.slice(1),
+            })));
+            const network = new vis.Network(container, { nodes, edges }, {
+              layout: { randomSeed: 42 },
+              nodes: { shape: 'box', borderWidth: 2 },
+              edges: {
+                smooth: {
+                  enabled: true,
+                  type: 'cubicBezier',
+                  forceDirection: 'vertical',
+                  roundness: 0.4,
+                }
+              },
+              physics: { enabled: false },
+            });
+            network.once('stabilizationIterationsDone', function () {
+              network.setOptions({ physics: false });
             });
           });
-        }
+      });
+      </script>
+    </div>
+  </div>
+
+  <script>
+  function toggleSection(formId, hideOnly) {
+    const section = document.getElementById(formId + '-section');
+    if (section) {
+      if (hideOnly) { section.classList.add('hidden'); }
+      else section.classList.toggle('hidden');
+    }
+  }
+  </script>
+
+<div class="block w-full mt-8">
+  <div class="mb-4 flex flex-row items-center gap-2">
+    <div class="flex-1">
+      {% if subject.is_finalized %}
+      <button class="btn btn-sm btn-primary btn-disabled" disabled title="Uncheck Finalized to add assignments">Add Assignment</button>
+      {% else %}
+      <button class="btn btn-sm btn-primary" id="show-add-assignment-form" type="button" onclick="toggleSection('add-assignment-form', false)">Add Assignment</button>
+      {% endif %}
+    </div>
+    <div class="flex-1 flex items-center justify-end gap-3">
+      {# Finalized toggle — submits immediately on change #}
+      <form method="post" action="/semester/{{ semester }}/subject/{{ subject.subject_code }}/finalize" id="finalize-form">
+        <input type="hidden" name="year" value="{{ year }}" />
+        <input type="hidden" name="is_finalized" value="false" />
+        <label class="flex items-center gap-1.5 cursor-pointer select-none text-xs font-semibold opacity-60 hover:opacity-100 transition-opacity" title="Mark this course as fully graded. Hides the target grade calculator.">
+          <input type="checkbox" name="is_finalized" value="true" class="checkbox checkbox-xs"
+            {% if subject.is_finalized %}checked{% endif %}
+            onchange="this.form.submit()" />
+          Finalized
+        </label>
+      </form>
+      {% if subject.is_finalized %}
+      <span class="text-xs font-semibold opacity-60 flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+        </svg>
+        Course Complete
+      </span>
+      {% else %}
+      <button class="btn btn-sm btn-accent" id="show-total-mark-form" type="button" onclick="toggleSection('add-total-mark-form')">Add Total Mark</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="flex flex-row gap-2 mb-6">
+    <div id="add-assignment-form-section" class="flex-1 hidden">
+      <form id="add-assignment-form" class="p-3 border border-gray-300 rounded-xl bg-base-200 space-y-2" method="post" action="/semester/{{ semester }}/subject/{{ subject.subject_code }}/assignment/create">
+        <input type="hidden" name="year" value="{{ year }}" />
+        <div>
+          <label class="block text-left text-xs font-semibold mb-1" for="assignment-title">Title</label>
+          <input id="assignment-title" name="assessment" class="input input-xs w-full" placeholder="Assignment title" required />
+        </div>
+        <div>
+          <label class="block text-left text-xs font-semibold mb-1" for="assignment-category">Category</label>
+          <input id="assignment-category" name="category" class="input input-xs w-full" placeholder="Category (defaults to title group)" />
+        </div>
+        <div>
+          <label class="block text-left text-xs font-semibold mb-1" for="assignment-mark">Mark</label>
+          <input id="assignment-mark" name="weighted_mark" type="number" step="0.01" class="input input-xs w-full text-right" placeholder="Mark" required />
+        </div>
+        <div>
+          <label class="block text-left text-xs font-semibold mb-1" for="assignment-weight">Weight (%)</label>
+          <input id="assignment-weight" name="mark_weight" type="number" step="0.01" min="0" max="100" class="input input-xs w-full text-right" placeholder="Weight (e.g. 20)" required />
+        </div>
+        <div class="flex gap-2 mt-2">
+          <button type="submit" class="btn btn-xs btn-success">Save</button>
+          <button type="button" class="btn btn-xs" onclick="toggleSection('add-assignment-form', true)">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="add-total-mark-form-section" class="flex-1 hidden">
+      {% if subject.has_exam %}
+        <div class="mb-2 p-2 rounded bg-base-100 border border-info text-xs text-left">
+          <div><strong>Current Exam Weight:</strong> {{ '%.2f' % final_exam_mark_weight if final_exam_mark_weight is defined else '-' }}%</div>
+          <div><strong>PS Exam:</strong> {{ 'Yes' if ps_exam else 'No' }}</div>
+          <div><strong>PS Factor:</strong> {{ ps_factor if ps_factor is defined else '40' }}</div>
+        </div>
+      {% endif %}
+      <form id="add-total-mark-form" class="p-3 border border-gray-300 rounded-xl bg-base-200 space-y-2" method="post" action="/semester/{{ semester }}/subject/{{ subject.subject_code }}/totalMark/save">
+        <input type="hidden" name="year" value="{{ year }}" />
+        <div>
+          <label class="block text-left text-xs font-semibold mb-1" for="total-mark">Total Mark (0-100)</label>
+          <input id="total-mark" name="total_mark" type="number" step="0.01" min="0" max="100" class="input input-xs w-full text-right" placeholder="Total Mark (0-100)" required />
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-xs font-semibold" for="ps-exam-toggle">PS Exam?</label>
+          <input type="checkbox" name="ps_exam" id="ps-exam-toggle" value="true" class="checkbox checkbox-xs" />
+        </div>
+        <div>
+          <label class="block text-left text-xs font-semibold mb-1" for="ps-factor-input">PS Factor (default 40)</label>
+          <input name="ps_factor" id="ps-factor-input" type="number" step="0.01" min="0" max="100" class="input input-xs w-full text-right" placeholder="PS Factor (default 40)" disabled />
+        </div>
+        <div class="flex gap-2 mt-2">
+          <button type="submit" class="btn btn-xs btn-success">Save</button>
+          <button type="button" class="btn btn-xs" onclick="toggleSection('add-total-mark-form', true)">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="mt-8">
+    <div class="tabs tabs-boxed w-full mb-4 flex items-center" style="position:sticky;top:0;z-index:10;background:inherit;">
+      <a class="tab tab-sm tab-active" id="tab-assignments" onclick="showTab('assignments')">Assignments</a>
+      <a class="tab tab-sm" id="tab-summary" onclick="showTab('summary')">Summary</a>
+      {% if subject.is_finalized %}
+      <span class="ml-auto flex items-center gap-1 text-[10px] font-semibold text-amber-700 opacity-70 pr-1" title="Uncheck Finalized to edit assignments">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg>
+        Read-only
+      </span>
+      {% endif %}
+    </div>
+
+    <div id="panel-assignments">
+      <div class="overflow-x-auto mb-6">
+        <table class="table table-sm w-full border-separate border-2 border-gray-400 rounded-xl" style="border-spacing: 0;">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Category</th>
+              <th>Mark</th>
+              <th>Score (<span class="text-[10px]">%</span>)</th>
+              <th>Weight (<span class="text-[10px]">%</span>)</th>
+              <th>Type</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+         <tbody>
+          {# compute total assessment weight for this subject so we can show contribution/total #}
+          {% set total_weight = 0.0 %}
+          {% for _a in assignments %}
+            {% set total_weight = total_weight + (_a.mark_weight|float if _a.mark_weight is not none else 0.0) %}
+          {% endfor %}
+
+          {% for assignment in assignments %}
+            <tr id="assignment-row-{{ loop.index }}" class="assignment-row"
+              data-assessment="{{ assignment.assessment }}"
+              data-category="{{ assignment.category or '' }}"
+              data-code="{{ subject.subject_code }}"
+              data-semester="{{ semester }}"
+              data-year="{{ year }}"
+              data-grade-type="{{ assignment.grade_type }}"
+              data-unweighted-mark="{% if assignment.grade_type in ['S','U'] %}-{% else %}{{ '%.2f' % ((assignment.unweighted_mark|float) * 100) if assignment.unweighted_mark is not none else 'Pending' }}{% endif %}">
+            <td class="assignment-title">{{ assignment.assessment }}</td>
+            <td class="assignment-category">{{ assignment.category or 'Uncategorized' }}</td>
+            <td class="assignment-mark">
+              {% if assignment.grade_type in ['S','U'] %}
+                {{ assignment.grade_type }}
+              {% else %}
+                {{ '%.2f' % (assignment.weighted_mark|float) if assignment.weighted_mark is not none else '0.00' }}
+              {% endif %}
+            </td>
+            <td class="assignment-raw">
+              {% if assignment.grade_type in ['S','U'] %}
+                -
+              {% else %}
+                {% if assignment.unweighted_mark is not none %}
+                  {% set u = assignment.unweighted_mark|float %}
+                  <span class="whitespace-nowrap">{{ '%.2f' % (u * 100) }}</span>
+                {% else %}
+                  Pending
+                {% endif %}
+              {% endif %}
+            </td>
+            <td class="assignment-weight">
+              {% if assignment.grade_type in ['S','U'] %}
+                -
+              {% else %}
+                {{ '%.2f' % (assignment.mark_weight|float) if assignment.mark_weight is not none else '0.00' }}
+              {% endif %}
+            </td>
+            <td class="assignment-type">{{ assignment.grade_type }}</td> <!-- Add this line -->
+            <td class="flex gap-1">
+              {% if subject.is_finalized %}
+              <span class="text-xs opacity-40 italic self-center">Locked</span>
+              {% else %}
+              <form method="post" action="/semester/{{ semester }}/subject/{{ subject.subject_code }}/assignment/{{ assignment.assessment }}/{{ year }}/delete" style="display:inline;" onsubmit="return confirm('Delete this assignment?');">
+                <input type="hidden" name="year" value="{{ year }}" />
+                <button class="btn btn-xs btn-error" type="submit">✕</button>
+              </form>
+              <button
+                type="button"
+                class="btn btn-xs btn-outline edit-assignment-btn"
+                data-index="{{ loop.index }}"
+                data-assessment="{{ assignment.assessment }}"
+                data-category="{{ assignment.category or '' }}"
+                data-mark="{{ assignment.weighted_mark }}"
+                data-weight="{{ assignment.mark_weight }}"
+              >Edit</button>
+              {% endif %}
+           </td>
+          </tr>
+          {% endfor %}
+          {% if assignments|length == 0 %}
+          <tr><td colspan="7" class="opacity-70 text-center">No assignments.</td></tr>
+          {% endif %}
+        </tbody>
+     </table>
+    </div>
+  </div>
+
+   <div id="panel-summary" class="hidden block w-full clear-both">
+    <div class="overflow-x-auto p-2 w-full">        
+      {% set assessment_summary = assessment_summary if assessment_summary is defined else {'standalone_assessments': [], 'grouped_assessments': {}} %}
+      {% set standalone_assessments = assessment_summary.standalone_assessments if assessment_summary.standalone_assessments is defined else [] %}
+      {% set grouped_assessments = assessment_summary.grouped_assessments if assessment_summary.grouped_assessments is defined else {} %}
+      <table class="table table-sm w-full border-separate border-2 border-teal-300 rounded-xl">
+        <thead class="bg-teal-600 text-white">
+          <tr>
+            <th class="text-left">Category</th>
+            <th class="text-center">Status</th>
+            <th class="text-center">Items</th>
+            <th class="text-right">Unweighted Avg (%)</th>
+            <th class="text-right">Weight Total (%)</th>
+            <th class="text-right">Weighted Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in summaries %}
+            <tr class="hover:bg-teal-50 transition-colors border-t border-teal-100">
+              <td class="px-4 py-2 font-medium border-l-4 {% if row.type == 'rule' %}border-l-blue-500{% elif row.type == 'exam' %}border-l-purple-500{% else %}border-l-teal-500{% endif %}">
+                {{ row.label }}
+                {% if row.bonus_count > 0 %}
+                  <span class="badge badge-xs badge-warning ml-1">+{{ row.bonus_count }} Bonus</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-2 text-center text-gray-600">
+                {% if row.display_status is defined %}
+                  <span class="badge badge-xs">{{ row.display_status }}</span>
+                {% else %}
+                  <span class="badge badge-xs">{{ 'Grouped' if row.count > 1 else 'Standalone' }}</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-2 text-center text-gray-600">{{ row.count }}</td>
+              <td class="px-4 py-2 text-right text-gray-600">
+                {% if row.has_scored_items is defined and not row.has_scored_items %}
+                  Pending
+                {% else %}
+                  {{ "%.2f"|format((row.unweighted_avg | default(0, true)) * 100) }}%
+                {% endif %}
+              </td>
+              <td class="px-4 py-2 text-right text-gray-600">
+                {{ "%.2f"|format(row.total_weight) }}%
+              </td>
+              <td class="px-4 py-2 text-right font-bold text-teal-700">
+                {% if row.has_scored_items is defined and not row.has_scored_items %}
+                  Pending
+                {% else %}
+                  {{ "%.2f"|format(row.weighted_score) }}
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="bg-teal-50 font-bold">
+            <td colspan="4" class="px-4 py-3 text-right uppercase text-xs text-gray-500">Total Calculation</td>
+            <td class="px-4 py-3 text-right border-t-2 border-teal-400">
+              {{ "%.2f"|format(summaries|sum(attribute='total_weight')) }}%
+            </td>
+            <td class="px-4 py-3 text-right text-lg text-teal-900 border-t-2 border-teal-400">
+              {{ "%.2f"|format(total_achieved if total_achieved is defined and total_achieved is not none else summaries|sum(attribute='weighted_score')) }}
+              {% if subject.is_finalized %}
+              <span class="ml-1 inline-flex items-center gap-0.5 text-xs font-semibold text-amber-700 opacity-80" title="Total locked at finalization">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" /></svg>
+                Locked
+              </span>
+              {% endif %}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="mt-8 block w-full bg-base-200 rounded-xl p-6 border border-base-300">
+      <div class="flex items-center justify-between mb-4">
+        <h4 class="text-sm font-bold uppercase opacity-60 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+          Target Grade Calculator
+        </h4>
+        <button 
+        class="btn btn-xs btn-ghost btn-square opacity-40 hover:opacity-100 transition-opacity"
+        hx-get="/year/{{ year }}/semester/{{ semester }}/subject/{{ subject.subject_code }}/recalculate"
+        hx-target="#panel-summary"
+        hx-swap="outerHTML"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+          </svg>
+      </button>
+      </div>
+
+      <div class="target-grade-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 w-full">
+        {% for goal in grade_goals %}
+          <div class="bg-base-100 p-4 rounded-xl border border-base-300 shadow-sm flex flex-col items-center text-center">
+            <p class="text-[10px] font-bold uppercase opacity-50">{{ goal.label }} ({{ goal.target }}+)</p>
+            {% set goal_status = goal.status if goal.status is defined else goal.needed|string %}
+            {% set goal_required = goal.required_percent if goal.required_percent is defined else none %}
+            {% if goal_status == 'Achieved' %}
+              <p class="text-xl font-mono font-black text-success">Achieved</p>
+            {% elif goal_status == 'Impossible' %}
+              <p class="text-xl font-mono font-black text-error">Impossible</p>
+            {% else %}
+              <p class="text-xl font-mono font-black text-base-content">
+                {% if goal_required is not none %}
+                  <span class="text-info">{{ "%.2f"|format(goal_required) }}</span><span class="text-info">%</span>
+                {% elif '%' in goal_status %}
+                  <span class="text-info">{{ goal_status.replace('%', '') }}</span><span class="text-info">%</span>
+                {% else %}
+                  {{ goal_status }}
+                {% endif %}
+              </p>
+            {% endif %}
+            <p class="text-[9px] opacity-40 mt-1">Required on remaining work</p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+// Shared global variables for JS logic
+window.subjectYear = "{{ year }}";
+window.subjectSemester = "{{ semester }}";
+window.subjectCode = "{{ subject.subject_code }}";
+
+function toggleSection(formId, hideOnly) {
+  const section = document.getElementById(formId + '-section');
+  if (section) {
+    if (hideOnly) { section.classList.add('hidden'); }
+    else {
+      section.classList.toggle('hidden');
+      if (formId === 'add-total-mark-form' && !section.classList.contains('hidden')) {
+        updatePsFactorState();
+      }
+    }
+  }
+}
+
+function updatePsFactorState() {
+  var psExamToggle = document.getElementById('ps-exam-toggle');
+  var psFactorInput = document.getElementById('ps-factor-input');
+  if (psExamToggle && psFactorInput) {
+    psFactorInput.disabled = !psExamToggle.checked;
+  }
+}
+
+function showTab(tab) {
+  const assignmentsPanel = document.getElementById('panel-assignments');
+  const summaryPanel = document.getElementById('panel-summary');
+  const tabAssignments = document.getElementById('tab-assignments');
+  const tabSummary = document.getElementById('tab-summary');
+  if (tab === 'assignments') {
+    assignmentsPanel.classList.remove('hidden');
+    summaryPanel.classList.add('hidden');
+    tabAssignments.classList.add('tab-active');
+    tabSummary.classList.remove('tab-active');
+  } else {
+    assignmentsPanel.classList.add('hidden');
+    summaryPanel.classList.remove('hidden');
+    tabAssignments.classList.remove('tab-active');
+    tabSummary.classList.add('tab-active');
+  }
+}
+
+// --- Inline edit for assignments ---
+
+let currentEditRow = null;
+
+// Escape HTML special characters for safety
+function escapeHtml(str) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/`/g, '&#96;')
+            .replace(/\\/g, '\\\\');
+}
+
+function startInlineEditAssignment(index, assessment, mark, weight) {
+  if (currentEditRow !== null) cancelInlineEditAssignment();
+
+  const rowId = 'assignment-row-' + index;
+  const row = document.getElementById(rowId);
+  if (!row) return;
+
+  currentEditRow = rowId;
+  row.dataset.originalHtml = row.innerHTML;
+  row.classList.add('editing-row');
+
+  // Use escapeHtml for all values
+  const safeAssessment = escapeHtml(assessment);
+  const safeMark = escapeHtml(mark);
+  const safeWeight = escapeHtml(weight);
+  const safeCategory = escapeHtml(row.dataset.category || '');
+
+  // Use the correct backend URL!
+  row.innerHTML = `
+    <td class="assignment-title" style="min-width:180px;">
+      <input id="assignment-title" name="assessment" class="input input-xs w-full" placeholder="Assignment title" value="${safeAssessment}" required />
+    </td>
+    <td class="assignment-category" style="min-width:150px;">
+      <input name="category" class="input input-xs w-full" placeholder="Category" value="${safeCategory}" />
+    </td>
+    <td class="assignment-mark" style="width:70px;">
+      <input name="weighted_mark" type="number" step="0.01" class="input input-xs w-16 text-right" value="${safeMark}" required />
+    </td>
+    <td class="assignment-raw" style="width:70px;">
+      <input name="unweighted_mark" type="number" step="0.01" class="input input-xs w-16 text-right" value="${row.dataset.unweightedMark || ''}" readonly tabindex="-1" style="background:#f3f3f3;" />
+    </td>
+    <td class="assignment-weight" style="width:70px;">
+      <input name="mark_weight" type="number" step="0.01" min="0" max="100" class="input input-xs w-16 text-right" value="${safeWeight}" required />
+    </td>
+    <td class="assignment-type" style="width:60px;">
+      <span class="inline-block w-12 text-center font-semibold">${row.dataset.gradeType || ''}</span>
+    </td>
+    <td class="flex gap-1">
+      <button type="button" class="btn btn-xs btn-success" onclick="submitInlineEditAssignmentRow('${assessment}', '${window.subjectCode}', '${window.subjectSemester}', '${window.subjectYear}')">Save</button>
+      <button type="button" class="btn btn-xs" onclick="cancelInlineEditAssignment()">Cancel</button>
+    </td>
+  `;
+}
+
+function cancelInlineEditAssignment() {
+  if (currentEditRow === null) return;
+  const row = document.getElementById(currentEditRow);
+  if (row && row.dataset.originalHtml) {
+    row.innerHTML = row.dataset.originalHtml;
+    delete row.dataset.originalHtml;
+    row.classList.remove('editing-row');
+  }
+  currentEditRow = null;
+}
+
+window.submitInlineEditAssignmentRow = function(assessment, code, semester, year) {
+  const row = document.querySelector('.editing-row');
+  if (!row) return;
+  const formData = new FormData();
+
+  formData.append('new_assessment', row.querySelector('[name="assessment"]').value);
+  formData.append('category', row.querySelector('[name="category"]')?.value || '');
+  formData.append('weighted_mark', row.querySelector('[name="weighted_mark"]').value);
+  formData.append('mark_weight', row.querySelector('[name="mark_weight"]').value);
+
+  // Use the correct backend URL!
+  const updateUrl = `/semester/${encodeURIComponent(semester)}/subject/${encodeURIComponent(code)}/assignment/${encodeURIComponent(assessment)}/${encodeURIComponent(year)}/update`;
+
+  fetch(updateUrl, {
+    method: 'POST',
+    body: formData
+  })
+  .then(r => r.json())
+  .then(result => {
+    if (result.success) {
+      if (result.reload_url) {
+        window.location.href = result.reload_url;
+      } else if (result.row_html) {
+        row.innerHTML = result.row_html;
+        row.classList.remove('editing-row');
+        currentEditRow = null;
+      }
+    } else {
+      alert(result.error || "Failed to update assignment.");
     }
   });
-// Force correct assignment edit function after all scripts load
-window.startInlineEditAssignment = function(assessment, code, semester, year) {
-    if (window.editing_assignment_keys !== null) { window.cancelInlineEditAssignment(); }
-    window.editing_assignment_keys = { assessment, code, semester, year };
-    const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
-    if (!row) return;
-    window.original_row_html = row.innerHTML;
-    fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/edit`)
-      .then(response => response.text())
-      .then(html => {
-        console.log('Edit row HTML:', html);
-        row.innerHTML = html;
-      });
 };
-window.submitInlineEditAssignmentRow = function(assessment, code, semester, year) {
-    const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
-    console.log('[Edit] Save clicked', { assessment, code, semester, year, row });
-    if (!row) { console.warn('[Edit] Row not found'); return false; }
-    const weighted_mark = row.querySelector("input[name='weighted_mark']")?.value || '';
-    const mark_weight = row.querySelector("input[name='mark_weight']")?.value || '';
-    const grade_type = row.querySelector("select[name='grade_type']")?.value || 'numeric';
-    console.log('[Edit] Form values', { weighted_mark, mark_weight, grade_type });
-    const formData = new FormData();
-    formData.append('assessment', assessment);
-    formData.append('subject_code', code);
-    formData.append('semester_name', semester);
-    formData.append('year', year);
-    formData.append('weighted_mark', weighted_mark);
-    formData.append('mark_weight', mark_weight);
-    formData.append('grade_type', grade_type);
-    fetch(`/semester/${semester}/subject/${code}/assignment/${assessment}/${year}/update`, { method: 'POST', body: formData })
-        .then(r => {
-            console.log('[Edit] AJAX response status', r.status);
-            return r.json();
-        })
-        .then(data => {
-            console.log('[Edit] AJAX response data', data);
-            if (data.success && typeof data.row_html === 'string') {
-                row.innerHTML = data.row_html;
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            } else {
-                row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>${data.error || 'Unknown error.'}</div></td>`;
-            }
-            window.editing_assignment_keys = null;
-            window.original_row_html = null;
-            console.log('[Edit] State cleared after save');
-        })
-        .catch((err) => {
-            console.error('[Edit] AJAX error', err);
-            row.innerHTML = `<td colspan='6'><div class='alert alert-error mb-2'>Error submitting edit.</div></td>`;
-            window.editing_assignment_keys = null;
-            window.original_row_html = null;
-            console.log('[Edit] State cleared after error');
-        });
-    return false;
-};
-window.cancelInlineEditAssignment = function() {
-  console.log('[Edit] Cancel clicked', window.editing_assignment_keys);
-  if (window.editing_assignment_keys && typeof window.editing_assignment_keys === 'object') {
-    const { assessment, code, semester, year } = window.editing_assignment_keys;
-    const row = document.querySelector(`tr[data-assessment='${assessment}'][data-code='${code}'][data-semester='${semester}'][data-year='${year}']`);
-    if (row && window.original_row_html) {
-      row.innerHTML = window.original_row_html;
-      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      console.log('[Edit] Row restored after cancel');
-    } else {
-      console.warn('[Edit] Row not found or no original HTML');
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Delegate click event for edit buttons
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.edit-assignment-btn');
+    if (btn) {
+      // Call the global startInlineEditAssignment with normalized args
+      // (assessment, code, semester, year) to match the external JS.
+      startInlineEditAssignment(
+        btn.dataset.assessment,
+        window.subjectCode,
+        window.subjectSemester,
+        window.subjectYear
+      );
     }
-    window.editing_assignment_keys = null; window.original_row_html = null;
-    console.log('[Edit] State cleared after cancel');
-  } else {
-    window.editing_assignment_keys = null; window.original_row_html = null;
-    console.log('[Edit] State cleared (no keys to cancel)');
+  });
+
+  var psExamToggle = document.getElementById('ps-exam-toggle');
+  if (psExamToggle) {
+    psExamToggle.addEventListener('change', updatePsFactorState);
   }
-};
+  updatePsFactorState();
+});
 </script>
+<script src="/static/js/subject_page.js"></script>
+<script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script> <script>
+      document.addEventListener('DOMContentLoaded', function() { // cite: subject.html
+        fetch(`/semester/{{semester}}/subject/{{subject.subject_code}}/prerequisite_graph/json?year={{year}}`) // cite: subject.html
+          .then(r => r.json()) // cite: subject.html
+          .then(data => { // cite: subject.html
+            const container = document.getElementById('prereq-graph'); // cite: subject.html
+            if (!container || !data.nodes) return; // cite: subject.html
+
+            // 1. Map the automated backend keys to explicit styling colors
+            const nodes = new vis.DataSet(data.nodes.map(n => {
+              let baseColor = '#90caf9'; // Planned (Soft Blue)
+              let borderCol = '#1565c0';
+              let fontCol = '#222';
+
+              if (n.is_completed) {
+                baseColor = '#a5d6a7';   // Completed (Soft Green)
+                borderCol = '#2e7d32';   
+                fontCol = '#1b5e20';
+              } else if (n.corequisite) {
+                baseColor = '#ffe082';   // Co-requisite & Uncompleted (Soft Yellow/Amber)
+                borderCol = '#ffb300';   
+                fontCol = '#b78103';
+              } else if (n.is_in_progress) {
+                baseColor = '#e0e0e0';   // Normal In Progress (Soft Light Gray)
+                borderCol = '#9e9e9e';   
+                fontCol = '#424242';
+              } else if (n.main) {
+                baseColor = '#1976d2';   // Current Page Subject Target
+                borderCol = '#0d47a1';
+                fontCol = '#fff';
+              }
+
+              return {
+                id: n.id,
+                label: n.label,
+                color: { background: baseColor, border: borderCol, highlight: { background: baseColor, border: borderCol } },
+                font: { color: fontCol, size: n.main ? 22 : 16, bold: n.main },
+                x: n.x,
+                y: n.y,
+                physics: n.physics || false, // cite: subject.html
+                fixed: { x: true, y: true }, // cite: subject.html
+              };
+            }));
+
+            const edges = new vis.DataSet(data.edges.map(e => ({ // cite: subject.html
+              from: e.from, // cite: subject.html
+              to: e.to, // cite: subject.html
+              arrows: 'to', // cite: subject.html
+              color: e.type === 'corequisite' ? { color: '#ff9800' } : { color: '#1976d2' }, // cite: subject.html
+              dashes: e.type === 'corequisite', // cite: subject.html
+              title: e.type.charAt(0).toUpperCase() + e.type.slice(1), // cite: subject.html
+            }))); // cite: subject.html
+
+            // 2. Load the network layout configuration
+            const options = {
+              layout: { randomSeed: 42 }, // cite: subject.html
+              nodes: { shape: 'box', borderWidth: 2 }, // cite: subject.html
+              edges: {
+                smooth: {
+                  enabled: true, // cite: subject.html
+                  type: 'cubicBezier', // cite: subject.html
+                  forceDirection: 'vertical', // cite: subject.html
+                  roundness: 0.4, // cite: subject.html
+                }
+              },
+              physics: { enabled: false }, // cite: subject.html
+            };
+
+            const network = new vis.Network(container, { nodes, edges }, options);
+            
+            const resizeObserver = new ResizeObserver(() => {
+              network.redraw();
+              network.fit();
+            });
+            resizeObserver.observe(container);
+          });
+      });
+      </script>
 {% endblock %}

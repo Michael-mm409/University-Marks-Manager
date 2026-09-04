@@ -1,0 +1,277 @@
+<diagram program="umletino" version="15.1"><zoom_level>8</zoom_level><help_text>Backend Architecture - FastAPI Application
+Layer: Presentation (API/Web) → Core (Services) → Infrastructure (DB)</help_text><element><id>UMLClass</id><coordinates><x>0</x><y>760</y><w>320</w><h>224</h></coordinates><panel_attributes>&lt;&lt;Infrastructure Layer&gt;&gt;
+engine.py
+--
+Database connection and session management
+--
++ engine: Engine
++ get_session() → Generator[Session]
++ session_scope() → Generator[Session]
++ wait_for_database(max_attempts, delay)
+--
+Dependencies:
+- SQLModel/SQLAlchemy
+- PostgreSQL or SQLite
+--
+Pattern: Factory + Context Manager
+Creates DB sessions for dependency injection</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>360</x><y>760</y><w>320</w><h>224</h></coordinates><panel_attributes>&lt;&lt;Infrastructure Layer&gt;&gt;
+models.py
+--
+ORM table definitions (SQLModel)
+--
++ Course(id, code, name, grading_scale)
++ Semester(id, name, year, course_id)
++ Subject(id, code, name, semester_id, ...)
++ Assignment(id, subject_id, assessment, ...)
++ Examination(id, subject_id, exam_mark, ...)
++ ExamSettings(id, subject_id, ps_exam, ...)
++ GradeScale(id, scale_name, grade, ...)
++ CourseSubjectLink(course_id, subject_id)
+--
+Pattern: Active Record (ORM)
+Defines database schema and relationships</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>0</x><y>440</y><w>320</w><h>240</h></coordinates><panel_attributes>&lt;&lt;Core Service Layer&gt;&gt;
+CourseManager
+--
+Manages course business logic
+--
+- session: Session
+--
++ create_course(name, code) → Course
++ get_all_courses() → list[Course]
++ get_course_by_id(id) → Course | None
++ get_course_by_code(code) → Course | None
++ add_subject_to_course(course_id, subject_id)
++ assign_semester_to_course(course_id, sem_id)
++ assign_year_to_course(course_id, year)
++ unassign_semester_from_course(...)
++ get_unassigned_semesters() → list[Semester]
++ update_course(id, name, code) → Course
++ delete_course(id) → bool
+--
+Pattern: Service Layer
+Encapsulates course-related operations</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>360</x><y>440</y><w>320</w><h>160</h></coordinates><panel_attributes>&lt;&lt;Core Service Layer&gt;&gt;
+SubjectManager
+--
+Manages subject business logic
+--
+- session: Session
+--
++ get_all_subjects() → list[Subject]
+--
+Pattern: Service Layer
+Provides subject-related operations
+(Currently minimal, extensible for future)</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>720</x><y>440</y><w>320</w><h>200</h></coordinates><panel_attributes>&lt;&lt;Core Service Layer&gt;&gt;
+SemesterManager
+--
+Manages semester business logic
+--
+- session: Session
+--
++ get_all_semesters() → list[Semester]
++ get_distinct_years() → list[int]
++ get_semesters_for_course(course_id)
++ get_distinct_years_for_course(course_id)
+--
+Pattern: Service Layer
+Handles semester queries and aggregations
+Orders results (newest first)</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>1136</x><y>440</y><w>304</w><h>240</h></coordinates><panel_attributes>&lt;&lt;Core Service Layer&gt;&gt;
+GradeCalculator
+--
+Calculates academic metrics
+--
+- session: Session
+--
++ calculate_wam(course_id) → float | None
++ calculate_gpa(course_id) → float | None
++ calculate_grade_counts(course_id) → dict[str, int]
+- _get_grade_scales(course_id) → list[GradeScale]
+--
+Pattern: Service Layer + Strategy
+Computes WAM (weighted average mark),
+GPA (grade point average), and grade distributions
+Uses GradeScale from DB for configurable grading
+Auto-seeds default "Standard" scale if missing</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>0</x><y>120</y><w>320</w><h>240</h></coordinates><panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
+routers/courses.py
+--
+FastAPI router for course endpoints
+--
++ courses_router: APIRouter
+--
+POST   /courses/
+GET    /courses/
+GET    /courses/{id}
+PUT    /courses/{id}
+DELETE /courses/{id}
+POST   /courses/{id}/semesters/{sem_id}
+DELETE /courses/{id}/semesters/{sem_id}
+GET    /courses/unassigned-semesters
+--
+Pattern: Controller (API Router)
+Uses CourseManager service
+Dependency injection: Depends(get_session)</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>360</x><y>120</y><w>320</w><h>240</h></coordinates><panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
+routers/subjects.py
+--
+FastAPI router for subject endpoints
+--
++ router: APIRouter
+--
+GET    /subjects/
+POST   /subjects/
+GET    /subjects/{code}/{sem}/{year}
+PUT    /subjects/{code}/{sem}/{year}
+DELETE /subjects/{code}/{sem}/{year}
+--
+Pattern: Controller (API Router)
+Uses models directly with JOINs
+Validates semester existence
+Dependency injection: Depends(get_session)</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>720</x><y>120</y><w>320</w><h>240</h></coordinates><panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
+routers/assignments.py
+routers/exams.py
+routers/semesters.py
+--
+FastAPI routers for other entities
+--
+Assignment endpoints (CRUD)
+Examination endpoints (CRUD)
+Semester endpoints (CRUD)
+--
+Pattern: Controller (API Router)
+Uses normalized schema with JOINs
+Validates foreign key relationships
+Type-safe parameter handling</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>1080</x><y>120</y><w>360</w><h>240</h></coordinates><panel_attributes>&lt;&lt;Presentation Layer - Web&gt;&gt;
+views.py + web/*.py
+--
+Jinja2 template-based web interface
+--
++ views: APIRouter (for HTMX endpoints)
+--
+Key modules:
+- views.py: Main routes, subject lookup
+- semester_views.py: Semester detail pages
+- course_views.py: Course management
+- assignment_views.py: Assignment forms
+- exam_views.py: Exam management
+- subject_views.py: Subject detail pages
+--
+Pattern: MVC (Controller + View)
+Uses Service Layer for business logic
+Returns rendered HTML (HTMX + Tailwind)</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>1480</x><y>120</y><w>280</w><h>200</h></coordinates><panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
+deps.py
+--
+FastAPI dependency providers
+--
++ get_session() → Generator[Session]
+--
+Pattern: Dependency Injection
+Provides DB session to API routes
+Ensures session lifecycle management
+(Created per request, auto-closed)</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>1480</x><y>360</y><w>280</w><h>240</h></coordinates><panel_attributes>&lt;&lt;Presentation Layer - API&gt;&gt;
+schemas.py
+--
+Pydantic request/response models
+--
++ SubjectCreate / SubjectRead
++ AssignmentCreate / AssignmentRead
++ ExaminationCreate / ExaminationRead
++ SemesterCreate / SemesterRead
+--
+Pattern: DTO (Data Transfer Object)
+Separates API contracts from ORM models
+Enables validation and serialization
+Uses Pydantic v2 model_config</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLClass</id><coordinates><x>720</x><y>744</y><w>360</w><h>224</h></coordinates><panel_attributes>&lt;&lt;Application Entry&gt;&gt;
+main.py
+--
+FastAPI application initialization
+--
++ app: FastAPI
++ lifespan(app): AsyncContextManager
+--
+Responsibilities:
+- Create DB tables (startup)
+- Configure Jinja2 environment
+- Mount API routers (versioned /api/v1)
+- Mount web routers (/)
+- Serve static files (/static, /assets)
+- Session middleware
+- Health check endpoint (/healthz)
+--
+Pattern: Application Factory
+Orchestrates all layers</panel_attributes><additional_attributes></additional_attributes></element><element><id>Relation</id><coordinates><x>144</x><y>352</y><w>56</w><h>104</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;uses&gt;&gt;
+creates</panel_attributes><additional_attributes>10;110;10;10</additional_attributes></element><element><id>Relation</id><coordinates><x>512</x><y>352</y><w>56</w><h>104</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;uses&gt;&gt;
+queries</panel_attributes><additional_attributes>10;110;10;10</additional_attributes></element><element><id>Relation</id><coordinates><x>872</x><y>352</y><w>56</w><h>104</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;uses&gt;&gt;
+queries</panel_attributes><additional_attributes>10;110;10;10</additional_attributes></element><element><id>Relation</id><coordinates><x>1248</x><y>352</y><w>64</w><h>104</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;uses&gt;&gt;
+calculates</panel_attributes><additional_attributes>10;110;10;10</additional_attributes></element><element><id>Relation</id><coordinates><x>144</x><y>672</y><w>72</w><h>104</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;depends&gt;&gt;
+session</panel_attributes><additional_attributes>10;10;10;110</additional_attributes></element><element><id>Relation</id><coordinates><x>512</x><y>592</y><w>72</w><h>184</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;depends&gt;&gt;
+queries</panel_attributes><additional_attributes>10;10;10;210</additional_attributes></element><element><id>Relation</id><coordinates><x>304</x><y>672</y><w>120</w><h>104</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;depends&gt;&gt;
+modifies</panel_attributes><additional_attributes>130;110;130;40;10;40;10;10</additional_attributes></element><element><id>Relation</id><coordinates><x>672</x><y>632</y><w>136</w><h>144</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;depends&gt;&gt;
+reads</panel_attributes><additional_attributes>10;160;10;80;150;80;150;10</additional_attributes></element><element><id>Relation</id><coordinates><x>992</x><y>672</y><w>176</w><h>88</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;depends&gt;&gt;
+reads GradeScale</panel_attributes><additional_attributes>10;90;10;50;200;50;200;10</additional_attributes></element><element><id>Relation</id><coordinates><x>872</x><y>632</y><w>72</w><h>128</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;depends&gt;&gt;
+queries</panel_attributes><additional_attributes>10;10;10;140</additional_attributes></element><element><id>Relation</id><coordinates><x>1248</x><y>672</y><w>72</w><h>104</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;depends&gt;&gt;
+session</panel_attributes><additional_attributes>10;10;10;110</additional_attributes></element><element><id>Relation</id><coordinates><x>672</x><y>88</y><w>424</w><h>112</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;injects&gt;&gt;</panel_attributes><additional_attributes>510;120;480;120;480;20;40;20;40;120;10;120</additional_attributes></element><element><id>Relation</id><coordinates><x>672</x><y>472</y><w>824</w><h>552</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;uses&gt;&gt;
+extends SQLModel</panel_attributes><additional_attributes>10;620;30;620;30;660;980;660;980;10;1010;10</additional_attributes></element><element><id>Relation</id><coordinates><x>272</x><y>240</y><w>1624</w><h>800</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;provides&gt;&gt;
+wraps</panel_attributes><additional_attributes>10;930;10;970;1510;970;2010;980;2000;10;1860;10</additional_attributes></element><element><id>Relation</id><coordinates><x>944</x><y>352</y><w>192</w><h>408</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;orchestrates&gt;&gt;
+mounts routers</panel_attributes><additional_attributes>10;490;10;410;130;410;140;60;20;60;20;10</additional_attributes></element><element><id>UMLClass</id><coordinates><x>1120</x><y>760</y><w>280</w><h>136</h></coordinates><panel_attributes>&lt;&lt;Core Domain - Enums&gt;&gt;
+grade_type.py
+semester_name.py
+--
++ GradeType: Enum
+  - NUMERIC, S, U
++ SemesterName: Enum
+  - Autumn, Spring, Summer
+--
+Pattern: Value Object
+Type-safe constants for domain logic</panel_attributes><additional_attributes></additional_attributes></element><element><id>Relation</id><coordinates><x>672</x><y>888</y><w>480</w><h>120</h></coordinates><panel_attributes>lt=&lt;.
+&lt;&lt;uses&gt;&gt;</panel_attributes><additional_attributes>580;10;580;130;40;130;40;20;10;20</additional_attributes></element><element><id>UMLNote</id><coordinates><x>1480</x><y>640</y><w>280</w><h>356</h></coordinates><panel_attributes>Architecture Patterns
+--
+1. Layered Architecture:
+   Presentation → Core → Infrastructure
+
+2. Dependency Injection:
+   FastAPI Depends() provides sessions
+   Services receive Session via constructor
+
+3. Service Layer Pattern:
+   Business logic in service classes
+   Controllers delegate to services
+
+4. Repository Pattern (implicit):
+   Services encapsulate data access
+   No explicit repository interfaces
+    Note: Repository layer optional; omitted for simplicity
+
+5. DTO Pattern:
+   Pydantic schemas separate API from ORM
+
+6. Active Record (SQLModel):
+   ORM models = DB tables
+
+7. Factory Pattern:
+   get_session() creates DB sessions
+
+8. Clean Architecture Principles:
+   - Core has no dependencies on outer layers
+   - Infrastructure provides implementations
+   - Presentation depends on Core
+bg=yellow</panel_attributes><additional_attributes></additional_attributes></element><element><id>UMLNote</id><coordinates><x>0</x><y>0</y><w>1760</w><h>80</h></coordinates><panel_attributes>University Marks Manager - Backend Architecture
+--
+FastAPI application with layered architecture following clean architecture principles.
+Presentation Layer (API/Web) → Core Service Layer → Infrastructure Layer (Database).
+Uses dependency injection, service layer pattern, and ORM (SQLModel) for data access.
+bg=#e1f5ff
+fontsize=16
+halign=center</panel_attributes><additional_attributes></additional_attributes></element></diagram>

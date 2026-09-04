@@ -1,16 +1,18 @@
 """Web views for managing courses."""
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional, cast
 
 from fastapi import APIRouter, Depends, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from sqlmodel import Session, select
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
+from sqlmodel import Session, select, func
+from sqlmodel import Table
 
 from src.core.services.course_manager import CourseManager
 from src.core.services.semester_manager import SemesterManager
+from src.core.services.grade_calculator import GradeCalculator
 from src.infrastructure.db.engine import get_session
-from src.infrastructure.db.models import Subject, Course, Semester
+from src.infrastructure.db.models import Subject, Course, Semester, University, GradeScale
 
 router = APIRouter()
 
@@ -36,12 +38,40 @@ def get_courses_page(
     request: Request,
     session: Session = Depends(get_session),
 ):
-    """Render the main page for managing courses."""
+    """Redirect to profile page where users manage their courses."""
+    return RedirectResponse(url="/profile", status_code=303)
+
+
+@router.head("/courses")
+def get_courses_head(request: Request, session: Session = Depends(get_session)):
+    """HEAD variant for the courses redirect."""
+    return Response(status_code=303, headers={"Location": "/profile"})
+
+
+# The selector fragment must be registered before the dynamic /courses/{course_code}
+# route to avoid the literal path "_selector" being captured as a course_code.
+# See: requests like /courses/_selector should match this static route.
+@router.get("/courses/_selector", response_class=HTMLResponse)
+def courses_selector_fragment(request: Request, session: Session = Depends(get_session)):
+    """Return a small HTML fragment with a course dropdown for inline selection.
+
+    This endpoint is intended to be loaded into the header via HTMX so users can
+    change the active course without leaving the current page.
+    """
     jinja_env = request.app.state.jinja_env
-    course_manager = CourseManager(session)
-    courses = course_manager.get_all_courses()
-    template = jinja_env.get_template("courses.html")
-    return template.render(request=request, courses=courses)
+    cm = CourseManager(session)
+    courses = cm.get_all_courses()
+    template = jinja_env.get_template("partials/course_header.html")
+    current_course_id = request.session.get("current_course_id")
+    current_course_name = request.session.get("current_course_name")
+    current_course_code = request.session.get("current_course_code")
+    return template.render(
+        request=request,
+        courses=courses,
+        current_course_id=current_course_id,
+        current_course_name=current_course_name,
+        current_course_code=current_course_code,
+    )
 
 
 @router.get("/courses/_codes", response_class=HTMLResponse)
@@ -200,18 +230,153 @@ def debug_resolve_course(key: str, request: Request, session: Session = Depends(
 
 
 @router.post("/courses/", response_class=HTMLResponse)
-def create_course_view(
+async def create_course_view(
     request: Request,
     name: str = Form(...),
     code: str = Form(...),
+    grading_scale_id: str = Form(...),
+    university_id: str = Form(None),
+    new_university_name: str = Form(None),
     session: Session = Depends(get_session),
 ):
     """Handle the form submission to create a new course and return the HTML fragment."""
     jinja_env = request.app.state.jinja_env
     course_manager = CourseManager(session)
-    course = course_manager.create_course(name=name, code=code)
-    template = jinja_env.get_template("partials/course_item.html")
-    return template.render(request=request, course=course)
+    # Handle grading_scale_id: if 'other', pass None or handle custom logic
+    gs_id = None
+    custom_scale_id = None
+    if grading_scale_id and grading_scale_id != "other":
+        try:
+            gs_id = int(grading_scale_id)
+        except Exception:
+            gs_id = None
+    elif grading_scale_id == "other":
+        # Handle custom grading scale creation (async)
+        form = await request.form()
+        custom_scale_name = str(form.get("custom_grading_scale")) if form.get("custom_grading_scale") is not None else None
+        custom_grades = [str(x) for x in form.getlist("custom_grades[]")]
+        custom_labels = [str(x) for x in form.getlist("custom_labels[]")]
+        custom_min_marks = [str(x) for x in form.getlist("custom_min_marks[]")]
+        custom_gpa_points = [str(x) for x in form.getlist("custom_gpa_points[]")]
+        custom_band_types = [str(x) for x in form.getlist("custom_band_types[]")]
+
+        # Validate required fields
+        if not custom_scale_name or not custom_grades or not custom_labels or not custom_min_marks or not custom_gpa_points:
+            return HTMLResponse("Missing custom grading scale data.", status_code=400)
+
+        # Create GradeScale entries for each row
+        from src.infrastructure.db.models import GradeScale
+        scale_ids = []
+        for i in range(len(custom_grades)):
+            grade = custom_grades[i]
+            label = custom_labels[i]
+            try:
+                min_mark = float(custom_min_marks[i])
+            except Exception:
+                min_mark = 0.0
+            try:
+                gpa_point = float(custom_gpa_points[i])
+            except Exception:
+                gpa_point = 0.0
+            band_type = custom_band_types[i] if custom_band_types and i < len(custom_band_types) else "both"
+            # Check if this GradeScale row already exists (avoid duplicates)
+            existing = session.exec(
+                select(GradeScale).where(
+                    GradeScale.scale_name == custom_scale_name,
+                    GradeScale.grade == grade,
+                    GradeScale.band_type == band_type
+                )
+            ).first()
+            if existing:
+                scale_ids.append(existing.id)
+            else:
+                gs = GradeScale(
+                    scale_name=custom_scale_name,
+                    grade=grade,
+                    label=label,
+                    min_mark=min_mark,
+                    gpa_point=gpa_point,
+                    band_type=band_type
+                )
+                session.add(gs)
+                session.commit()
+                session.refresh(gs)
+                scale_ids.append(gs.id)
+        # Use the first GradeScale row's id as the grading_scale_id for the course
+        if scale_ids:
+            gs_id = scale_ids[0]
+        else:
+            return HTMLResponse("Failed to create custom grading scale.", status_code=400)
+
+    # Handle university_id: if 'add_new', use new_university_name
+    uni_id = None
+    if university_id and university_id != "add_new":
+        try:
+            uni_id = int(university_id)
+        except Exception:
+            uni_id = None
+    elif university_id == "add_new" and new_university_name:
+        uni_id = None  # Will be handled in create_course
+    if gs_id is not None:
+        course = course_manager.create_course(
+            name=name,
+            code=code,
+            grading_scale_id=gs_id,
+            university_id=uni_id,
+            new_university_name=new_university_name if university_id == "add_new" else None,
+        )
+    else:
+        return HTMLResponse("Invalid grading scale selected.", status_code=400)
+    # After creating, render the full course list for HTMX swap
+    courses = course_manager.get_all_courses()
+    template = jinja_env.get_template("partials/course_list.html")
+    content = template.render(request=request, courses=courses)
+    if request.headers.get("HX-Request"):
+        resp = HTMLResponse(content=content, status_code=200)
+        resp.headers["Content-Type"] = "text/html"
+        resp.headers["HX-Trigger"] = "courseListChanged"
+        return resp
+    return HTMLResponse(content=content, status_code=200)
+
+
+@router.get("/courses/create", response_class=HTMLResponse)
+def create_course_page(
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    """Render the create/manage courses page used from the profile screen.
+
+    This must be declared before the dynamic /courses/{course_code} route so
+    that the literal path segment "create" is not treated as a course code.
+    """
+    jinja_env = request.app.state.jinja_env
+    course_manager = CourseManager(session)
+
+    # All existing courses for the list
+    courses = course_manager.get_all_courses()
+
+    # Distinct grading scales (by scale_name) for the dropdown
+    all_scales = session.exec(select(GradeScale)).all()
+    seen_scale_names = set()
+    grading_scales = []
+    for scale in all_scales:
+        name = getattr(scale, "scale_name", None)
+        if name and name not in seen_scale_names:
+            seen_scale_names.add(name)
+            grading_scales.append(scale)
+
+    # All universities for the university selector
+    universities = session.exec(select(University)).all()
+
+    template = jinja_env.get_template("courses.html")
+    return template.render(
+        request=request,
+        courses=courses,
+        grading_scales=grading_scales,
+        universities=universities,
+        # Hide the "Active Course" header on the global manage-courses page
+        no_courses_warning=True,
+    )
 
 
 @router.get("/courses/{course_code}", response_class=HTMLResponse)
@@ -224,6 +389,7 @@ def get_course_detail_page(
     jinja_env = request.app.state.jinja_env
     course_manager = CourseManager(session)
     semester_manager = SemesterManager(session)
+    grade_calculator = GradeCalculator(session)
 
     course = _resolve_course(course_manager, course_code)
     if not course:
@@ -239,16 +405,28 @@ def get_course_detail_page(
 
     # Map assigned semester -> subjects within that term for optional display
     subjects_by_semester: dict[int, list[Subject]] = {}
+    subjects_table = cast(Table, getattr(Subject, "__table__"))
     for sem in assigned_semesters:
-        year_col: Any = Subject.year
         candidates = session.exec(
-            select(Subject).where(
-                Subject.semester_name == sem.name,
-                year_col == str(sem.year),
+            select(Subject)
+            .where(
+                Subject.semester_id == sem.id,
             )
+            .order_by(subjects_table.c.subject_code.asc())
         ).all()
         subjects_by_semester[getattr(sem, "id")] = list(candidates)
 
+    # Calculate grade statistics for dashboard
+    wam = grade_calculator.calculate_wam(course.id) if course.id else None
+    gpa = grade_calculator.calculate_gpa(course.id) if course.id else None
+    grade_counts = grade_calculator.calculate_grade_counts(course.id) if course.id else {}
+
+    # Resolve the GPA max from the stored gpa_scale (default 4 for Standard scale)
+    gpa_max = int(getattr(course, "gpa_scale", None) or 4)
+
+    # Get all universities for the dropdown
+    from src.infrastructure.db.models import University
+    universities = session.exec(select(University)).all()
     template = jinja_env.get_template("course_detail.html")
     return template.render(
         request=request,
@@ -257,6 +435,11 @@ def get_course_detail_page(
         unassigned_semesters=unassigned_semesters,
         unassigned_years=unassigned_years,
         subjects_by_semester=subjects_by_semester,
+        universities=universities,
+        wam=wam,
+        gpa=gpa,
+        gpa_max=gpa_max,
+        grade_counts=grade_counts,
     )
 
 
@@ -352,6 +535,56 @@ def select_current_course(
     return response
 
 
+@router.post("/courses/select-inline")
+def select_course_inline(request: Request, course_key: str = Form(""), session: Session = Depends(get_session)) -> Response:
+    """Set the active course via an inline POST and return the updated selector fragment.
+
+    If the request is via HTMX the fragment returned will replace the selector and
+    include a small success message via the flash mechanism.
+    """
+    # Debug: log invocation so container logs show whether the endpoint was hit
+    try:
+        print(f"[debug] select_course_inline hit course_key={course_key!r} HX-Request={request.headers.get('HX-Request')!r}")
+    except Exception:
+        # avoid any accidental logging errors breaking the flow
+        pass
+    sess = request.session
+    # Treat explicit sentinel or empty value as a clear request
+    if not course_key or course_key == "__clear__":
+        sess.pop("current_course_id", None)
+        sess.pop("current_course_name", None)
+        sess.pop("current_course_code", None)
+        sess["flash_message"] = "Active course cleared."
+    else:
+        course = _resolve_course(CourseManager(session), course_key)
+        if course:
+            sess["current_course_id"] = course.id
+            sess["current_course_name"] = course.name
+            if getattr(course, "code", None):
+                sess["current_course_code"] = course.code
+            else:
+                sess.pop("current_course_code", None)
+            sess["flash_message"] = f"Active course changed to {course.name}{' (' + course.code + ')' if getattr(course, 'code', None) else ''}."
+
+    # After changing the session, navigate to Home so the header (active course)
+    # is refreshed. For HTMX clients we provide both HX-Redirect and HX-Refresh
+    # as some proxies or intermediary rewrites can prevent the browser from
+    # following the redirect reliably; HX-Refresh forces a full client reload.
+    redirect_url = "/?selected=1"
+    if request.headers.get("HX-Request"):
+        # Return an HTMLResponse with HTMX headers so HTMX will perform a
+        # navigation or a full page refresh.
+        resp = HTMLResponse("")
+        resp.headers["HX-Redirect"] = redirect_url
+        resp.headers["HX-Refresh"] = "true"
+        return resp
+
+    # Non-HTMX clients: standard 303 redirect to Home
+    response = RedirectResponse(url=redirect_url, status_code=303)
+    response.headers["HX-Redirect"] = redirect_url
+    return response
+
+
 @router.post("/courses/clear-selection")
 def clear_current_course(
     request: Request,
@@ -434,25 +667,81 @@ def update_course_view(
     course_code: str,
     name: str = Form(...),
     code: str = Form(...),
+    university_id: str = Form(None),
+    new_university_name: str = Form(None),
     session: Session = Depends(get_session),
 ):
-    """Update course name and code and redirect to the (possibly new) code path."""
+    """Update course name, code, and university. Create university if needed."""
     cm = CourseManager(session)
     course = _resolve_course(cm, course_code)
     if not course:
         return HTMLResponse("Course not found", status_code=404)
     try:
-        updated = cm.update_course(course.id, name=name, code=code)  # type: ignore[arg-type]
+        # Handle university_id: if 'add_new', use new_university_name
+        uni_id = None
+        if university_id and university_id != "add_new":
+            try:
+                uni_id = int(university_id)
+            except Exception:
+                uni_id = None
+        elif university_id == "add_new" and new_university_name:
+            uni_id = None  # Will be handled in update_course
+        if course.id is None:
+            return HTMLResponse("Course ID is missing.", status_code=400)
+        updated = cm.update_course(
+            course.id,
+            name=name,
+            code=code,
+            university_id=uni_id,
+            new_university_name=new_university_name if university_id == "add_new" else None,
+        )
     except Exception as ex:
-        # Likely a uniqueness violation; show simple message
         return HTMLResponse(f"Update failed: {ex}", status_code=400)
-    # Update session banner if this course is active
     sess = request.session
     if updated and sess.get("current_course_id") == getattr(updated, "id", None):
         sess["current_course_name"] = getattr(updated, "name", None)
         sess["current_course_code"] = getattr(updated, "code", None)
         sess["flash_message"] = "Course details updated."
     target = f"/courses/{(getattr(updated, 'code', None) or getattr(updated, 'id', ''))}"
+    if request.headers.get("HX-Request"):
+        resp = HTMLResponse()
+        resp.headers["HX-Redirect"] = target
+        return resp
+    return RedirectResponse(url=target, status_code=303)
+
+
+@router.post("/courses/{course_code}/settings/update", response_class=HTMLResponse)
+def update_course_settings_view(
+    request: Request,
+    course_code: str,
+    gpa_scale: int = Form(...),
+    return_to: Optional[str] = Form(None),
+    session: Session = Depends(get_session),
+):
+    """Update per-course GPA scale and sync the linked grading scale rows."""
+    cm = CourseManager(session)
+    course = _resolve_course(cm, course_code)
+    if not course or course.id is None:
+        return HTMLResponse("Course not found", status_code=404)
+    # Validate dynamically: accepted values are the integer max GPA points of
+    # any scale present in the grade_scales table, so newly added scales are
+    # accepted without any code changes.
+    scale_rows = session.exec(
+        select(func.max(GradeScale.gpa_point))
+        .where(GradeScale.band_type == "both")
+        .group_by(GradeScale.scale_name)
+    ).all()
+    valid_gpa_scales = {int(v) for v in scale_rows if v is not None}
+    if gpa_scale not in valid_gpa_scales:
+        return HTMLResponse(
+            f"gpa_scale {gpa_scale} is not a recognised scale maximum "
+            f"(valid: {sorted(valid_gpa_scales)})",
+            status_code=422,
+        )
+    cm.update_gpa_scale(course.id, gpa_scale)
+    # Honour an explicit return_to path supplied by the caller (e.g. "/profile");
+    # fall back to the course detail page.
+    target = return_to if (return_to and return_to.startswith("/")) else f"/courses/{course_code}"
     if request.headers.get("HX-Request"):
         resp = HTMLResponse()
         resp.headers["HX-Redirect"] = target

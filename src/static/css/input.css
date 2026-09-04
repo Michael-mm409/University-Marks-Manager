@@ -1,3 +1,41 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Global size tweak: increase base font-size so the whole UI scales up */
+@layer base {
+	html { font-size: 22px; }
+    h1 { font-size: 3rem;  font-weight: 900;}
+}
+
+/* Project components/utilities: headings, badges, cards */
+@layer utilities {
+	/* Spacing helpers */
+	.heading-badge { margin-left: 0.5rem; }
+	.heading-right { margin-right: 0.5rem; }
+	.grade-stats { margin-top: 1.75rem; }
+
+	/* Subject/Semester headings */
+	.subject-title, .semester-title {
+		font-weight: 900 !important; letter-spacing: -0.01em !important; line-height: 1.1 !important;
+		text-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+	}
+	.subject-title { font-size: 1.7rem !important; margin-bottom: 0.1rem !important; }
+	.semester-title { font-size: 1.3rem !important; }
+	.semester-title .semester-year { font-size: 1.1rem !important; font-weight: 600 !important; opacity: .7 !important; margin-left: .35rem !important; }
+
+	/* Subject page subtitle (legacy class, kept if used) */
+	.subject-semester-title { font-size: 2rem; font-weight: 700; letter-spacing: 0; opacity: .85; margin-bottom: .5rem; }
+
+	/* WAM/GPA displays */
+	.wam-gpa-value { font-size: 1.35rem; font-weight: 700; letter-spacing: 0; }
+	.grade-count { font-size: 1.05rem; font-weight: 600; letter-spacing: 0; }
+
+	/* Collapse headers: de-bold card header, emphasize only text */
+	.collapse .collapse-title { font-weight: 400 !important; }
+	.section-card-title { font-weight: 500 !important; letter-spacing: -0.005em !important; margin-right: .5rem !important; }
+
+	/* Minor spacing helpers */
+	.year-card .semester-year { margin-left: .35rem !important; }
+	#subject-code-display { margin-right: .5rem !important; }
+}

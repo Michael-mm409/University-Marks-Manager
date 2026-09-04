@@ -4,11 +4,12 @@ from __future__ import annotations
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
-from sqlmodel import Session, select
+from sqlmodel import col, Session, select
 
-from src.infrastructure.db.models import Assignment, GradeType
+from src.infrastructure.db.models import Assignment, GradeType, Subject, Semester
 from src.presentation.api.schemas import AssignmentCreate, AssignmentRead
 from src.presentation.api.deps import get_session
+from src.core.services.grade_calculator import GradeCalculator
 
 router = APIRouter()
 
@@ -16,6 +17,7 @@ router = APIRouter()
 @router.api_route("/", response_model=List[AssignmentRead], methods=["GET", "HEAD"])
 def list_assignments(
     session: Session = Depends(get_session),
+    subject_id: Optional[int] = None,
     subject_code: Optional[str] = None,
     semester_name: Optional[str] = None,
     year: Optional[str] = None,
@@ -32,13 +34,27 @@ def list_assignments(
     Returns:
         Sequence[Assignment]: List of assignments.
     """
-    stmt = select(Assignment).order_by(Assignment.assessment)
-    if subject_code:
-        stmt = stmt.where(Assignment.subject_code == subject_code)
-    if semester_name:
-        stmt = stmt.where(Assignment.semester_name == semester_name)
-    if year:
-        stmt = stmt.where(Assignment.year == year)
+    stmt = select(Assignment).order_by(col(Assignment.id))
+    # Prefer normalized filtering when subject_id provided
+    if subject_id is not None:
+        stmt = select(Assignment).where(Assignment.subject_id == subject_id).order_by(col(Assignment.id))
+        return session.exec(stmt).all()
+    # Legacy filtering when composite provided
+    if subject_code and semester_name and year:
+        subj = session.exec(
+            select(Subject)
+            .join(Semester)
+            .where(
+                Subject.subject_code == subject_code,
+                Semester.name == semester_name,
+                Semester.year == int(year),
+            )
+        ).first()
+        sid = getattr(subj, "id", None)
+        if sid is not None:
+            stmt = select(Assignment).where(Assignment.subject_id == sid).order_by(col(Assignment.id))
+            return session.exec(stmt).all()
+    # Without all three parameters, return all assignments
     return session.exec(stmt).all()
 
 
@@ -58,7 +74,7 @@ def create_assignment(data: AssignmentCreate, session: Session = Depends(get_ses
     if (
         data.grade_type == GradeType.NUMERIC.value
         and data.weighted_mark is not None
-        and data.mark_weight not in (None, 0)
+        and data.mark_weight is not None and data.mark_weight != 0
     ):
         try:
             weighted_val = float(data.weighted_mark)
@@ -81,31 +97,42 @@ def create_assignment(data: AssignmentCreate, session: Session = Depends(get_ses
         except Exception:
             # If conversion fails, leave as-is and let the ORM/DB raise if invalid
             pass
+    if not payload.get("category"):
+        payload["category"] = payload.get("assessment")
+    # Resolve subject_id and enforce duplicate by (subject_id, assessment)
+    sid = payload.get("subject_id")
+    if sid is None:
+        # Attempt legacy resolution via code/semester/year
+        year_val = payload.get("year")
+        if not year_val:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="subject_id or (subject_code, semester_name, year) is required")
+        subj = session.exec(
+            select(Subject)
+            .join(Semester)
+            .where(
+                Subject.subject_code == payload.get("subject_code"),
+                Semester.name == payload.get("semester_name"),
+                Semester.year == int(year_val),
+            )
+        ).first()
+        sid = getattr(subj, "id", None)
+        if sid is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="subject not found")
+        payload["subject_id"] = sid
     duplicate = session.exec(
         select(Assignment).where(
+            Assignment.subject_id == sid,
             Assignment.assessment == payload["assessment"],
-            Assignment.subject_code == payload["subject_code"],
-            Assignment.semester_name == payload["semester_name"],
-            Assignment.year == payload["year"],
         )
     ).first()
-    if duplicate:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assignment already exists")
-    duplicate = session.exec(
-        select(Assignment).where(
-            Assignment.assessment == payload["assessment"],
-            Assignment.subject_code == payload["subject_code"],
-            Assignment.semester_name == payload["semester_name"],
-            Assignment.year == payload["year"],
-        )
-    ).first()
-
     if duplicate:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Assignment already exists")
     assignment = Assignment(**payload)
     session.add(assignment)
     session.commit()
     session.refresh(assignment)
+    if assignment.subject_id is not None:
+        GradeCalculator(session).sync_subject_total(assignment.subject_id)
     return assignment
 
 
@@ -173,14 +200,33 @@ def update_assignment(assignment_id: int, data: AssignmentCreate,
             payload["weighted_mark"] = float(payload["weighted_mark"])
         except (ValueError, TypeError):
             pass
+    if not payload.get("category"):
+        payload["category"] = payload.get("assessment")
     # Guard against creating a duplicate natural key (exclude the current record)
+    # Resolve subject_id for duplicate check and update the record's subject_id if changed
+    sid = payload.get("subject_id")
+    if sid is None:
+        year_val = payload.get("year")
+        if not year_val:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="subject_id or (subject_code, semester_name, year) is required")
+        subj = session.exec(
+            select(Subject)
+            .join(Semester)
+            .where(
+                Subject.subject_code == payload.get("subject_code"),
+                Semester.name == payload.get("semester_name"),
+                Semester.year == int(year_val),
+            )
+        ).first()
+        sid = getattr(subj, "id", None)
+        if sid is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="subject not found")
+        payload["subject_id"] = sid
     duplicate = session.exec(
         select(Assignment).where(
             Assignment.id != assignment_id,
+            Assignment.subject_id == sid,
             Assignment.assessment == payload["assessment"],
-            Assignment.subject_code == payload["subject_code"],
-            Assignment.semester_name == payload["semester_name"],
-            Assignment.year == payload["year"],
         )
     ).first()
     if duplicate:
@@ -191,7 +237,7 @@ def update_assignment(assignment_id: int, data: AssignmentCreate,
     if (
         assignment_record.grade_type == GradeType.NUMERIC.value
         and assignment_record.weighted_mark is not None
-        and assignment_record.mark_weight not in (None, 0)
+        and assignment_record.mark_weight is not None and assignment_record.mark_weight != 0
     ):
         try:
             weighted_val = float(assignment_record.weighted_mark)
@@ -203,6 +249,8 @@ def update_assignment(assignment_id: int, data: AssignmentCreate,
     session.add(assignment_record)
     session.commit()
     session.refresh(assignment_record)
+    if assignment_record.subject_id is not None:
+        GradeCalculator(session).sync_subject_total(assignment_record.subject_id)
     return assignment_record
 
 
@@ -221,8 +269,11 @@ def delete_assignment(assignment_id: int, session: Session = Depends(get_session
     a = session.get(Assignment, assignment_id)
     if not a:
         raise HTTPException(status_code=404, detail="Not found")
+    subject_id = a.subject_id
     session.delete(a)
     session.commit()
+    if subject_id is not None:
+        GradeCalculator(session).sync_subject_total(subject_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 __all__ = ["router"]

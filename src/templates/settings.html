@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - University Marks Manager{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-3xl font-bold">Settings</h2>
+    <a href="/" class="btn btn-ghost">Back to Home</a>
+  </div>
+
+  <div class="card bg-base-100 shadow-xl border border-base-200">
+    <div class="card-body">
+      <h3 class="card-title mb-4">Grade Scales</h3>
+      
+      {% if course %}
+      <div class="alert alert-info mb-4 text-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <div>
+          Editing configuration for active course: <strong>{{ course.name }}</strong>
+          <br>
+          <form action="/settings/scale/update" method="post" style="display:inline">
+            <label for="scale_name" class="mr-2">Current Scale:</label>
+            <select name="scale_name" id="scale_name" class="select select-sm select-bordered" onchange="this.form.submit()">
+              {% for scale in all_scale_names %}
+                <option value="{{ scale }}" {% if scale == current_scale_name %}selected{% endif %}>{{ scale }}</option>
+              {% endfor %}
+            </select>
+            <noscript><button type="submit" class="btn btn-sm ml-2">Change</button></noscript>
+          </form>
+        </div>
+      </div>
+      {% else %}
+      <div class="alert alert-warning mb-4 text-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        <span>No active course selected. Editing default "Standard" scale.</span>
+      </div>
+      {% endif %}
+
+      <p class="text-sm opacity-70 mb-6">
+        Configure the grade bands used for WAM (Grade Counts) and GPA calculations.
+        <br>
+        <strong>WAM:</strong> Uses the "Min Mark" to categorize subjects into bands (HD, D, etc.).
+        <br>
+        <strong>GPA:</strong> Uses the "GPA Point" assigned to each band (4.0 scale).
+      </p>
+
+      <div class="flex mb-4 justify-center">
+        <div class="rounded-lg bg-base-200 p-1 flex w-fit border border-base-300 shadow-sm">
+          <a class="tab tab-lg font-semibold px-8 py-2 mx-1 transition-all duration-150 tab-active bg-primary text-primary-content rounded-md shadow-md border-2 border-primary cursor-pointer" id="wam-tab" onclick="showTab('wam')" style="margin-right: 0.5rem;" >WAM Bands</a>
+          <a class="tab tab-lg font-semibold px-8 py-2 mx-1 transition-all duration-150 bg-base-100 text-base-content rounded-md shadow border border-base-300 cursor-pointer" id="gpa-tab" onclick="showTab('gpa')">GPA Bands</a>
+        </div>
+      </div>
+      <form action="/settings/grades/update" method="post" id="wam-form">
+        <input type="hidden" name="band_type" value="wam" />
+        <div class="mb-4 flex items-center">
+          <label for="scale_name" class="mr-2 font-semibold">Scale Name:</label>
+          <input type="text" id="scale_name" name="scale_name" class="input input-bordered input-sm w-48" value="{{ current_scale_name }}" list="all_scale_names" required />
+          <datalist id="all_scale_names">
+            {% for scale in all_scale_names %}
+              <option value="{{ scale }}">{{ scale }}</option>
+            {% endfor %}
+          </datalist>
+          <span class="ml-2 text-xs opacity-60">(Type a new name to create a new scale)</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="table table-zebra w-full">
+            <thead>
+              <tr>
+                <th>Grade (Code)</th>
+                <th>Label</th>
+                <th>Min Mark (%)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="wam-grades-body">
+              {% for scale in wam_bands %}
+              <tr>
+                <td>
+                  <input type="text" name="grades" value="{{ scale.grade }}" class="input input-bordered input-sm w-20 font-bold" required />
+                </td>
+                <td>
+                  <input type="text" name="labels" value="{{ scale.label }}" class="input input-bordered input-sm w-full max-w-xs" required />
+                </td>
+                <td>
+                  <input type="number" name="min_marks" value="{{ scale.min_mark }}" step="0.01" min="0" max="100" class="input input-bordered input-sm w-24" required />
+                </td>
+                <td>
+                  <button type="button" class="btn btn-ghost btn-xs text-error" onclick="this.closest('tr').remove()">
+                    ✕
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-4 flex justify-between items-center">
+          <button type="button" class="btn btn-sm btn-outline" onclick="addGradeRow('wam-grades-body')">
+            + Add Grade Band
+          </button>
+          <button type="submit" class="btn btn-primary">
+            Save WAM Bands
+          </button>
+        </div>
+      </form>
+      <form action="/settings/grades/update" method="post" id="gpa-form" style="display:none;">
+        <input type="hidden" name="band_type" value="gpa" />
+        <div class="mb-4 flex items-center">
+          <label for="scale_name_gpa" class="mr-2 font-semibold">Scale Name:</label>
+          <input type="text" id="scale_name_gpa" name="scale_name" class="input input-bordered input-sm w-48" value="{{ current_scale_name }}" list="all_scale_names" required />
+          <datalist id="all_scale_names">
+            {% for scale in all_scale_names %}
+              <option value="{{ scale }}">{{ scale }}</option>
+            {% endfor %}
+          </datalist>
+          <span class="ml-2 text-xs opacity-60">(Type a new name to create a new scale)</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="table table-zebra w-full">
+            <thead>
+              <tr>
+                <th>Grade (Code)</th>
+                <th>Label</th>
+                <th>GPA Point</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="gpa-grades-body">
+              {% for scale in gpa_bands %}
+              <tr>
+                <td>
+                  <input type="text" name="grades" value="{{ scale.grade }}" class="input input-bordered input-sm w-20 font-bold" required />
+                </td>
+                <td>
+                  <input type="text" name="labels" value="{{ scale.label }}" class="input input-bordered input-sm w-full max-w-xs" required />
+                </td>
+                <td>
+                  <input type="number" name="gpa_points" value="{{ scale.gpa_point }}" step="0.01" min="0" max="7" class="input input-bordered input-sm w-24" required />
+                </td>
+                <td>
+                  <button type="button" class="btn btn-ghost btn-xs text-error" onclick="this.closest('tr').remove()">
+                    ✕
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-4 flex justify-between items-center">
+          <button type="button" class="btn btn-sm btn-outline" onclick="addGradeRow('gpa-grades-body')">
+            + Add Grade Band
+          </button>
+          <button type="submit" class="btn btn-primary">
+            Save GPA Bands
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function showTab(tab) {
+  document.getElementById('wam-form').style.display = tab === 'wam' ? '' : 'none';
+  document.getElementById('gpa-form').style.display = tab === 'gpa' ? '' : 'none';
+  document.getElementById('wam-tab').classList.toggle('tab-active', tab === 'wam');
+  document.getElementById('gpa-tab').classList.toggle('tab-active', tab === 'gpa');
+}
+function addGradeRow(tbodyId) {
+  const tbody = document.getElementById(tbodyId);
+  const tr = document.createElement('tr');
+  let html = '';
+  if (tbodyId === 'wam-grades-body') {
+    html = `
+      <td><input type="text" name="grades" class="input input-bordered input-sm w-20 font-bold" required placeholder="Code" /></td>
+      <td><input type="text" name="labels" class="input input-bordered input-sm w-full max-w-xs" required placeholder="Label" /></td>
+      <td><input type="number" name="min_marks" step="0.01" min="0" max="100" class="input input-bordered input-sm w-24" required placeholder="0-100" /></td>
+      <td><button type="button" class="btn btn-ghost btn-xs text-error" onclick="this.closest('tr').remove()">✕</button></td>
+    `;
+  } else {
+    html = `
+      <td><input type="text" name="grades" class="input input-bordered input-sm w-20 font-bold" required placeholder="Code" /></td>
+      <td><input type="text" name="labels" class="input input-bordered input-sm w-full max-w-xs" required placeholder="Label" /></td>
+      <td><input type="number" name="gpa_points" step="0.01" min="0" max="7" class="input input-bordered input-sm w-24" required placeholder="0.0" /></td>
+      <td><button type="button" class="btn btn-ghost btn-xs text-error" onclick="this.closest('tr').remove()">✕</button></td>
+    `;
+  }
+  tr.innerHTML = html;
+  tbody.appendChild(tr);
+}
+// Default to show WAM tab
+showTab('wam');
+</script>
+{% endblock %}

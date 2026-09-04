@@ -1,0 +1,6 @@
+/* Collapse card headers and section header text */
+.collapse .collapse-title { font-weight: 400 !important; }
+.section-card-title { font-weight: 500 !important; letter-spacing: -0.005em; margin-right: 0.5rem !important; }
+/* Add-subject and add-semester headings (legacy names kept if referenced) */
+body .add-subject-title { font-size: 1.15rem !important; font-weight: 800 !important; letter-spacing: -0.01em !important; margin-bottom: 0.5rem !important; }
+body .add-semester-card-title { font-size: 1.1rem !important; font-weight: 700 !important; margin-bottom: 0.25rem !important; letter-spacing: -0.01em !important; }

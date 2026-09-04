@@ -1,0 +1,144 @@
+/* ─────────────────────────────────────────────
+   style.css — app-level overrides
+   Loaded after Tailwind + DaisyUI in base.html
+   ───────────────────────────────────────────── */
+
+/* ── Semester grid fallback ── */
+.sem-grid { display: grid; gap: 1rem; }
+@media (min-width: 640px) { .sem-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 768px) { .sem-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.sem-card {
+  padding: 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 0.5rem;
+  background: var(--b1, #fff);
+}
+
+/* ── Glass sticky navbar ── */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  /* 3-column grid: minmax(0,1fr) forces both sides to actually shrink,
+     keeping the breadcrumb truly page-centred without expanding past its column */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  width: 100%;
+  min-height: 70px;
+  padding: 1rem 2rem;
+  gap: 1rem;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+[data-theme="dark"] .site-header {
+  background: rgba(24, 24, 24, 0.82);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+.site-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0; /* allows title to wrap rather than overflow */
+}
+.site-header-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  min-width: 0;
+  /* overflow must be visible so the absolutely-positioned dropdown-content
+     is not clipped by this container; the course selector's own
+     #course-header-container keeps overflow:hidden for text truncation */
+  overflow: visible;
+}
+/* Course selector grows to fill the right column; select fills it so
+   clientWidth is the actual constrained width the JS can measure against */
+#course-header-container {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+#course-header-container .select {
+  width: 100%;
+}
+.site-header-active-course {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  opacity: 0.85;
+  flex-wrap: wrap;
+}
+
+/* ── Breadcrumb: centered flex child between left and right sections ── */
+.site-header [aria-label="Breadcrumb"] {
+  flex: 1 1 0;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ── Narrow screens: switch to flex-wrap, three rows ── */
+/* Row 1: title                                                   */
+/* Row 2: course selector (full width) + user icon               */
+/* Row 3: breadcrumbs (full width)                               */
+@media (max-width: 767px) {
+  .site-header {
+    display: flex;
+    flex-wrap: wrap;
+    padding: 0.5rem 0.75rem;
+    min-height: auto;
+    gap: 0.35rem 0.5rem;
+    align-items: flex-start;
+  }
+  .site-header-left {
+    flex: 1 1 100%;
+    order: 1;
+  }
+  .site-header-active-course {
+    display: none;
+  }
+  /* Row 2: course selector grows to fill, user icon at end */
+  .site-header-right {
+    flex: 1 1 100%;
+    order: 2;
+    justify-content: flex-start;
+  }
+  #course-header-container {
+    flex: 1 1 auto;
+  }
+  #course-header-container .select {
+    width: 100%;
+    max-width: 100%;
+  }
+  /* Row 3: breadcrumbs full width */
+  .site-header [aria-label="Breadcrumb"] {
+    flex: 1 1 100%;
+    order: 3;
+    justify-content: flex-start;
+  }
+}
+
+/* ── Main content offset below sticky header ── */
+#main { padding-top: 110px; }
+@media (max-width: 767px) { #main { padding-top: 140px; } }
+
+
+/* ── Subject page: target-grade responsive grid ── */
+.target-grade-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  gap: 1rem;
+}
+@media (min-width: 640px) {
+  .target-grade-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .target-grade-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

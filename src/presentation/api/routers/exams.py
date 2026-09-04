@@ -4,9 +4,9 @@ from __future__ import annotations
 from typing import List, Optional, Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
-from sqlmodel import Session, select
+from sqlmodel import col, Session, select
 
-from src.infrastructure.db.models import Examination, Assignment
+from src.infrastructure.db.models import Examination, Assignment, Subject, Semester
 from src.presentation.api.schemas import ExaminationCreate, ExaminationRead
 from src.presentation.api.deps import get_session
 
@@ -14,6 +14,7 @@ router = APIRouter()
 @router.get("/", response_model=List[ExaminationRead])
 def list_exams(
     session: Session = Depends(get_session),
+    subject_id: Optional[int] = None,
     subject_code: Optional[str] = None,
     semester_name: Optional[str] = None,
     year: Optional[str] = None,
@@ -29,14 +30,26 @@ def list_exams(
     Returns:
         Sequence[Examination]: List of examinations.
     """
-    stmt = select(Examination)
-    if subject_code:
-        stmt = stmt.where(Examination.subject_code == subject_code)
-    if semester_name:
-        stmt = stmt.where(Examination.semester_name == semester_name)
-    if year:
-        stmt = stmt.where(Examination.year == year)
-    return session.exec(stmt).all()
+    # Prefer normalized filtering when subject_id provided
+    if subject_id is not None:
+        # Optionally filter by exam_type if provided in query params (future extension)
+        return session.exec(select(Examination).where(Examination.subject_id == subject_id)).all()
+    # Legacy: composite provided
+    if subject_code and semester_name and year:
+        subj = session.exec(
+            select(Subject)
+            .join(Semester)
+            .where(
+                Subject.subject_code == subject_code,
+                Semester.name == semester_name,
+                Semester.year == int(year),
+            )
+        ).first()
+        sid = getattr(subj, "id", None)
+        if sid is not None:
+            return session.exec(select(Examination).where(Examination.subject_id == sid)).all()
+    # Without all three parameters, return all exams
+    return session.exec(select(Examination)).all()
 
 
 @router.post("/", response_model=ExaminationRead, status_code=status.HTTP_201_CREATED)
@@ -54,24 +67,43 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
     Returns:
         Examination: The created examination.
     """
-    existing = session.exec(
-        select(Examination).where(
-            Examination.subject_code == data.subject_code,
-            Examination.semester_name == data.semester_name,
-            Examination.year == data.year,
-        )
-    ).first()
-    if existing:
-        raise HTTPException(status_code=409, detail="Exam already exists for subject")
+    # Resolve subject_id, enforce one-exam-per-subject
+    sid = getattr(data, "subject_id", None)
+    if sid is None:
+        # Legacy resolution requires all fields
+        if data.subject_code is None or data.semester_name is None or data.year is None:
+            raise HTTPException(
+                status_code=400,
+                detail="subject_id or (subject_code, semester_name, year) is required",
+            )
+        subj = session.exec(
+            select(Subject)
+            .join(Semester)
+            .where(
+                Subject.subject_code == data.subject_code,
+                Semester.name == data.semester_name,
+                Semester.year == int(data.year),
+            )
+        ).first()
+        sid = getattr(subj, "id", None)
+        if sid is None:
+            raise HTTPException(status_code=404, detail="subject not found")
+    # Allow multiple exams per subject, but only one per type (optional: enforce uniqueness per (subject_id, exam_type))
+    if data.exam_type:
+        existing = session.exec(select(Examination).where(
+            (Examination.subject_id == sid) & (Examination.exam_type == data.exam_type)
+        )).first()
+        if existing:
+            raise HTTPException(status_code=409, detail=f"Exam of type '{data.exam_type}' already exists for subject")
+    else:
+        existing = None
 
     # infer exam_weight if needed from remaining weight after assignments
     if not data.exam_weight:
         assignments = session.exec(
             select(Assignment).where(
-                Assignment.subject_code == data.subject_code,
-                Assignment.semester_name == data.semester_name,
-                Assignment.year == data.year,
-            ).order_by(Assignment.assessment)
+                Assignment.subject_id == sid
+            ).order_by(col(Assignment.id))
         ).all()
         used = 0.0
         for a in assignments:
@@ -84,6 +116,10 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
 
     # Exclude None values so SQLModel will use the model defaults for non-optional fields
     payload = data.model_dump(exclude_none=True, exclude={"id"})
+    payload["subject_id"] = sid
+    # Ensure exam_type is set
+    if "exam_type" not in payload or not payload["exam_type"]:
+        payload["exam_type"] = "main"
     exam = Examination(**payload)
     session.add(exam)
     session.commit()
@@ -91,34 +127,64 @@ def create_exam(data: ExaminationCreate, session: Session = Depends(get_session)
     return exam
 
 
-@router.get("/{subject_code}/{semester_name}/{year}", response_model=ExaminationRead)
+@router.get("/{year}/{subject_code}/{semester_name}", response_model=ExaminationRead)
 def get_exam(
+    year: str,
     subject_code: str,
     semester_name: str,
-    year: str,
     session: Session = Depends(get_session),
 ) -> Examination:
     """
     Retrieve an examination by its composite primary key (subject_code, semester_name, year).
     """
-    exam = session.get(Examination, (subject_code, semester_name, year))
+    # Prefer normalized lookup by subject_id; fallback to composite if not found
+    subj = session.exec(
+        select(Subject)
+        .join(Semester)
+        .where(
+            Subject.subject_code == subject_code,
+            Semester.name == semester_name,
+            Semester.year == int(year),
+        )
+    ).first()
+    sid = getattr(subj, "id", None)
+    exam = None
+    if sid is not None:
+        exam = session.exec(select(Examination).where(Examination.subject_id == sid)).first()
+    if not exam:
+        exam = session.get(Examination, (subject_code, semester_name, year))
     if not exam:
         raise HTTPException(status_code=404, detail="Not found")
     return exam
 
 
-@router.put("/{subject_code}/{semester_name}/{year}", response_model=ExaminationRead)
+@router.put("/{year}/{subject_code}/{semester_name}", response_model=ExaminationRead)
 def update_exam(
+    year: str,
     subject_code: str,
     semester_name: str,
-    year: str,
     data: ExaminationCreate,
     session: Session = Depends(get_session),
 ) -> Examination:
     """
     Update an existing examination's details identified by its composite primary key.
     """
-    exam = session.get(Examination, (subject_code, semester_name, year))
+    # Prefer normalized lookup by subject_id; fallback to composite if not found
+    subj = session.exec(
+        select(Subject)
+        .join(Semester)
+        .where(
+            Subject.subject_code == subject_code,
+            Semester.name == semester_name,
+            Semester.year == int(year),
+        )
+    ).first()
+    sid = getattr(subj, "id", None)
+    exam = None
+    if sid is not None:
+        exam = session.exec(select(Examination).where(Examination.subject_id == sid)).first()
+    if not exam:
+        exam = session.get(Examination, (subject_code, semester_name, year))
     if not exam:
         raise HTTPException(status_code=404, detail="Not found")
     # Only assign exam_mark if the client provided a value (it may be optional in the schema)
@@ -132,11 +198,11 @@ def update_exam(
     return exam
 
 
-@router.delete("/{subject_code}/{semester_name}/{year}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+@router.delete("/{year}/{subject_code}/{semester_name}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 def delete_exam(
+    year: str,
     subject_code: str,
     semester_name: str,
-    year: str,
     session: Session = Depends(get_session),
 ) -> Response:
     """

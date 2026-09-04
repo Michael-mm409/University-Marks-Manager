@@ -1,0 +1,24 @@
+
+# Labels for quick triage (refined set)
+- name: bug
+  color: d73a4a
+- name: enhancement
+  color: a2eeef
+- name: chore
+  color: 9e9e9e
+- name: docs
+  color: 0075ca
+- name: test
+  color: 5319e7
+- name: perf
+  color: f9d0c4
+- name: refactor
+  color: cfd3d7
+- name: ci
+  color: 006b75
+- name: help wanted
+  color: 008672
+- name: good first issue
+  color: 7057ff
+- name: discussion
+  color: fbca04

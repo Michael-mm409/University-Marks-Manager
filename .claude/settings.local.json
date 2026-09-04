@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /home/Michael/Marks-Manager status)",
+      "Bash(git -C /home/Michael/Marks-Manager diff --stat HEAD)",
+      "Bash(git -C /home/Michael/Marks-Manager add src/static/css/style.css)",
+      "Bash(git -C /home/Michael/Marks-Manager commit -m ' *)",
+      "Bash(git -C /home/Michael/Marks-Manager add src/infrastructure/db/models.py requirements.txt docker-compose.yml)",
+      "Bash(python3 -m mypy src/ --ignore-missing-imports --no-error-summary)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git *)",
+      "Bash(/home/Michael/miniconda3/bin/python *)"
+    ]
+  }
+}

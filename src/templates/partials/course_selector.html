@@ -1,0 +1,11 @@
+<div class="p-2 rounded-md bg-base-100 border border-base-200 flex items-center gap-3">
+  <div class="text-sm opacity-70">Select Active Course</div>
+  <!-- Use HTMX on the select itself to post on change; avoids relying on native form.submit() -->
+  <select name="course_key" class="select select-md"
+    hx-post="/courses/select-inline" hx-target="#course-header-container" hx-swap="outerHTML" hx-trigger="change">
+    {% for c in courses %}
+      <option value="{{ c.code or c.id }}" {% if current_course_id and (c.id == current_course_id) %}selected{% endif %}>{{ c.name }}{% if c.code %} ({{ c.code }}){% endif %}</option>
+    {% endfor %}
+  </select>
+  <div id="course-select-alert"></div>
+</div>
