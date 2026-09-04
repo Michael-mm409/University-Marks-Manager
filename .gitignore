@@ -24,3 +24,4 @@ db/build/
 assets/@eaDir/
 /CommandsThumbs.db
 **/Thumbs.db
+Commands/
