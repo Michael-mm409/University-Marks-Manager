@@ -22,4 +22,4 @@ __pycache__/
 db/data/
 db/build/
 assets/@eaDir/
-/Commands
+/CommandsThumbs.db
