@@ -25,3 +25,6 @@ assets/@eaDir/
 /CommandsThumbs.db
 **/Thumbs.db
 Commands/
+query_db.py
+debug_db.py
+check.py
