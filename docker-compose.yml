@@ -24,11 +24,16 @@ services:
     env_file:
       - .env
     environment:
-          - PYTHONUNBUFFERED=1
-          - LOG_FILTER_HEALTHCHECK=true
-          - SECRET_PEPPER=${SECRET_PEPPER}
-          - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
-          - FORWARDED_ALLOW_IPS=*
+      - PYTHONUNBUFFERED=1
+      - LOG_FILTER_HEALTHCHECK=true
+      - SECRET_PEPPER=${SECRET_PEPPER}
+      - SESSION_SECRET_KEY=${SESSION_SECRET_KEY}
+      - FORWARDED_ALLOW_IPS=*
+      - DB_USER=Michael
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DB_HOST=host.containers.internal
+      - DB_PORT=5432
+      - DB_NAME=marks-manager-db
     volumes:
       - ./:/app:Z
     healthcheck:

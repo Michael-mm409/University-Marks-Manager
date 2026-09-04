@@ -29,3 +29,12 @@ query_db.py
 debug_db.py
 check.py
 .venv/
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Database dumps & local artifacts
+*.sql
+*.dump
